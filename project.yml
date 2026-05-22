@@ -49,6 +49,8 @@ targets:
         buildPhase: resources
       - path: Tests/StatsAppTests/Fixtures/github-response.json
         buildPhase: resources
+      - path: Tests/StatsAppTests/Fixtures/ccusage-codex-daily.json
+        buildPhase: resources
     dependencies:
       - target: StatsApp
     settings:

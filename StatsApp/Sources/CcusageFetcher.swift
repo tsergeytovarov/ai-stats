@@ -2,25 +2,42 @@ import Foundation
 
 enum CcusageParser {
     static func parse(_ data: Data, source: String, now: () -> Date) throws -> [AIUsageRow] {
-        let report = try JSONDecoder().decode(CcusageReport.self, from: data)
         let isoFormatter = ISO8601DateFormatter()
         isoFormatter.formatOptions = [.withInternetDateTime]
         let nowString = isoFormatter.string(from: now())
+        let encoder = JSONEncoder()
 
-        return report.data.map { day in
-            let models = day.models
-            let modelsJson = (try? String(data: JSONEncoder().encode(models), encoding: .utf8)) ?? "[]"
-
-            return AIUsageRow(
-                id: nil,
-                day: day.date,
-                source: source,
-                modelsJson: modelsJson,
-                inputTokens: day.inputTokens + day.cacheCreationTokens + day.cacheReadTokens,
-                outputTokens: day.outputTokens,
-                costUsd: day.costUSD,
-                updatedAt: nowString
-            )
+        switch source {
+        case "codex":
+            let report = try JSONDecoder().decode(CcusageCodexReport.self, from: data)
+            return report.daily.map { day in
+                let modelsJson = (try? String(data: encoder.encode(day.modelNames), encoding: .utf8)) ?? "[]"
+                return AIUsageRow(
+                    id: nil,
+                    day: day.date,
+                    source: source,
+                    modelsJson: modelsJson,
+                    inputTokens: day.inputTokens + day.cachedInputTokens,
+                    outputTokens: day.outputTokens,
+                    costUsd: day.costUSD,
+                    updatedAt: nowString
+                )
+            }
+        default: // claude и любой другой провайдер, который пользуется claude-подобной схемой
+            let report = try JSONDecoder().decode(CcusageClaudeReport.self, from: data)
+            return report.daily.map { day in
+                let modelsJson = (try? String(data: encoder.encode(day.modelsUsed), encoding: .utf8)) ?? "[]"
+                return AIUsageRow(
+                    id: nil,
+                    day: day.date,
+                    source: source,
+                    modelsJson: modelsJson,
+                    inputTokens: day.inputTokens + day.cacheCreationTokens + day.cacheReadTokens,
+                    outputTokens: day.outputTokens,
+                    costUsd: day.totalCost,
+                    updatedAt: nowString
+                )
+            }
         }
     }
 }

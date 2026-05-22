@@ -1,30 +1,31 @@
 {
-  "type": "daily",
-  "data": [
+  "daily": [
     {
       "date": "2024-05-20",
-      "models": ["claude-opus-4-7", "claude-sonnet-4-6"],
+      "modelsUsed": ["claude-opus-4-7", "claude-sonnet-4-6"],
+      "modelBreakdowns": [],
       "inputTokens": 12000,
       "outputTokens": 3400,
       "cacheCreationTokens": 800,
       "cacheReadTokens": 5000,
       "totalTokens": 21200,
-      "costUSD": 1.42
+      "totalCost": 1.42
     },
     {
       "date": "2024-05-21",
-      "models": ["claude-opus-4-7"],
+      "modelsUsed": ["claude-opus-4-7"],
+      "modelBreakdowns": [],
       "inputTokens": 8000,
       "outputTokens": 1500,
       "cacheCreationTokens": 0,
       "cacheReadTokens": 2000,
       "totalTokens": 11500,
-      "costUSD": 0.95
+      "totalCost": 0.95
     }
   ],
-  "summary": {
-    "totalInputTokens": 20000,
-    "totalOutputTokens": 4900,
-    "totalCostUSD": 2.37
+  "totals": {
+    "inputTokens": 20000,
+    "outputTokens": 4900,
+    "totalCost": 2.37
   }
 }
