@@ -78,17 +78,15 @@ enum StatsQueries {
         return GitHubTotals(totalCommits: row["c"], uniqueRepos: row["r"])
     }
 
-    /// Суммирует LOC по неделям, которые покрывают переданные дни.
+    /// Суммирует LOC по дням напрямую из github_loc_daily.
     static func githubLOC(in db: GRDB.Database, days: [String]) throws -> GitHubLOC {
         guard !days.isEmpty else { return GitHubLOC(additions: 0, deletions: 0) }
-        let weekStarts = Set(days.compactMap { DateUtils.weekStart(forISODay: $0) })
-        guard !weekStarts.isEmpty else { return GitHubLOC(additions: 0, deletions: 0) }
-        let placeholders = weekStarts.map { _ in "?" }.joined(separator: ",")
+        let placeholders = days.map { _ in "?" }.joined(separator: ",")
         let sql = """
             SELECT COALESCE(SUM(additions), 0) AS a, COALESCE(SUM(deletions), 0) AS d
-            FROM github_loc_weekly WHERE week_start IN (\(placeholders))
+            FROM github_loc_daily WHERE day IN (\(placeholders))
         """
-        let row = try Row.fetchOne(db, sql: sql, arguments: StatementArguments(Array(weekStarts)))!
+        let row = try Row.fetchOne(db, sql: sql, arguments: StatementArguments(days))!
         return GitHubLOC(additions: row["a"], deletions: row["d"])
     }
 

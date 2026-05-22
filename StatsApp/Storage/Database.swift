@@ -83,6 +83,21 @@ enum Database {
             try db.execute(sql: "CREATE INDEX idx_ai_usage_model_day ON ai_usage_model(day)")
             try db.execute(sql: "CREATE INDEX idx_ai_usage_model_model ON ai_usage_model(model)")
         }
+        migrator.registerMigration("v4_replace_loc_weekly_with_daily") { db in
+            try db.execute(sql: "DROP TABLE IF EXISTS github_loc_weekly")
+            try db.execute(sql: """
+                CREATE TABLE github_loc_daily (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    day TEXT NOT NULL,
+                    repo TEXT NOT NULL,
+                    additions INTEGER NOT NULL,
+                    deletions INTEGER NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(day, repo)
+                )
+            """)
+            try db.execute(sql: "CREATE INDEX idx_github_loc_daily_day ON github_loc_daily(day)")
+        }
         try migrator.migrate(writer)
     }
 

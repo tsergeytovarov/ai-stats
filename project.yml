@@ -53,7 +53,7 @@ targets:
         buildPhase: resources
       - path: Tests/StatsAppTests/Fixtures/ccusage-codex-daily.json
         buildPhase: resources
-      - path: Tests/StatsAppTests/Fixtures/github-contributor-stats.json
+      - path: Tests/StatsAppTests/Fixtures/github-commit-history.json
         buildPhase: resources
     dependencies:
       - target: StatsApp

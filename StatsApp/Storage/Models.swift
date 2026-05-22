@@ -62,11 +62,11 @@ struct GitHubRow: Codable, FetchableRecord, PersistableRecord, Equatable {
     }
 }
 
-struct GitHubLOCWeeklyRow: Codable, FetchableRecord, PersistableRecord, Equatable {
-    static let databaseTableName = "github_loc_weekly"
+struct GitHubLOCDailyRow: Codable, FetchableRecord, PersistableRecord, Equatable {
+    static let databaseTableName = "github_loc_daily"
 
     var id: Int64?
-    var weekStart: String
+    var day: String
     var repo: String
     var additions: Int64
     var deletions: Int64
@@ -74,7 +74,7 @@ struct GitHubLOCWeeklyRow: Codable, FetchableRecord, PersistableRecord, Equatabl
 
     enum Columns {
         static let id = Column("id")
-        static let weekStart = Column("week_start")
+        static let day = Column("day")
         static let repo = Column("repo")
         static let additions = Column("additions")
         static let deletions = Column("deletions")
@@ -83,7 +83,7 @@ struct GitHubLOCWeeklyRow: Codable, FetchableRecord, PersistableRecord, Equatabl
 
     enum CodingKeys: String, CodingKey {
         case id
-        case weekStart = "week_start"
+        case day
         case repo
         case additions
         case deletions

@@ -1,0 +1,18 @@
+{
+  "data": {
+    "repository": {
+      "defaultBranchRef": {
+        "target": {
+          "history": {
+            "pageInfo": { "hasNextPage": false, "endCursor": null },
+            "nodes": [
+              { "committedDate": "2024-05-20T10:00:00Z", "additions": 50, "deletions": 10 },
+              { "committedDate": "2024-05-20T15:30:00Z", "additions": 20, "deletions": 5 },
+              { "committedDate": "2024-05-21T09:00:00Z", "additions": 100, "deletions": 0 }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

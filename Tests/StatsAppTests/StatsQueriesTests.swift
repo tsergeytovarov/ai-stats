@@ -66,20 +66,18 @@ final class StatsQueriesTests: XCTestCase {
 
     private func seedLOC() throws {
         try dbq.write { db in
-            // Week of 2024-05-19 (Sunday)
-            var r1 = GitHubLOCWeeklyRow(id: nil, weekStart: "2024-05-19", repo: "popovs/x", additions: 120, deletions: 30, updatedAt: "now")
+            var r1 = GitHubLOCDailyRow(id: nil, day: "2024-05-22", repo: "popovs/x", additions: 120, deletions: 30, updatedAt: "now")
             try r1.insert(db)
-            var r2 = GitHubLOCWeeklyRow(id: nil, weekStart: "2024-05-19", repo: "popovs/y", additions: 50, deletions: 10, updatedAt: "now")
+            var r2 = GitHubLOCDailyRow(id: nil, day: "2024-05-22", repo: "popovs/y", additions: 50, deletions: 10, updatedAt: "now")
             try r2.insert(db)
-            // Week of 2024-05-26
-            var r3 = GitHubLOCWeeklyRow(id: nil, weekStart: "2024-05-26", repo: "popovs/x", additions: 200, deletions: 80, updatedAt: "now")
+            var r3 = GitHubLOCDailyRow(id: nil, day: "2024-05-28", repo: "popovs/x", additions: 200, deletions: 80, updatedAt: "now")
             try r3.insert(db)
         }
     }
 
-    func test_githubLOC_sums_weeks_covering_days() throws {
+    func test_githubLOC_sums_days_directly() throws {
         try seedLOC()
-        // 2024-05-22 (Wed) → week start 2024-05-19 → additions 120+50=170, deletions 30+10=40
+        // 2024-05-22 → x:120+y:50=170 additions, 30+10=40 deletions
         let loc = try dbq.read { db in
             try StatsQueries.githubLOC(in: db, days: ["2024-05-22"])
         }
@@ -87,9 +85,8 @@ final class StatsQueriesTests: XCTestCase {
         XCTAssertEqual(loc.deletions, 40)
     }
 
-    func test_githubLOC_spans_two_weeks() throws {
+    func test_githubLOC_spans_two_days() throws {
         try seedLOC()
-        // 2024-05-22 → week 2024-05-19; 2024-05-28 (Tue) → week 2024-05-26
         let loc = try dbq.read { db in
             try StatsQueries.githubLOC(in: db, days: ["2024-05-22", "2024-05-28"])
         }
@@ -108,7 +105,6 @@ final class StatsQueriesTests: XCTestCase {
 
     func test_githubLOC_no_data_for_days_returns_zeros() throws {
         try seedLOC()
-        // 2024-01-01 → week 2023-12-31 — no data
         let loc = try dbq.read { db in
             try StatsQueries.githubLOC(in: db, days: ["2024-01-01"])
         }

@@ -58,29 +58,4 @@ final class DateUtilsTests: XCTestCase {
         XCTAssertEqual(days.last, DateUtils.isoDayLocal(end))
     }
 
-    // MARK: - weekStart
-
-    func test_weekStart_wednesday_returns_sunday() {
-        // 2024-05-22 is a Wednesday; its Sunday is 2024-05-19
-        XCTAssertEqual(DateUtils.weekStart(forISODay: "2024-05-22"), "2024-05-19")
-    }
-
-    func test_weekStart_already_sunday_returns_same() {
-        // 2024-05-19 is a Sunday
-        XCTAssertEqual(DateUtils.weekStart(forISODay: "2024-05-19"), "2024-05-19")
-    }
-
-    func test_weekStart_monday_returns_previous_sunday() {
-        // 2024-05-20 is a Monday; its Sunday is 2024-05-19
-        XCTAssertEqual(DateUtils.weekStart(forISODay: "2024-05-20"), "2024-05-19")
-    }
-
-    func test_weekStart_saturday_returns_sunday_of_same_week() {
-        // 2024-05-25 is a Saturday; its Sunday is 2024-05-19
-        XCTAssertEqual(DateUtils.weekStart(forISODay: "2024-05-25"), "2024-05-19")
-    }
-
-    func test_weekStart_invalid_string_returns_nil() {
-        XCTAssertNil(DateUtils.weekStart(forISODay: "not-a-date"))
-    }
 }

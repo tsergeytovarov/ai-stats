@@ -6,7 +6,7 @@ protocol Fetcher {
 
 struct GitHubFetchPayload {
     let dailyCommits: [GitHubRow]
-    let weeklyLOC: [GitHubLOCWeeklyRow]
+    let dailyLOC: [GitHubLOCDailyRow]
 }
 
 struct CcusagePayload {

@@ -39,18 +39,31 @@ struct GitHubResponse: Decodable {
     }
 }
 
-struct GitHubContributorStats: Decodable {
-    let author: Author?
-    let weeks: [Week]
+struct ViewerIDResponse: Decodable {
+    let data: DataNode?
+    let errors: [GitHubResponse.GraphQLError]?
+    struct DataNode: Decodable { let viewer: Viewer }
+    struct Viewer: Decodable { let id: String }
+}
 
-    struct Author: Decodable {
-        let login: String
+struct CommitHistoryResponse: Decodable {
+    let data: DataNode?
+    let errors: [GitHubResponse.GraphQLError]?
+    struct DataNode: Decodable { let repository: Repository? }
+    struct Repository: Decodable { let defaultBranchRef: BranchRef? }
+    struct BranchRef: Decodable { let target: CommitTarget? }
+    struct CommitTarget: Decodable { let history: History? }
+    struct History: Decodable {
+        let pageInfo: PageInfo
+        let nodes: [Node]
     }
-
-    struct Week: Decodable {
-        let w: Int64  // unix seconds (Sunday 00:00 UTC)
-        let a: Int64  // additions
-        let d: Int64  // deletions
-        let c: Int64  // commits
+    struct PageInfo: Decodable {
+        let hasNextPage: Bool
+        let endCursor: String?
+    }
+    struct Node: Decodable {
+        let committedDate: String
+        let additions: Int64
+        let deletions: Int64
     }
 }

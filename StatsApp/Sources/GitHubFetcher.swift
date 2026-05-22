@@ -45,39 +45,17 @@ enum GitHubResponseParser {
         return rows
     }
 
-    /// Парсит ответ /repos/.../stats/contributors, фильтрует по логину, возвращает LOC-строки.
-    static func parseLOCStats(
-        _ data: Data,
-        repo: String,
-        login: String,
-        now: () -> Date
-    ) throws -> [GitHubLOCWeeklyRow] {
-        let allStats: [GitHubContributorStats]
-        do { allStats = try JSONDecoder().decode([GitHubContributorStats].self, from: data) }
-        catch { throw GitHubError.decoding(error) }
-
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        let nowString = isoFormatter.string(from: now())
-
-        guard let mine = allStats.first(where: { $0.author?.login.lowercased() == login.lowercased() }) else {
-            return []
+    /// Агрегирует nodes истории коммитов по дням.
+    static func aggregateCommitsByDay(_ nodes: [CommitHistoryResponse.Node]) -> [(day: String, add: Int64, del: Int64)] {
+        var perDay: [String: (add: Int64, del: Int64)] = [:]
+        for node in nodes {
+            let day = String(node.committedDate.prefix(10))
+            var t = perDay[day] ?? (0, 0)
+            t.add += node.additions
+            t.del += node.deletions
+            perDay[day] = t
         }
-
-        var rows: [GitHubLOCWeeklyRow] = []
-        for week in mine.weeks where week.a > 0 || week.d > 0 {
-            let sunday = Date(timeIntervalSince1970: Double(week.w))
-            let weekStart = DateUtils.isoDay(sunday)
-            rows.append(GitHubLOCWeeklyRow(
-                id: nil,
-                weekStart: weekStart,
-                repo: repo,
-                additions: week.a,
-                deletions: week.d,
-                updatedAt: nowString
-            ))
-        }
-        return rows
+        return perDay.map { (day: $0.key, add: $0.value.add, del: $0.value.del) }
     }
 }
 
@@ -95,6 +73,16 @@ struct GitHubFetcher: Fetcher {
     }
 
     func fetch(since: Date) async throws -> FetchResult {
+        let commitRows = try await fetchCommits(since: since)
+        let viewerId = try await fetchViewerID()
+        let repos = Array(Set(commitRows.map(\.repo)))
+        let locRows = await fetchLOCForRepos(repos, viewerId: viewerId, since: since)
+        return .github(GitHubFetchPayload(dailyCommits: commitRows, dailyLOC: locRows))
+    }
+
+    // MARK: - Commits (existing contributionsCollection GraphQL)
+
+    private func fetchCommits(since: Date) async throws -> [GitHubRow] {
         let isoFormatter = ISO8601DateFormatter()
         isoFormatter.formatOptions = [.withInternetDateTime]
         let from = isoFormatter.string(from: since)
@@ -115,14 +103,125 @@ struct GitHubFetcher: Fetcher {
         }
         """
 
-        let body: [String: Any] = ["query": query, "variables": ["from": from, "to": to]]
+        let data = try await graphqlPost(query: query, variables: ["from": from, "to": to])
+        return try GitHubResponseParser.parse(data, now: now)
+    }
+
+    // MARK: - Viewer ID
+
+    private func fetchViewerID() async throws -> String {
+        let query = "query { viewer { id } }"
+        let data = try await graphqlPost(query: query, variables: [:])
+        let decoded: ViewerIDResponse
+        do { decoded = try JSONDecoder().decode(ViewerIDResponse.self, from: data) }
+        catch { throw GitHubError.decoding(error) }
+        if let errs = decoded.errors, !errs.isEmpty {
+            throw GitHubError.graphqlErrors(errs.map(\.message))
+        }
+        guard let id = decoded.data?.viewer.id else {
+            throw GitHubError.httpStatus(-1, body: "no viewer id")
+        }
+        return id
+    }
+
+    // MARK: - LOC via commit history
+
+    private func fetchLOCForRepos(_ repos: [String], viewerId: String, since: Date) async -> [GitHubLOCDailyRow] {
+        var all: [GitHubLOCDailyRow] = []
+        let batchSize = 5
+        var idx = 0
+        while idx < repos.count {
+            let batch = Array(repos[idx..<min(idx + batchSize, repos.count)])
+            let batchResults = await withTaskGroup(of: [GitHubLOCDailyRow].self) { group in
+                for repo in batch {
+                    group.addTask {
+                        do {
+                            return try await self.fetchLOCForRepo(repo, viewerId: viewerId, since: since)
+                        } catch {
+                            NSLog("ai-stats LOC fetch error [\(repo)]: \(error)")
+                            return []
+                        }
+                    }
+                }
+                var results: [GitHubLOCDailyRow] = []
+                for await r in group { results.append(contentsOf: r) }
+                return results
+            }
+            all.append(contentsOf: batchResults)
+            idx += batchSize
+        }
+        return all
+    }
+
+    private func fetchLOCForRepo(_ repo: String, viewerId: String, since: Date) async throws -> [GitHubLOCDailyRow] {
+        let parts = repo.split(separator: "/")
+        guard parts.count == 2 else { return [] }
+        let owner = String(parts[0])
+        let name = String(parts[1])
+
+        let isoFormatter = ISO8601DateFormatter()
+        isoFormatter.formatOptions = [.withInternetDateTime]
+        let sinceStr = isoFormatter.string(from: since)
+        let nowString = isoFormatter.string(from: now())
+
+        let query = """
+        query($owner: String!, $name: String!, $author: ID!, $since: GitTimestamp!, $cursor: String) {
+          repository(owner: $owner, name: $name) {
+            defaultBranchRef {
+              target {
+                ... on Commit {
+                  history(first: 100, author: { id: $author }, since: $since, after: $cursor) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes { committedDate additions deletions }
+                  }
+                }
+              }
+            }
+          }
+        }
+        """
+
+        var cursor: String? = nil
+        var allNodes: [CommitHistoryResponse.Node] = []
+
+        repeat {
+            var vars: [String: Any] = [
+                "owner": owner, "name": name, "author": viewerId, "since": sinceStr
+            ]
+            if let c = cursor { vars["cursor"] = c }
+
+            let data = try await graphqlPost(query: query, variables: vars)
+            let decoded: CommitHistoryResponse
+            do { decoded = try JSONDecoder().decode(CommitHistoryResponse.self, from: data) }
+            catch { throw GitHubError.decoding(error) }
+
+            if let errs = decoded.errors, !errs.isEmpty {
+                // 404 / deleted repo etc — skip silently
+                NSLog("ai-stats LOC [\(repo)] graphql errors: \(errs.map(\.message).joined(separator: "; "))")
+                return []
+            }
+            guard let history = decoded.data?.repository?.defaultBranchRef?.target?.history else {
+                return []  // no default branch or no history
+            }
+            allNodes.append(contentsOf: history.nodes)
+            cursor = history.pageInfo.hasNextPage ? history.pageInfo.endCursor : nil
+        } while cursor != nil
+
+        return GitHubResponseParser.aggregateCommitsByDay(allNodes).map { day, add, del in
+            GitHubLOCDailyRow(id: nil, day: day, repo: repo, additions: add, deletions: del, updatedAt: nowString)
+        }
+    }
+
+    // MARK: - HTTP
+
+    private func graphqlPost(query: String, variables: [String: Any]) async throws -> Data {
+        let body: [String: Any] = ["query": query, "variables": variables]
         var request = URLRequest(url: URL(string: "https://api.github.com/graphql")!)
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("ai-stats/0.1", forHTTPHeaderField: "User-Agent")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse else {
             throw GitHubError.httpStatus(-1, body: "no http response")
@@ -131,90 +230,6 @@ struct GitHubFetcher: Fetcher {
             let bodyStr = String(data: data, encoding: .utf8) ?? ""
             throw GitHubError.httpStatus(http.statusCode, body: bodyStr)
         }
-        let commitRows = try GitHubResponseParser.parse(data, now: now)
-
-        // Collect unique repos from commit response
-        let repos = Array(Set(commitRows.map(\.repo)))
-        let locRows = await fetchLOCForRepos(repos)
-
-        return .github(GitHubFetchPayload(dailyCommits: commitRows, weeklyLOC: locRows))
-    }
-
-    // Fetches LOC stats for all repos, up to 5 concurrently. Skips repos that stay at 202.
-    private func fetchLOCForRepos(_ repos: [String]) async -> [GitHubLOCWeeklyRow] {
-        var allRows: [GitHubLOCWeeklyRow] = []
-        // Process in batches of 5 to limit concurrency
-        let batchSize = 5
-        var index = 0
-        while index < repos.count {
-            let batch = Array(repos[index..<min(index + batchSize, repos.count)])
-            let batchResults = await withTaskGroup(of: [GitHubLOCWeeklyRow].self) { group in
-                for repo in batch {
-                    group.addTask {
-                        do {
-                            return try await self.fetchLOCForRepo(repo)
-                        } catch {
-                            NSLog("ai-stats LOC fetch error [\(repo)]: \(error)")
-                            return []
-                        }
-                    }
-                }
-                var results: [GitHubLOCWeeklyRow] = []
-                for await rows in group { results.append(contentsOf: rows) }
-                return results
-            }
-            allRows.append(contentsOf: batchResults)
-            index += batchSize
-        }
-        return allRows
-    }
-
-    private func fetchLOCForRepo(_ repo: String) async throws -> [GitHubLOCWeeklyRow] {
-        let url = URL(string: "https://api.github.com/repos/\(repo)/stats/contributors")!
-        var request = URLRequest(url: url)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("ai-stats/0.1", forHTTPHeaderField: "User-Agent")
-
-        // GitHub считает stats асинхронно. Первый запрос на «холодный» репо обычно
-        // возвращает 202 и инициирует фоновое вычисление, которое занимает 5-30 секунд.
-        // Делаем экспоненциальный бэкофф: 2, 4, 8, 16, 16 — до ~46с на репо.
-        let backoffSeconds: [UInt64] = [2, 4, 8, 16, 16]
-        for (attempt, wait) in backoffSeconds.enumerated() {
-            let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse else {
-                throw GitHubError.httpStatus(-1, body: "no http response")
-            }
-            if http.statusCode == 202 {
-                if attempt < backoffSeconds.count - 1 {
-                    try await Task.sleep(nanoseconds: wait * 1_000_000_000)
-                    continue
-                } else {
-                    NSLog("ai-stats LOC stats still 202 after retries for \(repo), skipping")
-                    return []
-                }
-            }
-            // 404 / 403 — репо удалён, перенесён или нет доступа. Скипаем тихо.
-            if http.statusCode == 404 || http.statusCode == 403 {
-                NSLog("ai-stats LOC stats \(http.statusCode) for \(repo), skipping")
-                return []
-            }
-            guard (200..<300).contains(http.statusCode) else {
-                let bodyStr = String(data: data, encoding: .utf8) ?? ""
-                throw GitHubError.httpStatus(http.statusCode, body: bodyStr)
-            }
-            // Пустой ответ "{}" вместо массива — GitHub иногда отдаёт его пока считает.
-            // Воспринимаем как 202: ждём и пробуем ещё раз.
-            if data.count < 5 {
-                if attempt < backoffSeconds.count - 1 {
-                    try await Task.sleep(nanoseconds: wait * 1_000_000_000)
-                    continue
-                }
-                NSLog("ai-stats LOC stats empty body for \(repo), skipping")
-                return []
-            }
-            return try GitHubResponseParser.parseLOCStats(data, repo: repo, login: login, now: now)
-        }
-        return []
+        return data
     }
 }
