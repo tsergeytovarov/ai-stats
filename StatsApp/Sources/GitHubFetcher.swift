@@ -176,24 +176,42 @@ struct GitHubFetcher: Fetcher {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("ai-stats/0.1", forHTTPHeaderField: "User-Agent")
 
-        let maxRetries = 3
-        for attempt in 0..<maxRetries {
+        // GitHub считает stats асинхронно. Первый запрос на «холодный» репо обычно
+        // возвращает 202 и инициирует фоновое вычисление, которое занимает 5-30 секунд.
+        // Делаем экспоненциальный бэкофф: 2, 4, 8, 16, 16 — до ~46с на репо.
+        let backoffSeconds: [UInt64] = [2, 4, 8, 16, 16]
+        for (attempt, wait) in backoffSeconds.enumerated() {
             let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse else {
                 throw GitHubError.httpStatus(-1, body: "no http response")
             }
             if http.statusCode == 202 {
-                if attempt < maxRetries - 1 {
-                    try await Task.sleep(nanoseconds: 1_000_000_000) // 1s
+                if attempt < backoffSeconds.count - 1 {
+                    try await Task.sleep(nanoseconds: wait * 1_000_000_000)
                     continue
                 } else {
                     NSLog("ai-stats LOC stats still 202 after retries for \(repo), skipping")
                     return []
                 }
             }
+            // 404 / 403 — репо удалён, перенесён или нет доступа. Скипаем тихо.
+            if http.statusCode == 404 || http.statusCode == 403 {
+                NSLog("ai-stats LOC stats \(http.statusCode) for \(repo), skipping")
+                return []
+            }
             guard (200..<300).contains(http.statusCode) else {
                 let bodyStr = String(data: data, encoding: .utf8) ?? ""
                 throw GitHubError.httpStatus(http.statusCode, body: bodyStr)
+            }
+            // Пустой ответ "{}" вместо массива — GitHub иногда отдаёт его пока считает.
+            // Воспринимаем как 202: ждём и пробуем ещё раз.
+            if data.count < 5 {
+                if attempt < backoffSeconds.count - 1 {
+                    try await Task.sleep(nanoseconds: wait * 1_000_000_000)
+                    continue
+                }
+                NSLog("ai-stats LOC stats empty body for \(repo), skipping")
+                return []
             }
             return try GitHubResponseParser.parseLOCStats(data, repo: repo, login: login, now: now)
         }
