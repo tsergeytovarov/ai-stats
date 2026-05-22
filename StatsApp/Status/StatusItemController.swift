@@ -52,7 +52,9 @@ final class StatusItemController: NSObject {
         if popover == nil {
             let pop = NSPopover()
             pop.behavior = .transient
-            pop.contentViewController = NSHostingController(rootView: DropdownView(
+            // Фиксируем appearance — без этого vibrancy material блекнет при потере фокуса.
+            pop.appearance = NSApp.effectiveAppearance
+            let hosting = NSHostingController(rootView: DropdownView(
                 viewModel: viewModel,
                 onRefresh: { [weak self] in self?.onRefresh() },
                 onOpenSettings: { [weak self] in
@@ -60,12 +62,15 @@ final class StatusItemController: NSObject {
                     self?.onOpenSettings()
                 }
             ))
+            pop.contentViewController = hosting
             popover = pop
         }
         guard let popover, let button = statusItem?.button else { return }
         if popover.isShown {
             popover.performClose(sender)
         } else {
+            // Активируем app чтобы popover не открывался в «inactive» состоянии.
+            NSApp.activate(ignoringOtherApps: true)
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             Task { @MainActor in
                 await viewModel.reload()

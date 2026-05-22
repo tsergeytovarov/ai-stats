@@ -6,6 +6,13 @@ struct DropdownView: View {
     let onOpenSettings: () -> Void
 
     var body: some View {
+        content
+            .padding(16)
+            .frame(width: 380)
+            .background(Color(nsColor: .windowBackgroundColor))
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 12) {
             Picker("", selection: $viewModel.period) {
                 ForEach(Period.allCases) { p in Text(p.titleKey).tag(p) }
@@ -95,8 +102,6 @@ struct DropdownView: View {
                 Button(action: onOpenSettings) { Image(systemName: "gearshape") }.buttonStyle(.borderless)
             }
         }
-        .padding(16)
-        .frame(width: 380)
     }
 
     private func formatTokens(_ count: Int64) -> String {
