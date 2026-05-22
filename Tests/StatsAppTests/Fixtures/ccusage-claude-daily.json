@@ -1,0 +1,30 @@
+{
+  "type": "daily",
+  "data": [
+    {
+      "date": "2024-05-20",
+      "models": ["claude-opus-4-7", "claude-sonnet-4-6"],
+      "inputTokens": 12000,
+      "outputTokens": 3400,
+      "cacheCreationTokens": 800,
+      "cacheReadTokens": 5000,
+      "totalTokens": 21200,
+      "costUSD": 1.42
+    },
+    {
+      "date": "2024-05-21",
+      "models": ["claude-opus-4-7"],
+      "inputTokens": 8000,
+      "outputTokens": 1500,
+      "cacheCreationTokens": 0,
+      "cacheReadTokens": 2000,
+      "totalTokens": 11500,
+      "costUSD": 0.95
+    }
+  ],
+  "summary": {
+    "totalInputTokens": 20000,
+    "totalOutputTokens": 4900,
+    "totalCostUSD": 2.37
+  }
+}

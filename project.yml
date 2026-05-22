@@ -43,6 +43,10 @@ targets:
     platform: macOS
     sources:
       - path: Tests/StatsAppTests
+        excludes:
+          - "Fixtures/**"
+      - path: Tests/StatsAppTests/Fixtures/ccusage-claude-daily.json
+        buildPhase: resources
     dependencies:
       - target: StatsApp
     settings:
