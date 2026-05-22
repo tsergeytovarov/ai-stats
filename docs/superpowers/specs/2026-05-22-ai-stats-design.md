@@ -46,11 +46,18 @@
 
 #### 3.3.1 AI usage — через ccusage
 
-`Process.run("bunx", ["-y", "ccusage@latest", "daily", "--json", "--since", "<ISO date>"])`.
+`Process.run("bunx", ["-y", "ccusage@latest", "<provider>", "daily", "--json", "--since", "YYYYMMDD"])`.
 
-- Окно sync — последние 7 дней.
-- Парсим JSON в структуру `CcusageDailyReport`, мапим на `ai_usage` строки.
-- ccusage отдаёт daily aggregates с разбивкой по модели и провайдеру (Claude Code, Codex, ...) — храним этот уровень детализации.
+- ccusage фильтрует по провайдеру через **subcommand**: `ccusage claude daily`, `ccusage codex daily` и т.д. Одного вызова на «все провайдеры с разбивкой» нет — делаем один вызов на каждого провайдера из списка `enabled_providers` в конфиге.
+- Окно sync — последние 7 дней (`--since YYYYMMDD`, без дефисов).
+- Парсим JSON. Структура:
+  ```
+  { "type": "daily", "data": [{ "date": "YYYY-MM-DD", "models": [...],
+    "inputTokens": N, "outputTokens": N, "cacheCreationTokens": N,
+    "cacheReadTokens": N, "totalTokens": N, "costUSD": N.NN }], "summary": {...} }
+  ```
+- Гранулярность хранения — **per (день, source)**, не per-модель. ccusage не отдаёт per-model breakdown в `daily`. Список моделей хранится как JSON массив в колонке `models`.
+- В наш `input_tokens` мапим `inputTokens + cacheCreationTokens + cacheReadTokens` (кэш биллится по input rate). В `output_tokens` — `outputTokens`.
 - **Требование к окружению:** установленный `bun` (или `node` + `npx`). Документируем в README. В v1.0 — либо бандлим, либо обнаруживаем при первом запуске и просим установить.
 
 #### 3.3.2 GitHub commits
@@ -106,15 +113,15 @@ query($from: DateTime!, $to: DateTime!) {
 
 ```sql
 CREATE TABLE ai_usage (
-  id           INTEGER PRIMARY KEY,
-  day          TEXT NOT NULL,           -- ISO YYYY-MM-DD
-  source       TEXT NOT NULL,           -- 'claude', 'codex', ...
-  model        TEXT NOT NULL,           -- 'claude-opus-4-7', ...
-  input_tokens INTEGER NOT NULL,
+  id            INTEGER PRIMARY KEY,
+  day           TEXT NOT NULL,           -- ISO YYYY-MM-DD
+  source        TEXT NOT NULL,           -- 'claude', 'codex', ...
+  models_json   TEXT NOT NULL,           -- JSON array: ["claude-opus-4-7", ...]
+  input_tokens  INTEGER NOT NULL,        -- includes cacheCreation + cacheRead
   output_tokens INTEGER NOT NULL,
-  cost_usd     REAL NOT NULL,
-  updated_at   TEXT NOT NULL,
-  UNIQUE(day, source, model)
+  cost_usd      REAL NOT NULL,
+  updated_at    TEXT NOT NULL,
+  UNIQUE(day, source)
 );
 CREATE INDEX idx_ai_usage_day ON ai_usage(day);
 
@@ -156,9 +163,12 @@ Single source of daily aggregate — ccusage. Никакого хранения 
   "github_token": "ghp_xxx",
   "github_login": "popovs",
   "sync_interval_minutes": 5,
-  "ccusage_command": ["bunx", "-y", "ccusage@latest"]
+  "ccusage_command": ["bunx", "-y", "ccusage@latest"],
+  "enabled_providers": ["claude", "codex"]
 }
 ```
+
+`enabled_providers` — список ccusage subcommand'ов которые мы будем дёргать. На v0.1 — `claude` и `codex`. Если у юзера появится OpenCode/Amp/etc — добавит руками в конфиг.
 
 Читается при старте app. Изменения требуют рестарта app в v0.1 (никакого file watcher).
 
