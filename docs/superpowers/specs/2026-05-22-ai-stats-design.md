@@ -163,7 +163,7 @@ Single source of daily aggregate — ccusage. Никакого хранения 
   "github_token": "ghp_xxx",
   "github_login": "popovs",
   "sync_interval_minutes": 5,
-  "ccusage_command": ["bunx", "-y", "ccusage@latest"],
+  "ccusage_command": ["npx", "-y", "ccusage@latest"],
   "enabled_providers": ["claude", "codex"]
 }
 ```
