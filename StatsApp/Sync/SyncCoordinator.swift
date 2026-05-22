@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import WidgetKit
 
 /// Управляет периодической синхронизацией. Single-flight per source.
 @MainActor
@@ -49,6 +50,7 @@ final class SyncCoordinator {
 
         try recordSyncState(source: source, error: capturedError)
         lastSyncAt[source] = now()
+        WidgetCenter.shared.reloadAllTimelines()
     }
 
     private func syncWindowStart(source: String) throws -> Date {
