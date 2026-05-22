@@ -1,0 +1,51 @@
+name: ai-stats
+options:
+  bundleIdPrefix: com.sergeytovarov
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    ENABLE_HARDENED_RUNTIME: YES
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "-"
+packages:
+  GRDB:
+    url: https://github.com/groue/GRDB.swift
+    from: "6.29.0"
+targets:
+  StatsApp:
+    type: application
+    platform: macOS
+    sources:
+      - path: StatsApp
+    dependencies:
+      - package: GRDB
+        product: GRDB
+    info:
+      path: StatsApp/Info.plist
+      properties:
+        LSUIElement: true
+        CFBundleDisplayName: ai-stats
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        NSHumanReadableCopyright: "Sergey Tovarov, MIT"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sergeytovarov.aistats
+        GENERATE_INFOPLIST_FILE: NO
+  StatsAppTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/StatsAppTests
+    dependencies:
+      - target: StatsApp
+    settings:
+      base:
+        BUNDLE_LOADER: "$(TEST_HOST)"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/StatsApp.app/Contents/MacOS/StatsApp"
+        GENERATE_INFOPLIST_FILE: YES

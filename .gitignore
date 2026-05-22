@@ -31,3 +31,6 @@ config.json
 *.db
 *.db-wal
 *.db-shm
+
+## Xcode-generated project
+ai-stats.xcodeproj/
