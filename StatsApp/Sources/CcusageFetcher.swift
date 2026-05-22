@@ -12,14 +12,16 @@ enum CcusageParser {
             let report = try JSONDecoder().decode(CcusageCodexReport.self, from: data)
             return report.daily.map { day in
                 let modelsJson = (try? String(data: encoder.encode(day.modelNames), encoding: .utf8)) ?? "[]"
+                let cost = computeCodexCost(day)
+                let reasoningOut = day.models?.values.reduce(0) { $0 + ($1.reasoningOutputTokens ?? 0) } ?? 0
                 return AIUsageRow(
                     id: nil,
                     day: day.date,
                     source: source,
                     modelsJson: modelsJson,
                     inputTokens: day.inputTokens + day.cachedInputTokens,
-                    outputTokens: day.outputTokens,
-                    costUsd: day.costUSD,
+                    outputTokens: day.outputTokens + reasoningOut,
+                    costUsd: cost,
                     updatedAt: nowString
                 )
             }
@@ -27,6 +29,7 @@ enum CcusageParser {
             let report = try JSONDecoder().decode(CcusageClaudeReport.self, from: data)
             return report.daily.map { day in
                 let modelsJson = (try? String(data: encoder.encode(day.modelsUsed), encoding: .utf8)) ?? "[]"
+                let cost = computeClaudeCost(day)
                 return AIUsageRow(
                     id: nil,
                     day: day.date,
@@ -34,10 +37,52 @@ enum CcusageParser {
                     modelsJson: modelsJson,
                     inputTokens: day.inputTokens + day.cacheCreationTokens + day.cacheReadTokens,
                     outputTokens: day.outputTokens,
-                    costUsd: day.totalCost,
+                    costUsd: cost,
                     updatedAt: nowString
                 )
             }
+        }
+    }
+
+    private static func computeClaudeCost(_ day: CcusageClaudeDay) -> Double {
+        // Если breakdown есть — суммируем точно по модели.
+        if let breakdowns = day.modelBreakdowns, !breakdowns.isEmpty {
+            return breakdowns.reduce(0) { acc, b in
+                acc + PricingTable.cost(
+                    model: b.modelName,
+                    inputTokens: b.inputTokens,
+                    outputTokens: b.outputTokens,
+                    cacheReadTokens: b.cacheReadTokens,
+                    cacheCreateTokens: b.cacheCreationTokens
+                )
+            }
+        }
+        // Fallback — берём первую модель из списка modelsUsed и применяем её ставку к агрегату.
+        let model = day.modelsUsed.first ?? ""
+        return PricingTable.cost(
+            model: model,
+            inputTokens: day.inputTokens,
+            outputTokens: day.outputTokens,
+            cacheReadTokens: day.cacheReadTokens,
+            cacheCreateTokens: day.cacheCreationTokens
+        )
+    }
+
+    private static func computeCodexCost(_ day: CcusageCodexDay) -> Double {
+        guard let models = day.models, !models.isEmpty else {
+            // Нет breakdown — единственный вариант, ставим 0.
+            return 0
+        }
+        return models.reduce(0.0) { acc, kv in
+            let (name, stats) = kv
+            let reasoningOut = stats.reasoningOutputTokens ?? 0
+            return acc + PricingTable.cost(
+                model: name,
+                inputTokens: stats.inputTokens,
+                outputTokens: stats.outputTokens + reasoningOut,
+                cacheReadTokens: stats.cachedInputTokens ?? 0,
+                cacheCreateTokens: 0
+            )
         }
     }
 }

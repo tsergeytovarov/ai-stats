@@ -16,7 +16,15 @@ struct CcusageClaudeDay: Decodable {
     let outputTokens: Int64
     let cacheCreationTokens: Int64
     let cacheReadTokens: Int64
-    let totalCost: Double
+    let modelBreakdowns: [ClaudeModelBreakdown]?
+}
+
+struct ClaudeModelBreakdown: Decodable {
+    let modelName: String
+    let inputTokens: Int64
+    let outputTokens: Int64
+    let cacheCreationTokens: Int64
+    let cacheReadTokens: Int64
 }
 
 // MARK: - Codex
@@ -30,16 +38,14 @@ struct CcusageCodexDay: Decodable {
     let inputTokens: Int64
     let outputTokens: Int64
     let cachedInputTokens: Int64
-    let costUSD: Double
     let models: [String: CodexModelStats]?
 
-    var modelNames: [String] {
-        models?.keys.sorted() ?? []
-    }
+    var modelNames: [String] { models?.keys.sorted() ?? [] }
 }
 
 struct CodexModelStats: Decodable {
     let inputTokens: Int64
     let outputTokens: Int64
     let cachedInputTokens: Int64?
+    let reasoningOutputTokens: Int64?
 }

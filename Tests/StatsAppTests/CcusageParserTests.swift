@@ -13,7 +13,10 @@ final class CcusageParserTests: XCTestCase {
         XCTAssertEqual(day0.source, "claude")
         XCTAssertEqual(day0.inputTokens, 17800) // 12000 + 800 + 5000
         XCTAssertEqual(day0.outputTokens, 3400)
-        XCTAssertEqual(day0.costUsd, 1.42, accuracy: 0.0001)
+        // opus: 10000*15 + 3000*75 + 4000*1.5 + 500*18.75 (all /1e6) = 0.390375
+        // sonnet: 2000*3 + 400*15 + 1000*0.3 + 300*3.75 (all /1e6)  = 0.013425
+        // total: 0.4038
+        XCTAssertEqual(day0.costUsd, 0.4038, accuracy: 0.0001)
         XCTAssertEqual(day0.modelsJson, "[\"claude-opus-4-7\",\"claude-sonnet-4-6\"]")
         XCTAssertEqual(day0.updatedAt, "2024-05-22T10:00:00Z")
     }
@@ -36,7 +39,10 @@ final class CcusageParserTests: XCTestCase {
         // codex inputTokens = inputTokens + cachedInputTokens = 12000 + 5000
         XCTAssertEqual(day.inputTokens, 17000)
         XCTAssertEqual(day.outputTokens, 3400)
-        XCTAssertEqual(day.costUsd, 1.42, accuracy: 0.0001)
+        // gpt-5.5: 7000*10 + 2000*30 + 3000*1.25 (all /1e6) = 0.13375
+        // codex-auto-review: 5000*5 + 1400*15 + 2000*0.63 (all /1e6) = 0.04726
+        // total: ~0.18101
+        XCTAssertEqual(day.costUsd, 0.181, accuracy: 0.0001)
         // models из объекта-словаря, отсортированные по имени
         XCTAssertEqual(day.modelsJson, "[\"codex-auto-review\",\"gpt-5.5\"]")
     }
