@@ -84,6 +84,27 @@ struct DropdownView: View {
                         .font(.system(.body, design: .monospaced))
                         .foregroundStyle(.secondary)
                 }
+
+                if viewModel.githubTotals.totalCommits > 0 && !viewModel.topRepos.isEmpty {
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("section.top_repos").font(.headline)
+                        ForEach(viewModel.topRepos, id: \.self) { r in
+                            HStack {
+                                Text(repoShortName(r.repo))
+                                    .lineLimit(1)
+                                    .truncationMode(.middle)
+                                Spacer()
+                                Text("\(r.commits) c")
+                                Text(formatLOC(r.additions) + " +")
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 90, alignment: .trailing)
+                            }
+                            .font(.system(.body, design: .monospaced))
+                        }
+                    }
+                }
             }
 
             Divider()
@@ -91,6 +112,13 @@ struct DropdownView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text("section.trend").font(.caption).foregroundStyle(.secondary)
                 Sparkline(values: viewModel.sparklineSeries)
+            }
+
+            if viewModel.githubEnabled && viewModel.additionsSeries.contains(where: { $0 > 0 }) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("section.trend_additions").font(.caption).foregroundStyle(.secondary)
+                    Sparkline(values: viewModel.additionsSeries)
+                }
             }
 
             Divider()
@@ -119,6 +147,12 @@ struct DropdownView: View {
         if value >= 1_000_000 { return String(format: "%.1fM", value / 1_000_000) }
         if value >= 1_000 { return String(format: "%.0fk", value / 1_000) }
         return "\(count)"
+    }
+
+    private func repoShortName(_ full: String) -> String {
+        // owner/name → name. Если name слишком длинный, оставляем как есть.
+        guard let slash = full.firstIndex(of: "/") else { return full }
+        return String(full[full.index(after: slash)...])
     }
 
     private func formatLOC(_ count: Int64) -> String {

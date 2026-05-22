@@ -6,6 +6,8 @@
 "section.top_models" = "Top Models";
 "section.github" = "GitHub";
 "section.trend" = "Daily AI cost • 30 days";
+"section.trend_additions" = "Daily additions • 30 days";
+"section.top_repos" = "Top Repos";
 
 "label.no_data" = "no data yet";
 

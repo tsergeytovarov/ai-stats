@@ -32,6 +32,13 @@ struct ModelTotal: Equatable, Hashable {
     let outputTokens: Int64
 }
 
+struct RepoTotal: Equatable, Hashable {
+    let repo: String
+    let commits: Int64
+    let additions: Int64
+    let deletions: Int64
+}
+
 enum StatsQueries {
     static func aiTotals(in db: GRDB.Database, days: [String]) throws -> AITotals {
         guard !days.isEmpty else { return AITotals(totalCost: 0, totalInputTokens: 0, totalOutputTokens: 0) }
@@ -106,6 +113,50 @@ enum StatsQueries {
         return try Row.fetchAll(db, sql: sql, arguments: args).map {
             ModelTotal(model: $0["model"], source: $0["source"], costUsd: $0["c"], inputTokens: $0["i"], outputTokens: $0["o"])
         }
+    }
+
+    /// Топ-N репозиториев по коммитам за переданные дни, с приджойненным LOC.
+    static func topRepos(in db: GRDB.Database, days: [String], limit: Int = 5) throws -> [RepoTotal] {
+        guard !days.isEmpty else { return [] }
+        let placeholders = days.map { _ in "?" }.joined(separator: ",")
+        let sql = """
+            SELECT ga.repo AS repo,
+                   SUM(ga.commits) AS commits,
+                   COALESCE(loc.adds, 0) AS adds,
+                   COALESCE(loc.dels, 0) AS dels
+            FROM github_activity ga
+            LEFT JOIN (
+                SELECT repo, SUM(additions) AS adds, SUM(deletions) AS dels
+                FROM github_loc_daily
+                WHERE day IN (\(placeholders))
+                GROUP BY repo
+            ) loc ON loc.repo = ga.repo
+            WHERE ga.day IN (\(placeholders)) AND ga.commits > 0
+            GROUP BY ga.repo
+            ORDER BY commits DESC
+            LIMIT ?
+        """
+        var args = StatementArguments(days)
+        args += StatementArguments(days)
+        args += StatementArguments([limit])
+        return try Row.fetchAll(db, sql: sql, arguments: args).map {
+            RepoTotal(repo: $0["repo"], commits: $0["commits"], additions: $0["adds"], deletions: $0["dels"])
+        }
+    }
+
+    /// Возвращает массив additions параллельно `days`. Если за день нет данных — 0.
+    static func dailyAdditionsSeries(in db: GRDB.Database, days: [String]) throws -> [Double] {
+        guard !days.isEmpty else { return [] }
+        let placeholders = days.map { _ in "?" }.joined(separator: ",")
+        let sql = """
+            SELECT day, SUM(additions) AS a
+            FROM github_loc_daily WHERE day IN (\(placeholders))
+            GROUP BY day
+        """
+        let rows = try Row.fetchAll(db, sql: sql, arguments: StatementArguments(days))
+        var map: [String: Double] = [:]
+        for row in rows { map[row["day"]] = Double(row["a"] as Int64) }
+        return days.map { map[$0] ?? 0.0 }
     }
 
     /// Возвращает массив cost_usd параллельно `days`. Если за день нет данных — 0.0.
