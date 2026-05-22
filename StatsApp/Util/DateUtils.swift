@@ -29,12 +29,12 @@ enum DateUtils {
         isoFormatter.date(from: s)
     }
 
-    /// Возвращает массив `lookback` ISO-дней, заканчивающихся на `end` (включительно).
-    /// lookback=0 → [end], lookback=3 → [end-2, end-1, end].
+    /// Возвращает `lookback + 1` ISO-дней: `[end - lookback, ..., end]`.
+    /// lookback=0 → [end], lookback=6 → 7-дневная неделя оканчивающаяся `end`.
     static func daysRange(endingAt end: Date, lookback: Int) -> [String] {
         let cal = Calendar(identifier: .gregorian)
         var days: [String] = []
-        for offset in stride(from: max(0, lookback - 1), through: 0, by: -1) {
+        for offset in (0...max(0, lookback)).reversed() {
             guard let d = cal.date(byAdding: .day, value: -offset, to: end) else { continue }
             days.append(isoDay(d))
         }
