@@ -40,7 +40,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { @MainActor in await container.start() }
         } catch {
             let alert = NSAlert()
-            alert.messageText = "ai-stats failed to start"
+            alert.messageText = NSLocalizedString("app.failed_to_start.title", comment: "")
             alert.informativeText = "\(error)"
             alert.alertStyle = .critical
             alert.runModal()

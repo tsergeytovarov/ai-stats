@@ -55,8 +55,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             let imported = await DatabaseImporter.runImport(currentPool: container.dbPool, parentWindow: window)
             if imported {
                 let alert = NSAlert()
-                alert.messageText = "Database imported"
-                alert.informativeText = "Please restart the app for changes to take effect."
+                alert.messageText = NSLocalizedString("alert.import_success.title", comment: "")
+                alert.informativeText = NSLocalizedString("alert.import_success.body", comment: "")
                 alert.runModal()
                 NSApp.terminate(nil)
             }

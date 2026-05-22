@@ -27,7 +27,7 @@ enum DatabaseExporter {
         } catch {
             await MainActor.run {
                 let alert = NSAlert()
-                alert.messageText = "Export failed"
+                alert.messageText = NSLocalizedString("alert.export_failed.title", comment: "")
                 alert.informativeText = "\(error)"
                 alert.alertStyle = .warning
                 alert.runModal()

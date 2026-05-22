@@ -1,0 +1,43 @@
+"period.day" = "День";
+"period.week" = "Неделя";
+"period.month" = "Месяц";
+
+"section.ai_usage" = "AI использование";
+"section.top_models" = "Топ моделей";
+"section.github" = "GitHub";
+"section.trend" = "Дневные AI траты • 14 дней";
+
+"label.no_data" = "пока нет данных";
+
+"github.commits_repos %@ %@" = "коммитов: %1$@ в %2$@ репах";
+"github.loc %@ %@" = "+%1$@ / -%2$@ строк";
+
+"footer.last_sync %@" = "Последний sync %@";
+
+"settings.title" = "Настройки";
+"settings.config_file" = "Файл конфига";
+"settings.open_in_editor" = "Открыть в редакторе";
+"settings.database" = "База данных";
+"settings.export" = "Экспорт…";
+"settings.import" = "Импорт…";
+"settings.sync" = "Sync";
+"settings.refresh_now" = "Обновить сейчас";
+
+"alert.config_initialized.title" = "Конфиг создан";
+"alert.config_initialized.body %@" = "По адресу %@ создан конфиг по умолчанию. Заполни GitHub токен (опционально) и перезапусти app. AI usage работает и без него.";
+"alert.config_initialized.open" = "Открыть конфиг";
+"alert.config_initialized.ok" = "ОК";
+
+"alert.import.title" = "Заменить базу?";
+"alert.import.body %@" = "Текущая база будет забэкаплена в:\n%@\n\nПродолжить?";
+"alert.import.replace" = "Заменить";
+"alert.import.cancel" = "Отмена";
+"alert.import_success.title" = "База импортирована";
+"alert.import_success.body" = "Перезапусти app чтобы изменения вступили в силу.";
+
+"alert.export_failed.title" = "Ошибка экспорта";
+"alert.import_failed.title" = "Ошибка импорта";
+
+"app.failed_to_start.title" = "ai-stats не запустилось";
+
+"unit.never" = "никогда";

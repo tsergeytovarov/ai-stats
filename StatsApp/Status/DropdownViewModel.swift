@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI
 import GRDB
 
 enum Period: String, CaseIterable, Identifiable {
@@ -12,11 +13,11 @@ enum Period: String, CaseIterable, Identifiable {
         case .month: return 29
         }
     }
-    var title: String {
+    var titleKey: LocalizedStringKey {
         switch self {
-        case .day: return "Day"
-        case .week: return "Week"
-        case .month: return "Month"
+        case .day: return "period.day"
+        case .week: return "period.week"
+        case .month: return "period.month"
         }
     }
 }
@@ -81,7 +82,7 @@ final class DropdownViewModel: ObservableObject {
     }
 
     private func relativeDescription(for date: Date?) -> String {
-        guard let date else { return "never" }
+        guard let date else { return NSLocalizedString("unit.never", comment: "") }
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .abbreviated
         return formatter.localizedString(for: date, relativeTo: Date())

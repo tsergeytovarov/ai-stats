@@ -19,12 +19,12 @@ enum DatabaseImporter {
         guard pickResponse == .OK, let importedURL = open.url else { return false }
 
         let confirm = NSAlert()
-        confirm.messageText = "Replace database?"
+        confirm.messageText = NSLocalizedString("alert.import.title", comment: "")
         let backupURL = backupURL()
-        confirm.informativeText = "Your current database will be backed up to:\n\(backupURL.path)\n\nContinue?"
+        confirm.informativeText = String(format: NSLocalizedString("alert.import.body %@", comment: ""), backupURL.path)
         confirm.alertStyle = .warning
-        confirm.addButton(withTitle: "Replace")
-        confirm.addButton(withTitle: "Cancel")
+        confirm.addButton(withTitle: NSLocalizedString("alert.import.replace", comment: ""))
+        confirm.addButton(withTitle: NSLocalizedString("alert.import.cancel", comment: ""))
         guard confirm.runModal() == .alertFirstButtonReturn else { return false }
 
         do {
@@ -43,7 +43,7 @@ enum DatabaseImporter {
             return true
         } catch {
             let alert = NSAlert()
-            alert.messageText = "Import failed"
+            alert.messageText = NSLocalizedString("alert.import_failed.title", comment: "")
             alert.informativeText = "\(error)"
             alert.alertStyle = .warning
             alert.runModal()

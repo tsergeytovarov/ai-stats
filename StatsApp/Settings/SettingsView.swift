@@ -13,24 +13,24 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Settings").font(.title2).bold()
+            Text("settings.title").font(.title2).bold()
 
-            section("Config file") {
+            section(NSLocalizedString("settings.config_file", comment: "")) {
                 Text(configPath).font(.system(.body, design: .monospaced))
-                Button("Open in editor", action: onOpenConfig)
+                Button(NSLocalizedString("settings.open_in_editor", comment: ""), action: onOpenConfig)
             }
 
-            section("Database") {
+            section(NSLocalizedString("settings.database", comment: "")) {
                 Text(dbPath).font(.system(.body, design: .monospaced))
                 Text(formatBytes(dbSizeBytes)).font(.caption).foregroundStyle(.secondary)
                 HStack {
-                    Button("Export…", action: onExport)
-                    Button("Import…", action: onImport)
+                    Button(NSLocalizedString("settings.export", comment: ""), action: onExport)
+                    Button(NSLocalizedString("settings.import", comment: ""), action: onImport)
                 }
             }
 
-            section("Sync") {
-                Button("Refresh now", action: onRefreshNow)
+            section(NSLocalizedString("settings.sync", comment: "")) {
+                Button(NSLocalizedString("settings.refresh_now", comment: ""), action: onRefreshNow)
             }
 
             Spacer()

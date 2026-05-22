@@ -46,11 +46,11 @@ final class AppContainer {
     func showFirstLaunchAlertIfNeeded() {
         guard configWasCreated else { return }
         let alert = NSAlert()
-        alert.messageText = "Config initialized"
-        alert.informativeText = "A default config was created at \(Paths.configURL.path). Add your GitHub token (optional) and restart the app. AI usage tracking already works."
+        alert.messageText = NSLocalizedString("alert.config_initialized.title", comment: "")
+        alert.informativeText = String(format: NSLocalizedString("alert.config_initialized.body %@", comment: ""), Paths.configURL.path)
         alert.alertStyle = .informational
-        alert.addButton(withTitle: "Open Config")
-        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: NSLocalizedString("alert.config_initialized.open", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("alert.config_initialized.ok", comment: ""))
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
             NSWorkspace.shared.open(Paths.configURL)

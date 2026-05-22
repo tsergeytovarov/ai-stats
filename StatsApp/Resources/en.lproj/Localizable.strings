@@ -1,0 +1,45 @@
+"period.day" = "Day";
+"period.week" = "Week";
+"period.month" = "Month";
+
+"section.ai_usage" = "AI Usage";
+"section.top_models" = "Top Models";
+"section.github" = "GitHub";
+"section.trend" = "Daily AI cost • 14 days";
+
+"label.no_data" = "no data yet";
+
+/* {commits} = "17", {repos} = "4" */
+"github.commits_repos %@ %@" = "%1$@ commits across %2$@ repos";
+/* {additions} = "12,345", {deletions} = "2,109" */
+"github.loc %@ %@" = "+%1$@ / -%2$@ lines";
+
+"footer.last_sync %@" = "Last sync %@";
+
+"settings.title" = "Settings";
+"settings.config_file" = "Config file";
+"settings.open_in_editor" = "Open in editor";
+"settings.database" = "Database";
+"settings.export" = "Export…";
+"settings.import" = "Import…";
+"settings.sync" = "Sync";
+"settings.refresh_now" = "Refresh now";
+
+"alert.config_initialized.title" = "Config initialized";
+"alert.config_initialized.body %@" = "A default config was created at %@. Add your GitHub token (optional) and restart the app. AI usage tracking already works.";
+"alert.config_initialized.open" = "Open Config";
+"alert.config_initialized.ok" = "OK";
+
+"alert.import.title" = "Replace database?";
+"alert.import.body %@" = "Your current database will be backed up to:\n%@\n\nContinue?";
+"alert.import.replace" = "Replace";
+"alert.import.cancel" = "Cancel";
+"alert.import_success.title" = "Database imported";
+"alert.import_success.body" = "Please restart the app for changes to take effect.";
+
+"alert.export_failed.title" = "Export failed";
+"alert.import_failed.title" = "Import failed";
+
+"app.failed_to_start.title" = "ai-stats failed to start";
+
+"unit.never" = "never";

@@ -8,7 +8,7 @@ struct DropdownView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Picker("", selection: $viewModel.period) {
-                ForEach(Period.allCases) { p in Text(p.title).tag(p) }
+                ForEach(Period.allCases) { p in Text(p.titleKey).tag(p) }
             }
             .pickerStyle(.segmented)
 
@@ -23,9 +23,9 @@ struct DropdownView: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("AI Usage").font(.headline)
+                Text("section.ai_usage").font(.headline)
                 if viewModel.bySource.isEmpty {
-                    Text("no data yet").font(.caption).foregroundStyle(.secondary)
+                    Text("label.no_data").font(.caption).foregroundStyle(.secondary)
                 } else {
                     ForEach(viewModel.bySource, id: \.source) { src in
                         HStack {
@@ -44,9 +44,9 @@ struct DropdownView: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Top Models").font(.headline)
+                Text("section.top_models").font(.headline)
                 if viewModel.topModels.isEmpty {
-                    Text("no data yet").font(.caption).foregroundStyle(.secondary)
+                    Text("label.no_data").font(.caption).foregroundStyle(.secondary)
                 } else {
                     ForEach(viewModel.topModels, id: \.self) { m in
                         HStack {
@@ -65,10 +65,14 @@ struct DropdownView: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("GitHub").font(.headline)
-                Text("\(viewModel.githubTotals.totalCommits) commits across \(viewModel.githubTotals.uniqueRepos) repos")
+                Text("section.github").font(.headline)
+                Text(String(format: NSLocalizedString("github.commits_repos %@ %@", comment: ""),
+                            viewModel.githubTotals.totalCommits.formatted(),
+                            viewModel.githubTotals.uniqueRepos.formatted()))
                     .font(.system(.body, design: .monospaced))
-                Text("+\(formatLOC(viewModel.loc.additions)) / -\(formatLOC(viewModel.loc.deletions)) lines")
+                Text(String(format: NSLocalizedString("github.loc %@ %@", comment: ""),
+                            formatLOC(viewModel.loc.additions),
+                            formatLOC(viewModel.loc.deletions)))
                     .font(.system(.body, design: .monospaced))
                     .foregroundStyle(.secondary)
             }
@@ -76,14 +80,15 @@ struct DropdownView: View {
             Divider()
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("Trend (last 14 days)").font(.caption).foregroundStyle(.secondary)
+                Text("section.trend").font(.caption).foregroundStyle(.secondary)
                 Sparkline(values: viewModel.sparklineSeries)
             }
 
             Divider()
 
             HStack {
-                Text("Last sync \(viewModel.lastSyncDescription)")
+                Text(String(format: NSLocalizedString("footer.last_sync %@", comment: ""),
+                            viewModel.lastSyncDescription))
                     .font(.caption).foregroundStyle(.secondary)
                 Spacer()
                 Button(action: onRefresh) { Image(systemName: "arrow.clockwise") }.buttonStyle(.borderless)
