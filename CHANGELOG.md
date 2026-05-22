@@ -5,14 +5,17 @@
 
 ## [Unreleased]
 
-## [0.1.0] — 2026-05-22
+## [0.1.0] — 2026-05-23
 
 ### Добавлено
 - macOS menu bar app со статус-иконкой и SwiftUI dropdown.
 - Сегментированный селектор Day / Week / Month.
 - Sparkline-тренд AI-трат за последние 14 дней.
 - Shell-out к `ccusage` для агрегатов по Claude Code, Codex и любым другим провайдерам из `enabled_providers`.
+- Раздельные DTO под claude и codex (форматы JSON у них разные).
+- Свой pricing table — USD за 1M токенов для claude/gpt-5.x. ccusage's costUSD больше не используется (он нулит codex-дни на subscription'е).
 - GraphQL-фетчер GitHub-коммитов по всем доступным репозиториям.
+- LOC tracking: additions/deletions через Contributor Stats API, недельная гранулярность, exponential backoff 2/4/8/16/16с на 202 Accepted, скип 404/403.
 - Локальная SQLite-история с политикой never-decrease — удаление логов агентов не стирает уже накопленную статистику.
 - Initial backfill на 365 дней при первом запуске.
 - Settings sheet с Export / Import базы данных.
