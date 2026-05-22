@@ -29,6 +29,7 @@ targets:
       path: StatsApp/Info.plist
       properties:
         LSUIElement: true
+        LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
         CFBundleDisplayName: ai-stats
         CFBundleShortVersionString: "0.1.0"
         CFBundleVersion: "1"
