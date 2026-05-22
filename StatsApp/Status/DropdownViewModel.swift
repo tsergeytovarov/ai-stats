@@ -26,6 +26,7 @@ enum Period: String, CaseIterable, Identifiable {
 final class DropdownViewModel: ObservableObject {
     private let db: any DatabaseReader
     private weak var syncCoordinator: SyncCoordinator?
+    let githubEnabled: Bool
 
     @Published var period: Period = .day { didSet { Task { await reload() } } }
     @Published var aiTotals: AITotals = .init(totalCost: 0, totalInputTokens: 0, totalOutputTokens: 0)
@@ -36,15 +37,16 @@ final class DropdownViewModel: ObservableObject {
     @Published var sparklineSeries: [Double] = []
     @Published var lastSyncDescription: String = "never"
 
-    init(db: any DatabaseReader, syncCoordinator: SyncCoordinator) {
+    init(db: any DatabaseReader, syncCoordinator: SyncCoordinator, githubEnabled: Bool = true) {
         self.db = db
         self.syncCoordinator = syncCoordinator
+        self.githubEnabled = githubEnabled
     }
 
     func reload() async {
         let now = Date()
         let periodDays = DateUtils.daysRange(endingAt: now, lookback: period.lookbackDays)
-        let sparkDays = DateUtils.daysRange(endingAt: now, lookback: 13)
+        let sparkDays = DateUtils.daysRange(endingAt: now, lookback: 29)
 
         do {
             let snapshot = try await db.read { db -> (AITotals, [SourceTotal], [ModelTotal], GitHubTotals, GitHubLOC, [Double]) in

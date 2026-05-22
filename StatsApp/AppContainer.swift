@@ -17,7 +17,7 @@ final class AppContainer {
         self.dbPool = try Database.openPool()
         let coordinator = SyncCoordinator(db: dbPool)
         self.syncCoordinator = coordinator
-        self.dropdownViewModel = DropdownViewModel(db: dbPool, syncCoordinator: coordinator)
+        self.dropdownViewModel = DropdownViewModel(db: dbPool, syncCoordinator: coordinator, githubEnabled: cfg.githubEnabled)
     }
 
     func buildFetchers() -> [(name: String, fetchers: [any Fetcher])] {

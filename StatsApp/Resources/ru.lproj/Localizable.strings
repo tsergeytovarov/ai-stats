@@ -5,7 +5,7 @@
 "section.ai_usage" = "AI использование";
 "section.top_models" = "Топ моделей";
 "section.github" = "GitHub";
-"section.trend" = "Дневные AI траты • 14 дней";
+"section.trend" = "Дневные AI траты • 30 дней";
 
 "label.no_data" = "пока нет данных";
 

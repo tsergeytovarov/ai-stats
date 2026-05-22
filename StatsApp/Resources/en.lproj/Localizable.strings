@@ -5,7 +5,7 @@
 "section.ai_usage" = "AI Usage";
 "section.top_models" = "Top Models";
 "section.github" = "GitHub";
-"section.trend" = "Daily AI cost • 14 days";
+"section.trend" = "Daily AI cost • 30 days";
 
 "label.no_data" = "no data yet";
 

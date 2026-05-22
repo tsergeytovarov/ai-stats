@@ -22,7 +22,7 @@ struct DropdownView: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(String(format: "$%.2f", viewModel.aiTotals.totalCost))
                     .font(.system(size: 32, weight: .semibold, design: .rounded))
-                Text("\(formatTokens(viewModel.aiTotals.totalInputTokens + viewModel.aiTotals.totalOutputTokens)) tokens • \(viewModel.githubTotals.totalCommits) commits")
+                Text(summarySubtitle)
                     .foregroundStyle(.secondary)
                     .font(.caption)
             }
@@ -69,19 +69,21 @@ struct DropdownView: View {
                 }
             }
 
-            Divider()
+            if viewModel.githubEnabled {
+                Divider()
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("section.github").font(.headline)
-                Text(String(format: NSLocalizedString("github.commits_repos %@ %@", comment: ""),
-                            viewModel.githubTotals.totalCommits.formatted(),
-                            viewModel.githubTotals.uniqueRepos.formatted()))
-                    .font(.system(.body, design: .monospaced))
-                Text(String(format: NSLocalizedString("github.loc %@ %@", comment: ""),
-                            formatLOC(viewModel.loc.additions),
-                            formatLOC(viewModel.loc.deletions)))
-                    .font(.system(.body, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("section.github").font(.headline)
+                    Text(String(format: NSLocalizedString("github.commits_repos %@ %@", comment: ""),
+                                viewModel.githubTotals.totalCommits.formatted(),
+                                viewModel.githubTotals.uniqueRepos.formatted()))
+                        .font(.system(.body, design: .monospaced))
+                    Text(String(format: NSLocalizedString("github.loc %@ %@", comment: ""),
+                                formatLOC(viewModel.loc.additions),
+                                formatLOC(viewModel.loc.deletions)))
+                        .font(.system(.body, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Divider()
@@ -102,6 +104,14 @@ struct DropdownView: View {
                 Button(action: onOpenSettings) { Image(systemName: "gearshape") }.buttonStyle(.borderless)
             }
         }
+    }
+
+    private var summarySubtitle: String {
+        let tokens = formatTokens(viewModel.aiTotals.totalInputTokens + viewModel.aiTotals.totalOutputTokens)
+        if viewModel.githubEnabled {
+            return "\(tokens) tokens • \(viewModel.githubTotals.totalCommits) commits"
+        }
+        return "\(tokens) tokens"
     }
 
     private func formatTokens(_ count: Int64) -> String {
