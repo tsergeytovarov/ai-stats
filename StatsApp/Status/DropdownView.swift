@@ -117,7 +117,7 @@ struct DropdownView: View {
             if viewModel.githubEnabled && viewModel.additionsSeries.contains(where: { $0 > 0 }) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("section.trend_additions").font(.caption).foregroundStyle(.secondary)
-                    Sparkline(values: viewModel.additionsSeries)
+                    Sparkline(values: viewModel.additionsSeries, tint: .githubGreen)
                 }
             }
 
