@@ -9,7 +9,12 @@ struct GitHubFetchPayload {
     let weeklyLOC: [GitHubLOCWeeklyRow]
 }
 
+struct CcusagePayload {
+    let dayRows: [AIUsageRow]
+    let modelRows: [AIUsageModelRow]
+}
+
 enum FetchResult {
-    case aiUsage([AIUsageRow])
+    case aiUsage(CcusagePayload)
     case github(GitHubFetchPayload)
 }

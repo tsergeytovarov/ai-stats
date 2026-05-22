@@ -24,6 +24,14 @@ struct GitHubLOC: Equatable {
     let deletions: Int64
 }
 
+struct ModelTotal: Equatable, Hashable {
+    let model: String
+    let source: String
+    let costUsd: Double
+    let inputTokens: Int64
+    let outputTokens: Int64
+}
+
 enum StatsQueries {
     static func aiTotals(in db: GRDB.Database, days: [String]) throws -> AITotals {
         guard !days.isEmpty else { return AITotals(totalCost: 0, totalInputTokens: 0, totalOutputTokens: 0) }
@@ -82,6 +90,24 @@ enum StatsQueries {
         """
         let row = try Row.fetchOne(db, sql: sql, arguments: StatementArguments(Array(weekStarts)))!
         return GitHubLOC(additions: row["a"], deletions: row["d"])
+    }
+
+    /// Топ-N моделей по суммарному cost_usd за переданные дни.
+    static func topModels(in db: GRDB.Database, days: [String], limit: Int = 5) throws -> [ModelTotal] {
+        guard !days.isEmpty else { return [] }
+        let placeholders = days.map { _ in "?" }.joined(separator: ",")
+        let sql = """
+            SELECT model, source, SUM(cost_usd) AS c, SUM(input_tokens) AS i, SUM(output_tokens) AS o
+            FROM ai_usage_model WHERE day IN (\(placeholders))
+            GROUP BY model, source
+            ORDER BY c DESC
+            LIMIT ?
+        """
+        var args = StatementArguments(days)
+        args += StatementArguments([limit])
+        return try Row.fetchAll(db, sql: sql, arguments: args).map {
+            ModelTotal(model: $0["model"], source: $0["source"], costUsd: $0["c"], inputTokens: $0["i"], outputTokens: $0["o"])
+        }
     }
 
     /// Возвращает массив cost_usd параллельно `days`. Если за день нет данных — 0.0.

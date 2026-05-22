@@ -18,7 +18,7 @@ final class SyncCoordinatorTests: XCTestCase {
     func test_first_run_uses_365d_backfill_window() async throws {
         let dbq = try DatabaseQueue()
         try Database.migrate(dbq)
-        let fetcher = MockFetcher(result: .aiUsage([]))
+        let fetcher = MockFetcher(result: .aiUsage(CcusagePayload(dayRows: [], modelRows: [])))
         let coordinator = await SyncCoordinator(db: dbq, now: { Date(timeIntervalSince1970: 1716336000) })
 
         try await coordinator.runOnce(source: "ccusage", fetchers: [fetcher])
@@ -35,7 +35,7 @@ final class SyncCoordinatorTests: XCTestCase {
             let s = SyncStateRow(source: "ccusage", lastSyncAt: "2024-05-20T00:00:00Z", lastError: nil)
             try s.insert(db)
         }
-        let fetcher = MockFetcher(result: .aiUsage([]))
+        let fetcher = MockFetcher(result: .aiUsage(CcusagePayload(dayRows: [], modelRows: [])))
         let coordinator = await SyncCoordinator(db: dbq, now: { Date(timeIntervalSince1970: 1716336000) })
 
         try await coordinator.runOnce(source: "ccusage", fetchers: [fetcher])
@@ -54,7 +54,7 @@ final class SyncCoordinatorTests: XCTestCase {
             func fetch(since: Date) async throws -> FetchResult {
                 callCount += 1
                 try await Task.sleep(nanoseconds: 200_000_000)
-                return .aiUsage([])
+                return .aiUsage(CcusagePayload(dayRows: [], modelRows: []))
             }
         }
 
@@ -73,7 +73,7 @@ final class SyncCoordinatorTests: XCTestCase {
         let dbq = try DatabaseQueue()
         try Database.migrate(dbq)
         let row = AIUsageRow(id: nil, day: "2024-05-22", source: "claude", modelsJson: "[]", inputTokens: 100, outputTokens: 50, costUsd: 1.0, updatedAt: "now")
-        let fetcher = MockFetcher(result: .aiUsage([row]))
+        let fetcher = MockFetcher(result: .aiUsage(CcusagePayload(dayRows: [row], modelRows: [])))
         let coordinator = await SyncCoordinator(db: dbq, now: Date.init)
 
         try await coordinator.runOnce(source: "ccusage", fetchers: [fetcher])

@@ -115,4 +115,52 @@ final class StatsQueriesTests: XCTestCase {
         XCTAssertEqual(loc.additions, 0)
         XCTAssertEqual(loc.deletions, 0)
     }
+
+    // MARK: - topModels
+
+    private func seedModelRows() throws {
+        try dbq.write { db in
+            let rows: [AIUsageModelRow] = [
+                AIUsageModelRow(id: nil, day: "2024-05-22", source: "claude", model: "claude-opus-4-7",    inputTokens: 1000, outputTokens: 500,  costUsd: 10.0, updatedAt: "now"),
+                AIUsageModelRow(id: nil, day: "2024-05-22", source: "claude", model: "claude-sonnet-4-6",  inputTokens: 500,  outputTokens: 200,  costUsd: 3.0,  updatedAt: "now"),
+                AIUsageModelRow(id: nil, day: "2024-05-22", source: "codex",  model: "gpt-5.5",            inputTokens: 300,  outputTokens: 100,  costUsd: 5.0,  updatedAt: "now"),
+                AIUsageModelRow(id: nil, day: "2024-05-20", source: "claude", model: "claude-opus-4-7",    inputTokens: 800,  outputTokens: 300,  costUsd: 8.0,  updatedAt: "now"),
+                AIUsageModelRow(id: nil, day: "2024-05-20", source: "codex",  model: "codex-auto-review",  inputTokens: 200,  outputTokens: 80,   costUsd: 1.0,  updatedAt: "now"),
+            ]
+            for var row in rows { try row.insert(db) }
+        }
+    }
+
+    func test_topModels_orders_by_cost_desc_and_limits() throws {
+        try seedModelRows()
+        let top2 = try dbq.read { db in
+            try StatsQueries.topModels(in: db, days: ["2024-05-22", "2024-05-20"], limit: 2)
+        }
+        // claude-opus-4-7 appears on both days: 10 + 8 = 18 total
+        // gpt-5.5: 5, claude-sonnet: 3, codex-auto-review: 1
+        XCTAssertEqual(top2.count, 2)
+        XCTAssertEqual(top2[0].model, "claude-opus-4-7")
+        XCTAssertEqual(top2[0].costUsd, 18.0, accuracy: 0.001)
+        XCTAssertEqual(top2[1].model, "gpt-5.5")
+        XCTAssertEqual(top2[1].costUsd, 5.0, accuracy: 0.001)
+    }
+
+    func test_topModels_empty_days_returns_empty() throws {
+        try seedModelRows()
+        let result = try dbq.read { db in
+            try StatsQueries.topModels(in: db, days: [])
+        }
+        XCTAssertTrue(result.isEmpty)
+    }
+
+    func test_topModels_filters_by_days() throws {
+        try seedModelRows()
+        // Only 2024-05-20 — opus(8), codex-auto-review(1)
+        let result = try dbq.read { db in
+            try StatsQueries.topModels(in: db, days: ["2024-05-20"], limit: 5)
+        }
+        XCTAssertEqual(result.count, 2)
+        XCTAssertEqual(result[0].model, "claude-opus-4-7")
+        XCTAssertEqual(result[0].costUsd, 8.0, accuracy: 0.001)
+    }
 }

@@ -43,6 +43,27 @@ struct DropdownView: View {
 
             Divider()
 
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Top Models").font(.headline)
+                if viewModel.topModels.isEmpty {
+                    Text("no data yet").font(.caption).foregroundStyle(.secondary)
+                } else {
+                    ForEach(viewModel.topModels, id: \.self) { m in
+                        HStack {
+                            Text(m.model)
+                            Spacer()
+                            Text(String(format: "$%.2f", m.costUsd))
+                            Text(formatTokens(m.inputTokens + m.outputTokens) + " tok")
+                                .foregroundStyle(.secondary)
+                                .frame(width: 80, alignment: .trailing)
+                        }
+                        .font(.system(.body, design: .monospaced))
+                    }
+                }
+            }
+
+            Divider()
+
             VStack(alignment: .leading, spacing: 4) {
                 Text("GitHub").font(.headline)
                 Text("\(viewModel.githubTotals.totalCommits) commits across \(viewModel.githubTotals.uniqueRepos) repos")

@@ -1,7 +1,7 @@
 import Foundation
 
 enum CcusageParser {
-    static func parse(_ data: Data, source: String, now: () -> Date) throws -> [AIUsageRow] {
+    static func parse(_ data: Data, source: String, now: () -> Date) throws -> CcusagePayload {
         let isoFormatter = ISO8601DateFormatter()
         isoFormatter.formatOptions = [.withInternetDateTime]
         let nowString = isoFormatter.string(from: now())
@@ -10,11 +10,13 @@ enum CcusageParser {
         switch source {
         case "codex":
             let report = try JSONDecoder().decode(CcusageCodexReport.self, from: data)
-            return report.daily.map { day in
+            var dayRows: [AIUsageRow] = []
+            var modelRows: [AIUsageModelRow] = []
+            for day in report.daily {
                 let modelsJson = (try? String(data: encoder.encode(day.modelNames), encoding: .utf8)) ?? "[]"
                 let cost = computeCodexCost(day)
                 let reasoningOut = day.models?.values.reduce(0) { $0 + ($1.reasoningOutputTokens ?? 0) } ?? 0
-                return AIUsageRow(
+                dayRows.append(AIUsageRow(
                     id: nil,
                     day: day.date,
                     source: source,
@@ -23,14 +25,39 @@ enum CcusageParser {
                     outputTokens: day.outputTokens + reasoningOut,
                     costUsd: cost,
                     updatedAt: nowString
-                )
+                ))
+                if let models = day.models {
+                    for (name, stats) in models {
+                        let reasoningOutModel = stats.reasoningOutputTokens ?? 0
+                        let modelCost = PricingTable.cost(
+                            model: name,
+                            inputTokens: stats.inputTokens,
+                            outputTokens: stats.outputTokens + reasoningOutModel,
+                            cacheReadTokens: stats.cachedInputTokens ?? 0,
+                            cacheCreateTokens: 0
+                        )
+                        modelRows.append(AIUsageModelRow(
+                            id: nil,
+                            day: day.date,
+                            source: source,
+                            model: name,
+                            inputTokens: stats.inputTokens + (stats.cachedInputTokens ?? 0),
+                            outputTokens: stats.outputTokens + reasoningOutModel,
+                            costUsd: modelCost,
+                            updatedAt: nowString
+                        ))
+                    }
+                }
             }
+            return CcusagePayload(dayRows: dayRows, modelRows: modelRows)
         default: // claude и любой другой провайдер, который пользуется claude-подобной схемой
             let report = try JSONDecoder().decode(CcusageClaudeReport.self, from: data)
-            return report.daily.map { day in
+            var dayRows: [AIUsageRow] = []
+            var modelRows: [AIUsageModelRow] = []
+            for day in report.daily {
                 let modelsJson = (try? String(data: encoder.encode(day.modelsUsed), encoding: .utf8)) ?? "[]"
                 let cost = computeClaudeCost(day)
-                return AIUsageRow(
+                dayRows.append(AIUsageRow(
                     id: nil,
                     day: day.date,
                     source: source,
@@ -39,8 +66,30 @@ enum CcusageParser {
                     outputTokens: day.outputTokens,
                     costUsd: cost,
                     updatedAt: nowString
-                )
+                ))
+                if let breakdowns = day.modelBreakdowns {
+                    for b in breakdowns {
+                        let modelCost = PricingTable.cost(
+                            model: b.modelName,
+                            inputTokens: b.inputTokens,
+                            outputTokens: b.outputTokens,
+                            cacheReadTokens: b.cacheReadTokens,
+                            cacheCreateTokens: b.cacheCreationTokens
+                        )
+                        modelRows.append(AIUsageModelRow(
+                            id: nil,
+                            day: day.date,
+                            source: source,
+                            model: b.modelName,
+                            inputTokens: b.inputTokens + b.cacheCreationTokens + b.cacheReadTokens,
+                            outputTokens: b.outputTokens,
+                            costUsd: modelCost,
+                            updatedAt: nowString
+                        ))
+                    }
+                }
             }
+            return CcusagePayload(dayRows: dayRows, modelRows: modelRows)
         }
     }
 
@@ -141,8 +190,8 @@ struct CcusageFetcher: Fetcher {
             throw CcusageError.processFailed(exitCode: process.terminationStatus, stderr: stderr)
         }
 
-        let rows = try CcusageParser.parse(stdoutData, source: provider, now: now)
-        return .aiUsage(rows)
+        let payload = try CcusageParser.parse(stdoutData, source: provider, now: now)
+        return .aiUsage(payload)
     }
 
     private func resolveExecutable(_ name: String) throws -> URL {

@@ -29,6 +29,7 @@ final class DropdownViewModel: ObservableObject {
     @Published var period: Period = .day { didSet { Task { await reload() } } }
     @Published var aiTotals: AITotals = .init(totalCost: 0, totalInputTokens: 0, totalOutputTokens: 0)
     @Published var bySource: [SourceTotal] = []
+    @Published var topModels: [ModelTotal] = []
     @Published var githubTotals: GitHubTotals = .init(totalCommits: 0, uniqueRepos: 0)
     @Published var loc: GitHubLOC = GitHubLOC(additions: 0, deletions: 0)
     @Published var sparklineSeries: [Double] = []
@@ -45,19 +46,21 @@ final class DropdownViewModel: ObservableObject {
         let sparkDays = DateUtils.daysRange(endingAt: now, lookback: 13)
 
         do {
-            let snapshot = try await db.read { db -> (AITotals, [SourceTotal], GitHubTotals, GitHubLOC, [Double]) in
+            let snapshot = try await db.read { db -> (AITotals, [SourceTotal], [ModelTotal], GitHubTotals, GitHubLOC, [Double]) in
                 let totals = try StatsQueries.aiTotals(in: db, days: periodDays)
                 let bySource = try StatsQueries.aiTotalsBySource(in: db, days: periodDays)
+                let models = try StatsQueries.topModels(in: db, days: periodDays, limit: 5)
                 let gh = try StatsQueries.githubTotals(in: db, days: periodDays)
                 let loc = try StatsQueries.githubLOC(in: db, days: periodDays)
                 let series = try StatsQueries.dailyAICostSeries(in: db, days: sparkDays)
-                return (totals, bySource, gh, loc, series)
+                return (totals, bySource, models, gh, loc, series)
             }
             self.aiTotals = snapshot.0
             self.bySource = snapshot.1
-            self.githubTotals = snapshot.2
-            self.loc = snapshot.3
-            self.sparklineSeries = snapshot.4
+            self.topModels = snapshot.2
+            self.githubTotals = snapshot.3
+            self.loc = snapshot.4
+            self.sparklineSeries = snapshot.5
             self.lastSyncDescription = relativeDescription(for: syncCoordinator?.lastSyncAt.values.max())
         } catch {
             NSLog("ai-stats reload error: \(error)")

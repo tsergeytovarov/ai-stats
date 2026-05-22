@@ -91,6 +91,41 @@ struct GitHubLOCWeeklyRow: Codable, FetchableRecord, PersistableRecord, Equatabl
     }
 }
 
+struct AIUsageModelRow: Codable, FetchableRecord, PersistableRecord, Equatable {
+    static let databaseTableName = "ai_usage_model"
+
+    var id: Int64?
+    var day: String
+    var source: String
+    var model: String
+    var inputTokens: Int64
+    var outputTokens: Int64
+    var costUsd: Double
+    var updatedAt: String
+
+    enum Columns {
+        static let id = Column("id")
+        static let day = Column("day")
+        static let source = Column("source")
+        static let model = Column("model")
+        static let inputTokens = Column("input_tokens")
+        static let outputTokens = Column("output_tokens")
+        static let costUsd = Column("cost_usd")
+        static let updatedAt = Column("updated_at")
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case day
+        case source
+        case model
+        case inputTokens = "input_tokens"
+        case outputTokens = "output_tokens"
+        case costUsd = "cost_usd"
+        case updatedAt = "updated_at"
+    }
+}
+
 struct SyncStateRow: Codable, FetchableRecord, PersistableRecord, Equatable {
     static let databaseTableName = "sync_state"
 

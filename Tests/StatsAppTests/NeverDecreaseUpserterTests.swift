@@ -78,6 +78,49 @@ final class NeverDecreaseUpserterTests: XCTestCase {
         }
     }
 
+    // MARK: - AIUsageModel
+
+    private func makeModelRow(day: String = "2024-05-22", source: String = "claude",
+                              model: String = "claude-opus-4-7",
+                              input: Int64 = 100, output: Int64 = 50, cost: Double = 1.0) -> AIUsageModelRow {
+        AIUsageModelRow(id: nil, day: day, source: source, model: model,
+                        inputTokens: input, outputTokens: output, costUsd: cost,
+                        updatedAt: "2024-05-22T10:00:00Z")
+    }
+
+    func test_upsert_ai_usage_model_insert_when_no_existing() throws {
+        try dbq.write { db in
+            try NeverDecreaseUpserter.upsertAIUsageModel(makeModelRow(), in: db)
+            XCTAssertEqual(try AIUsageModelRow.fetchCount(db), 1)
+        }
+    }
+
+    func test_upsert_ai_usage_model_never_decrease() throws {
+        try dbq.write { db in
+            try NeverDecreaseUpserter.upsertAIUsageModel(makeModelRow(cost: 5.0), in: db)
+            try NeverDecreaseUpserter.upsertAIUsageModel(makeModelRow(cost: 2.0), in: db)
+            let row = try AIUsageModelRow.fetchOne(db)!
+            XCTAssertEqual(row.costUsd, 5.0)
+        }
+    }
+
+    func test_upsert_ai_usage_model_updates_when_greater() throws {
+        try dbq.write { db in
+            try NeverDecreaseUpserter.upsertAIUsageModel(makeModelRow(cost: 1.0), in: db)
+            try NeverDecreaseUpserter.upsertAIUsageModel(makeModelRow(cost: 3.0), in: db)
+            let row = try AIUsageModelRow.fetchOne(db)!
+            XCTAssertEqual(row.costUsd, 3.0)
+        }
+    }
+
+    func test_upsert_ai_usage_model_different_models_coexist() throws {
+        try dbq.write { db in
+            try NeverDecreaseUpserter.upsertAIUsageModel(makeModelRow(model: "claude-opus-4-7"), in: db)
+            try NeverDecreaseUpserter.upsertAIUsageModel(makeModelRow(model: "claude-sonnet-4-6"), in: db)
+            XCTAssertEqual(try AIUsageModelRow.fetchCount(db), 2)
+        }
+    }
+
     // MARK: - LOC
 
     private func makeLOCRow(weekStart: String = "2024-05-19", repo: String = "popovs/x",

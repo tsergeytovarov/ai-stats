@@ -61,8 +61,9 @@ final class SyncCoordinator {
     private func persist(_ result: FetchResult) throws {
         try db.write { db in
             switch result {
-            case .aiUsage(let rows):
-                for row in rows { try NeverDecreaseUpserter.upsertAIUsage(row, in: db) }
+            case .aiUsage(let payload):
+                for row in payload.dayRows { try NeverDecreaseUpserter.upsertAIUsage(row, in: db) }
+                for row in payload.modelRows { try NeverDecreaseUpserter.upsertAIUsageModel(row, in: db) }
             case .github(let payload):
                 for row in payload.dailyCommits { try NeverDecreaseUpserter.upsertGitHub(row, in: db) }
                 for row in payload.weeklyLOC { try NeverDecreaseUpserter.upsertGitHubLOC(row, in: db) }

@@ -19,6 +19,24 @@ enum NeverDecreaseUpserter {
         }
     }
 
+    /// То же для per-model breakdown: метрика сравнения — cost_usd.
+    static func upsertAIUsageModel(_ row: AIUsageModelRow, in db: GRDB.Database) throws {
+        if let existing = try AIUsageModelRow
+            .filter(AIUsageModelRow.Columns.day == row.day
+                 && AIUsageModelRow.Columns.source == row.source
+                 && AIUsageModelRow.Columns.model == row.model)
+            .fetchOne(db) {
+            guard row.costUsd > existing.costUsd else { return }
+            var updated = row
+            updated.id = existing.id
+            try updated.update(db)
+        } else {
+            var inserted = row
+            inserted.id = nil
+            try inserted.insert(db)
+        }
+    }
+
     /// То же для LOC: метрика сравнения — additions + deletions (общий объём).
     static func upsertGitHubLOC(_ row: GitHubLOCWeeklyRow, in db: GRDB.Database) throws {
         let newTotal = row.additions + row.deletions
