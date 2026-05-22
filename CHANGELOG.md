@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-23
+
+### Добавлено
+- WidgetKit widget со Small + Medium размерами.
+- Период в виджете настраивается через AppIntent (правый клик → Edit Widget): Day / Week / Month.
+- Medium показывает топ-4 моделей.
+- Миграция базы данных в App Group container (требуется для шаринга с виджетом).
+- При успешном sync приложение вызывает WidgetCenter.shared.reloadAllTimelines().
+
 ## [0.1.0] — 2026-05-23
 
 ### Добавлено
