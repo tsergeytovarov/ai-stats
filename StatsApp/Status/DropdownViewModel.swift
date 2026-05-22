@@ -65,7 +65,7 @@ final class DropdownViewModel: ObservableObject {
     }
 
     func todayCost() async -> Double {
-        let today = [DateUtils.isoDay(Date())]
+        let today = [DateUtils.isoDayLocal(Date())]
         return (try? await db.read { db in try StatsQueries.aiTotals(in: db, days: today).totalCost }) ?? 0
     }
 

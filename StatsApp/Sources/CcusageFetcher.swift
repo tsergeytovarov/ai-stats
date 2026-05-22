@@ -114,7 +114,11 @@ struct CcusageFetcher: Fetcher {
 
     func fetch(since: Date) async throws -> FetchResult {
         let sinceArg = DateUtils.isoDayCompact(since)
-        let args = Array(commandPrefix.dropFirst()) + [provider, "daily", "--json", "--since", sinceArg]
+        let args = Array(commandPrefix.dropFirst()) + [
+            provider, "daily", "--json",
+            "--since", sinceArg,
+            "--timezone", TimeZone.current.identifier,
+        ]
         let head = commandPrefix.first ?? "npx"
 
         let process = Process()
