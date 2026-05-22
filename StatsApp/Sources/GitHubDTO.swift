@@ -38,3 +38,19 @@ struct GitHubResponse: Decodable {
         let message: String
     }
 }
+
+struct GitHubContributorStats: Decodable {
+    let author: Author?
+    let weeks: [Week]
+
+    struct Author: Decodable {
+        let login: String
+    }
+
+    struct Week: Decodable {
+        let w: Int64  // unix seconds (Sunday 00:00 UTC)
+        let a: Int64  // additions
+        let d: Int64  // deletions
+        let c: Int64  // commits
+    }
+}

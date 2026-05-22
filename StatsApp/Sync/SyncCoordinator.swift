@@ -63,8 +63,9 @@ final class SyncCoordinator {
             switch result {
             case .aiUsage(let rows):
                 for row in rows { try NeverDecreaseUpserter.upsertAIUsage(row, in: db) }
-            case .github(let rows):
-                for row in rows { try NeverDecreaseUpserter.upsertGitHub(row, in: db) }
+            case .github(let payload):
+                for row in payload.dailyCommits { try NeverDecreaseUpserter.upsertGitHub(row, in: db) }
+                for row in payload.weeklyLOC { try NeverDecreaseUpserter.upsertGitHubLOC(row, in: db) }
             }
         }
     }

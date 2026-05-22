@@ -29,6 +29,20 @@ enum DateUtils {
         isoFormatter.date(from: s)
     }
 
+    /// Возвращает ISO-дату (YYYY-MM-DD) воскресенья недели, в которую попадает `isoDay`.
+    /// GitHub использует воскресенье как первый день недели.
+    static func weekStart(forISODay isoDay: String) -> String? {
+        guard let date = isoFormatter.date(from: isoDay) else { return nil }
+        // Snap to Sunday: GitHub returns unix timestamps for Sunday 00:00 UTC.
+        // Sunday = weekday 1 in .gregorian (1=Sun, 2=Mon, ..., 7=Sat)
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "UTC")!
+        cal.firstWeekday = 1 // Sunday
+        let components = cal.dateComponents([.yearForWeekOfYear, .weekOfYear], from: date)
+        guard let sunday = cal.date(from: components) else { return nil }
+        return isoFormatter.string(from: sunday)
+    }
+
     /// Возвращает `lookback + 1` ISO-дней: `[end - lookback, ..., end]`.
     /// lookback=0 → [end], lookback=6 → 7-дневная неделя оканчивающаяся `end`.
     static func daysRange(endingAt end: Date, lookback: Int) -> [String] {

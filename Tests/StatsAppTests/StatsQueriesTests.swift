@@ -61,4 +61,58 @@ final class StatsQueriesTests: XCTestCase {
         }
         XCTAssertEqual(series, [1.5, 0.0, 5.0])
     }
+
+    // MARK: - githubLOC
+
+    private func seedLOC() throws {
+        try dbq.write { db in
+            // Week of 2024-05-19 (Sunday)
+            var r1 = GitHubLOCWeeklyRow(id: nil, weekStart: "2024-05-19", repo: "popovs/x", additions: 120, deletions: 30, updatedAt: "now")
+            try r1.insert(db)
+            var r2 = GitHubLOCWeeklyRow(id: nil, weekStart: "2024-05-19", repo: "popovs/y", additions: 50, deletions: 10, updatedAt: "now")
+            try r2.insert(db)
+            // Week of 2024-05-26
+            var r3 = GitHubLOCWeeklyRow(id: nil, weekStart: "2024-05-26", repo: "popovs/x", additions: 200, deletions: 80, updatedAt: "now")
+            try r3.insert(db)
+        }
+    }
+
+    func test_githubLOC_sums_weeks_covering_days() throws {
+        try seedLOC()
+        // 2024-05-22 (Wed) → week start 2024-05-19 → additions 120+50=170, deletions 30+10=40
+        let loc = try dbq.read { db in
+            try StatsQueries.githubLOC(in: db, days: ["2024-05-22"])
+        }
+        XCTAssertEqual(loc.additions, 170)
+        XCTAssertEqual(loc.deletions, 40)
+    }
+
+    func test_githubLOC_spans_two_weeks() throws {
+        try seedLOC()
+        // 2024-05-22 → week 2024-05-19; 2024-05-28 (Tue) → week 2024-05-26
+        let loc = try dbq.read { db in
+            try StatsQueries.githubLOC(in: db, days: ["2024-05-22", "2024-05-28"])
+        }
+        XCTAssertEqual(loc.additions, 170 + 200)
+        XCTAssertEqual(loc.deletions, 40 + 80)
+    }
+
+    func test_githubLOC_empty_days_returns_zeros() throws {
+        try seedLOC()
+        let loc = try dbq.read { db in
+            try StatsQueries.githubLOC(in: db, days: [])
+        }
+        XCTAssertEqual(loc.additions, 0)
+        XCTAssertEqual(loc.deletions, 0)
+    }
+
+    func test_githubLOC_no_data_for_days_returns_zeros() throws {
+        try seedLOC()
+        // 2024-01-01 → week 2023-12-31 — no data
+        let loc = try dbq.read { db in
+            try StatsQueries.githubLOC(in: db, days: ["2024-01-01"])
+        }
+        XCTAssertEqual(loc.additions, 0)
+        XCTAssertEqual(loc.deletions, 0)
+    }
 }

@@ -52,6 +52,20 @@ enum Database {
                 )
             """)
         }
+        migrator.registerMigration("v2_add_github_loc") { db in
+            try db.execute(sql: """
+                CREATE TABLE github_loc_weekly (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    week_start TEXT NOT NULL,
+                    repo TEXT NOT NULL,
+                    additions INTEGER NOT NULL,
+                    deletions INTEGER NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    UNIQUE(week_start, repo)
+                )
+            """)
+            try db.execute(sql: "CREATE INDEX idx_github_loc_week ON github_loc_weekly(week_start)")
+        }
         try migrator.migrate(writer)
     }
 

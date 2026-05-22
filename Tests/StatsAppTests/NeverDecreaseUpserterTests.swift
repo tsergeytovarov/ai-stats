@@ -77,4 +77,69 @@ final class NeverDecreaseUpserterTests: XCTestCase {
             XCTAssertEqual(row.commits, 5)
         }
     }
+
+    // MARK: - LOC
+
+    private func makeLOCRow(weekStart: String = "2024-05-19", repo: String = "popovs/x",
+                             additions: Int64 = 100, deletions: Int64 = 50) -> GitHubLOCWeeklyRow {
+        GitHubLOCWeeklyRow(id: nil, weekStart: weekStart, repo: repo,
+                           additions: additions, deletions: deletions,
+                           updatedAt: "2024-05-22T10:00:00Z")
+    }
+
+    func test_loc_insert_when_no_existing_row() throws {
+        try dbq.write { db in
+            try NeverDecreaseUpserter.upsertGitHubLOC(makeLOCRow(), in: db)
+            XCTAssertEqual(try GitHubLOCWeeklyRow.fetchCount(db), 1)
+        }
+    }
+
+    func test_loc_update_when_new_total_greater() throws {
+        try dbq.write { db in
+            try NeverDecreaseUpserter.upsertGitHubLOC(makeLOCRow(additions: 100, deletions: 50), in: db)
+            try NeverDecreaseUpserter.upsertGitHubLOC(makeLOCRow(additions: 200, deletions: 80), in: db)
+            let row = try GitHubLOCWeeklyRow.fetchOne(db)!
+            XCTAssertEqual(row.additions, 200)
+            XCTAssertEqual(row.deletions, 80)
+        }
+    }
+
+    func test_loc_keep_old_when_new_total_lower() throws {
+        try dbq.write { db in
+            try NeverDecreaseUpserter.upsertGitHubLOC(makeLOCRow(additions: 500, deletions: 200), in: db)
+            try NeverDecreaseUpserter.upsertGitHubLOC(makeLOCRow(additions: 10, deletions: 5), in: db)
+            let row = try GitHubLOCWeeklyRow.fetchOne(db)!
+            XCTAssertEqual(row.additions, 500)
+            XCTAssertEqual(row.deletions, 200)
+        }
+    }
+
+    func test_loc_keep_old_when_new_total_equal() throws {
+        try dbq.write { db in
+            var first = makeLOCRow(additions: 100, deletions: 50)
+            first.updatedAt = "2024-01-01T00:00:00Z"
+            try NeverDecreaseUpserter.upsertGitHubLOC(first, in: db)
+            var second = makeLOCRow(additions: 100, deletions: 50)
+            second.updatedAt = "2024-12-31T00:00:00Z"
+            try NeverDecreaseUpserter.upsertGitHubLOC(second, in: db)
+            let row = try GitHubLOCWeeklyRow.fetchOne(db)!
+            XCTAssertEqual(row.updatedAt, "2024-01-01T00:00:00Z")
+        }
+    }
+
+    func test_loc_different_weeks_same_repo_coexist() throws {
+        try dbq.write { db in
+            try NeverDecreaseUpserter.upsertGitHubLOC(makeLOCRow(weekStart: "2024-05-19"), in: db)
+            try NeverDecreaseUpserter.upsertGitHubLOC(makeLOCRow(weekStart: "2024-05-26"), in: db)
+            XCTAssertEqual(try GitHubLOCWeeklyRow.fetchCount(db), 2)
+        }
+    }
+
+    func test_loc_different_repos_same_week_coexist() throws {
+        try dbq.write { db in
+            try NeverDecreaseUpserter.upsertGitHubLOC(makeLOCRow(repo: "popovs/x"), in: db)
+            try NeverDecreaseUpserter.upsertGitHubLOC(makeLOCRow(repo: "popovs/y"), in: db)
+            XCTAssertEqual(try GitHubLOCWeeklyRow.fetchCount(db), 2)
+        }
+    }
 }

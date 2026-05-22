@@ -62,6 +62,35 @@ struct GitHubRow: Codable, FetchableRecord, PersistableRecord, Equatable {
     }
 }
 
+struct GitHubLOCWeeklyRow: Codable, FetchableRecord, PersistableRecord, Equatable {
+    static let databaseTableName = "github_loc_weekly"
+
+    var id: Int64?
+    var weekStart: String
+    var repo: String
+    var additions: Int64
+    var deletions: Int64
+    var updatedAt: String
+
+    enum Columns {
+        static let id = Column("id")
+        static let weekStart = Column("week_start")
+        static let repo = Column("repo")
+        static let additions = Column("additions")
+        static let deletions = Column("deletions")
+        static let updatedAt = Column("updated_at")
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case weekStart = "week_start"
+        case repo
+        case additions
+        case deletions
+        case updatedAt = "updated_at"
+    }
+}
+
 struct SyncStateRow: Codable, FetchableRecord, PersistableRecord, Equatable {
     static let databaseTableName = "sync_state"
 

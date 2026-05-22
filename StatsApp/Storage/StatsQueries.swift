@@ -19,6 +19,11 @@ struct GitHubTotals: Equatable {
     let uniqueRepos: Int
 }
 
+struct GitHubLOC: Equatable {
+    let additions: Int64
+    let deletions: Int64
+}
+
 enum StatsQueries {
     static func aiTotals(in db: GRDB.Database, days: [String]) throws -> AITotals {
         guard !days.isEmpty else { return AITotals(totalCost: 0, totalInputTokens: 0, totalOutputTokens: 0) }
@@ -63,6 +68,20 @@ enum StatsQueries {
         """
         let row = try Row.fetchOne(db, sql: sql, arguments: StatementArguments(days))!
         return GitHubTotals(totalCommits: row["c"], uniqueRepos: row["r"])
+    }
+
+    /// Суммирует LOC по неделям, которые покрывают переданные дни.
+    static func githubLOC(in db: GRDB.Database, days: [String]) throws -> GitHubLOC {
+        guard !days.isEmpty else { return GitHubLOC(additions: 0, deletions: 0) }
+        let weekStarts = Set(days.compactMap { DateUtils.weekStart(forISODay: $0) })
+        guard !weekStarts.isEmpty else { return GitHubLOC(additions: 0, deletions: 0) }
+        let placeholders = weekStarts.map { _ in "?" }.joined(separator: ",")
+        let sql = """
+            SELECT COALESCE(SUM(additions), 0) AS a, COALESCE(SUM(deletions), 0) AS d
+            FROM github_loc_weekly WHERE week_start IN (\(placeholders))
+        """
+        let row = try Row.fetchOne(db, sql: sql, arguments: StatementArguments(Array(weekStarts)))!
+        return GitHubLOC(additions: row["a"], deletions: row["d"])
     }
 
     /// Возвращает массив cost_usd параллельно `days`. Если за день нет данных — 0.0.

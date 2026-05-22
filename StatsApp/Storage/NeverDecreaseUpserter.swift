@@ -19,6 +19,24 @@ enum NeverDecreaseUpserter {
         }
     }
 
+    /// То же для LOC: метрика сравнения — additions + deletions (общий объём).
+    static func upsertGitHubLOC(_ row: GitHubLOCWeeklyRow, in db: GRDB.Database) throws {
+        let newTotal = row.additions + row.deletions
+        if let existing = try GitHubLOCWeeklyRow
+            .filter(GitHubLOCWeeklyRow.Columns.weekStart == row.weekStart && GitHubLOCWeeklyRow.Columns.repo == row.repo)
+            .fetchOne(db) {
+            let oldTotal = existing.additions + existing.deletions
+            guard newTotal > oldTotal else { return }
+            var updated = row
+            updated.id = existing.id
+            try updated.update(db)
+        } else {
+            var inserted = row
+            inserted.id = nil
+            try inserted.insert(db)
+        }
+    }
+
     /// То же для GitHub: метрика сравнения — commits.
     static func upsertGitHub(_ row: GitHubRow, in db: GRDB.Database) throws {
         if let existing = try GitHubRow

@@ -47,6 +47,9 @@ struct DropdownView: View {
                 Text("GitHub").font(.headline)
                 Text("\(viewModel.githubTotals.totalCommits) commits across \(viewModel.githubTotals.uniqueRepos) repos")
                     .font(.system(.body, design: .monospaced))
+                Text("+\(formatLOC(viewModel.loc.additions)) / -\(formatLOC(viewModel.loc.deletions)) lines")
+                    .font(.system(.body, design: .monospaced))
+                    .foregroundStyle(.secondary)
             }
 
             Divider()
@@ -75,5 +78,12 @@ struct DropdownView: View {
         if value >= 1_000_000 { return String(format: "%.1fM", value / 1_000_000) }
         if value >= 1_000 { return String(format: "%.0fk", value / 1_000) }
         return "\(count)"
+    }
+
+    private func formatLOC(_ count: Int64) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = ","
+        return formatter.string(from: NSNumber(value: count)) ?? "\(count)"
     }
 }
