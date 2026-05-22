@@ -22,24 +22,61 @@ targets:
     platform: macOS
     sources:
       - path: StatsApp
+      - path: Shared
     dependencies:
       - package: GRDB
         product: GRDB
+      - target: StatsWidget
+        embed: true
     info:
       path: StatsApp/Info.plist
       properties:
         LSUIElement: true
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
         CFBundleDisplayName: ai-stats
-        CFBundleShortVersionString: "0.1.0"
+        CFBundleShortVersionString: "0.2.0"
         CFBundleVersion: "1"
         NSHumanReadableCopyright: "Sergey Tovarov, MIT"
         CFBundleDevelopmentRegion: en
         CFBundleLocalizations: [en, ru]
+    entitlements:
+      path: StatsApp/StatsApp.entitlements
+      properties:
+        com.apple.security.application-groups: ["group.com.sergeytovarov.aistats"]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.sergeytovarov.aistats
         GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: StatsApp/StatsApp.entitlements
+
+  StatsWidget:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: StatsWidget
+      - path: Shared
+    dependencies:
+      - package: GRDB
+        product: GRDB
+    info:
+      path: StatsWidget/Info.plist
+      properties:
+        CFBundleDisplayName: ai-stats Widget
+        CFBundleShortVersionString: "0.2.0"
+        CFBundleVersion: "1"
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.widgetkit-extension
+    entitlements:
+      path: StatsWidget/StatsWidget.entitlements
+      properties:
+        com.apple.security.application-groups: ["group.com.sergeytovarov.aistats"]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.sergeytovarov.aistats.widget
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_ENTITLEMENTS: StatsWidget/StatsWidget.entitlements
+        SKIP_INSTALL: YES
+
   StatsAppTests:
     type: bundle.unit-test
     platform: macOS
@@ -57,6 +94,8 @@ targets:
         buildPhase: resources
     dependencies:
       - target: StatsApp
+      - package: GRDB
+        product: GRDB
     settings:
       base:
         BUNDLE_LOADER: "$(TEST_HOST)"

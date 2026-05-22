@@ -3,16 +3,9 @@ import Combine
 import SwiftUI
 import GRDB
 
-enum Period: String, CaseIterable, Identifiable {
-    case day, week, month
-    var id: String { rawValue }
-    var lookbackDays: Int {
-        switch self {
-        case .day: return 0
-        case .week: return 6
-        case .month: return 29
-        }
-    }
+// Period enum lives in Shared/Period.swift — accessible to both app and widget targets.
+
+extension Period {
     var titleKey: LocalizedStringKey {
         switch self {
         case .day: return "period.day"

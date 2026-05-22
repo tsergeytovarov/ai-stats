@@ -3,6 +3,7 @@ import GRDB
 
 enum Database {
     static func openPool(at url: URL = Paths.databaseURL) throws -> DatabasePool {
+        migrateLegacyLocationIfNeeded(targetURL: url)
         var config = Configuration()
         config.prepareDatabase { db in
             try db.execute(sql: "PRAGMA journal_mode = WAL")
@@ -12,6 +13,28 @@ enum Database {
         let pool = try DatabasePool(path: url.path, configuration: config)
         try migrate(pool)
         return pool
+    }
+
+    private static func migrateLegacyLocationIfNeeded(targetURL: URL) {
+        let fm = FileManager.default
+        let legacyURL = Paths.appSupportDir.appendingPathComponent("stats.db")
+        guard !fm.fileExists(atPath: targetURL.path),
+              fm.fileExists(atPath: legacyURL.path) else { return }
+        do {
+            try? fm.createDirectory(at: targetURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try fm.copyItem(at: legacyURL, to: targetURL)
+            // Также пробуем перенести WAL/SHM
+            for suffix in ["-wal", "-shm"] {
+                let legacy = URL(fileURLWithPath: legacyURL.path + suffix)
+                let target = URL(fileURLWithPath: targetURL.path + suffix)
+                if fm.fileExists(atPath: legacy.path) {
+                    try? fm.copyItem(at: legacy, to: target)
+                }
+            }
+            NSLog("ai-stats: migrated DB from \(legacyURL.path) to \(targetURL.path)")
+        } catch {
+            NSLog("ai-stats: legacy DB migration failed: \(error)")
+        }
     }
 
     static func migrate(_ writer: any DatabaseWriter) throws {
