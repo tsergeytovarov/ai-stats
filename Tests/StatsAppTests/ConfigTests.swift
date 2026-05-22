@@ -25,7 +25,7 @@ final class ConfigTests: XCTestCase {
         { "github_token": "", "github_login": "" }
         """.data(using: .utf8)!
         let cfg = try Config.decode(from: json)
-        XCTAssertEqual(cfg.syncIntervalMinutes, 5)
+        XCTAssertEqual(cfg.syncIntervalMinutes, 15)
         XCTAssertEqual(cfg.ccusageCommand, ["npx", "-y", "ccusage@latest"])
         XCTAssertEqual(cfg.enabledProviders, ["claude", "codex"])
     }

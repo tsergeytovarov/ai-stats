@@ -22,7 +22,7 @@ struct Config: Equatable {
         return Config(
             githubToken: container.githubToken,
             githubLogin: container.githubLogin,
-            syncIntervalMinutes: container.syncIntervalMinutes ?? 5,
+            syncIntervalMinutes: container.syncIntervalMinutes ?? 15,
             ccusageCommand: container.ccusageCommand ?? ["npx", "-y", "ccusage@latest"],
             enabledProviders: container.enabledProviders ?? ["claude", "codex"]
         )
@@ -48,7 +48,7 @@ struct Config: Equatable {
     {
       "github_token": "",
       "github_login": "",
-      "sync_interval_minutes": 5,
+      "sync_interval_minutes": 15,
       "ccusage_command": ["npx", "-y", "ccusage@latest"],
       "enabled_providers": ["claude", "codex"]
     }

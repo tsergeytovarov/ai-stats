@@ -167,6 +167,7 @@ struct CcusageFetcher: Fetcher {
             provider, "daily", "--json",
             "--since", sinceArg,
             "--timezone", TimeZone.current.identifier,
+            "--speed", "fast",
         ]
         let head = commandPrefix.first ?? "npx"
 
