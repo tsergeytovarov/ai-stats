@@ -1,0 +1,33 @@
+## macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+## Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Swift Package Manager
+.build/
+Packages/
+Package.resolved
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+
+## Local config (contains secrets)
+config.json
+*.local
+
+## Database files (in case someone runs the app from repo dir)
+*.db
+*.db-wal
+*.db-shm
