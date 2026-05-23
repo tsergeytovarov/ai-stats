@@ -8,15 +8,21 @@ final class SyncCoordinator {
     private let db: any DatabaseWriter
     private let now: () -> Date
     private let snapshotSyncer: SnapshotSyncer?
+    private let friendsPullSyncer: FriendsPullSyncer?
+    private let leaderboardPullSyncer: LeaderboardPullSyncer?
     private var inFlight: Set<String> = []
     private var timer: Timer?
     private(set) var lastSyncAt: [String: Date] = [:]
 
     init(db: any DatabaseWriter,
          snapshotSyncer: SnapshotSyncer? = nil,
+         friendsPullSyncer: FriendsPullSyncer? = nil,
+         leaderboardPullSyncer: LeaderboardPullSyncer? = nil,
          now: @escaping () -> Date = Date.init) {
         self.db = db
         self.snapshotSyncer = snapshotSyncer
+        self.friendsPullSyncer = friendsPullSyncer
+        self.leaderboardPullSyncer = leaderboardPullSyncer
         self.now = now
     }
 
@@ -57,13 +63,20 @@ final class SyncCoordinator {
         try? buildAndWriteWidgetSnapshot()
         WidgetCenter.shared.reloadAllTimelines()
 
-        // После ccusage-sync пушим snapshot'ы на aiuse-сервер (если syncer wired
-        // и есть профиль + sharing). Ошибки тут не должны ронять общий тик.
-        if source == "ccusage", let syncer = snapshotSyncer {
-            do {
-                _ = try await syncer.runOnce()
-            } catch {
-                NSLog("ai-stats aiuse sync error: \(error)")
+        // После ccusage-sync пушим snapshot'ы на aiuse-сервер, потом тянем
+        // обновлённый список друзей и лидерборд. Ошибки не ронят общий тик.
+        if source == "ccusage" {
+            if let syncer = snapshotSyncer {
+                do { _ = try await syncer.runOnce() }
+                catch { NSLog("ai-stats aiuse snapshot sync error: \(error)") }
+            }
+            if let pullSyncer = friendsPullSyncer {
+                do { _ = try await pullSyncer.runOnce() }
+                catch { NSLog("ai-stats aiuse friends pull error: \(error)") }
+            }
+            if let lbSyncer = leaderboardPullSyncer {
+                do { _ = try await lbSyncer.runOnce() }
+                catch { NSLog("ai-stats aiuse leaderboard pull error: \(error)") }
             }
         }
     }
