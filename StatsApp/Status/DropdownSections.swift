@@ -120,7 +120,7 @@ struct DropdownAISection: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("section.trend").font(.caption).foregroundStyle(.secondary)
-                Sparkline(values: viewModel.sparklineSeries)
+                Sparkline(values: viewModel.sparklineSeries, variant: .ai)
             }
         }
     }
@@ -177,7 +177,7 @@ struct DropdownGitHubSection: View {
                 Divider()
                 VStack(alignment: .leading, spacing: 4) {
                     Text("section.trend_additions").font(.caption).foregroundStyle(.secondary)
-                    Sparkline(values: viewModel.additionsSeries, tint: .githubGreen)
+                    Sparkline(values: viewModel.additionsSeries, variant: .github)
                 }
             }
         }
