@@ -45,6 +45,9 @@
 "app.failed_to_start.title" = "ai-stats failed to start";
 
 "unit.never" = "never";
+"unit.commits" = "commits";
+"unit.lines" = "lines";
+"unit.repos_active %d" = "%d active repo(s)";
 "widget.commits_suffix" = "commits";
 
 "delta.vs_yesterday" = "vs yesterday";

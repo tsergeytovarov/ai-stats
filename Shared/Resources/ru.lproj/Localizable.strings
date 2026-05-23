@@ -43,6 +43,9 @@
 "app.failed_to_start.title" = "ai-stats не запустилось";
 
 "unit.never" = "никогда";
+"unit.commits" = "коммитов";
+"unit.lines" = "строк";
+"unit.repos_active %d" = "%d репозиторий активен";
 "widget.commits_suffix" = "коммитов";
 
 "delta.vs_yesterday" = "vs вчера";

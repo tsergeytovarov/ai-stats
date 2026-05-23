@@ -123,53 +123,56 @@ struct DropdownGitHubSection: View {
     @ObservedObject var viewModel: DropdownViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(viewModel.githubTotals.totalCommits)")
-                    .font(.system(size: 32, weight: .semibold, design: .rounded))
-                Text("commits • \(viewModel.githubTotals.uniqueRepos) repos")
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            Crumb(category: .github, title: "GitHub", period: viewModel.period.localizedTitle)
 
-            Divider()
+            HeroNumberWithUnit(
+                number: "\(viewModel.githubTotals.totalCommits)",
+                unit: NSLocalizedString("unit.commits", comment: "")
+            )
+            .padding(.top, 4)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("section.github").font(.headline)
-                Text(String(format: NSLocalizedString("github.loc %@ %@", comment: ""),
-                            DropdownFormat.loc(viewModel.loc.additions),
-                            DropdownFormat.loc(viewModel.loc.deletions)))
-                    .font(.system(.body, design: .monospaced))
-                    .foregroundStyle(.secondary)
-            }
+            Text("+\(viewModel.loc.additions) / −\(viewModel.loc.deletions) " + NSLocalizedString("unit.lines", comment: ""))
+                .font(BrandFont.delta)
+                .foregroundStyle(BrandColor.cyanLight)
+                .padding(.top, 4)
 
-            if viewModel.githubTotals.totalCommits > 0 && !viewModel.topRepos.isEmpty {
-                Divider()
+            Text(String(format: NSLocalizedString("unit.repos_active %d", comment: ""), viewModel.topRepos.count))
+                .font(BrandFont.caption)
+                .foregroundStyle(TextColor.muted)
+                .padding(.top, 2)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("section.top_repos").font(.headline)
-                    ForEach(viewModel.topRepos, id: \.self) { r in
-                        HStack {
-                            Text(DropdownFormat.repoShortName(r.repo))
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            Spacer()
-                            Text("\(r.commits) c")
-                            Text(DropdownFormat.loc(r.additions) + " +")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 90, alignment: .trailing)
-                        }
-                        .font(.system(.body, design: .monospaced))
-                    }
+            Text("section.top_repos")
+                .font(BrandFont.lbl)
+                .tracking(1.2)
+                .textCase(.uppercase)
+                .foregroundStyle(BrandColor.cyanLight.opacity(0.7))
+                .padding(.top, 14)
+                .padding(.bottom, 6)
+
+            ForEach(viewModel.topRepos.prefix(5), id: \.self) { r in
+                HStack {
+                    Text(DropdownFormat.repoShortName(r.repo))
+                        .font(BrandFont.body)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer()
+                    Text("\(r.commits) c · +\(r.additions)")
+                        .font(BrandFont.body)
+                        .monospacedDigit()
+                        .foregroundStyle(.white.opacity(0.8))
                 }
+                .padding(.vertical, 3)
             }
 
-            if viewModel.additionsSeries.contains(where: { $0 > 0 }) {
-                Divider()
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("section.trend_additions").font(.caption).foregroundStyle(.secondary)
-                    Sparkline(values: viewModel.additionsSeries, variant: .github)
-                }
+            Spacer(minLength: 14)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("section.trend_additions")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
+                Sparkline(values: viewModel.additionsSeries, variant: .github)
+                    .frame(height: 38)
             }
         }
     }
