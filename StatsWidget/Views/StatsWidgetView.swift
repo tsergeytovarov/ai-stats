@@ -14,8 +14,8 @@ struct StatsWidgetView: View {
     }
 }
 
-/// Левый блок: период, большая сумма, сабтайтлы.
-/// Используется и в Small, и в левой половине Medium — единообразно.
+/// Левый блок: период, большая сумма, строка дельты, сабтайтлы.
+/// Используется в Small, в левой половине Medium и в левой колонке Large — единообразно.
 struct SummaryColumn: View {
     let entry: StatsEntry
 
@@ -31,8 +31,24 @@ struct SummaryColumn: View {
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
 
+            if let delta = DropdownFormat.formatCostDelta(
+                current: entry.aiCost,
+                previous: entry.aiCostPrev,
+                period: entry.period
+            ) {
+                HStack(spacing: 4) {
+                    Text(delta.arrow + " " + delta.amount)
+                        .foregroundStyle(delta.direction == .up ? .green : .red)
+                    Text(NSLocalizedString(delta.labelKey, comment: ""))
+                        .foregroundStyle(.secondary)
+                }
+                .font(.caption2)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            }
+
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(formatTokens(entry.aiTokens)) tokens")
+                Text("\(DropdownFormat.tokens(entry.aiTokens)) tokens")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 if entry.githubEnabled {
@@ -57,13 +73,6 @@ struct SummaryColumn: View {
         let n = entry.commits
         let suffix = NSLocalizedString("widget.commits_suffix", comment: "")
         return "\(n) \(suffix)"
-    }
-
-    private func formatTokens(_ count: Int64) -> String {
-        let value = Double(count)
-        if value >= 1_000_000 { return String(format: "%.1fM", value / 1_000_000) }
-        if value >= 1_000 { return String(format: "%.0fk", value / 1_000) }
-        return "\(count)"
     }
 }
 
