@@ -51,5 +51,11 @@
 "delta.new" = "NEW";
 
 "section.leaderboard" = "Лидерборд";
+
+"period.short.day" = "Д";
+"period.short.week" = "Н";
+"period.short.month" = "М";
+"section.ai" = "AI";
+"section.friends" = "Друзья";
 "widget.leaderboard.no_account" = "Включи sharing в Настройках, чтобы увидеть лидерборд.";
 "widget.leaderboard.empty" = "Пока никого. Добавь друзей.";

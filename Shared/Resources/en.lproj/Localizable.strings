@@ -53,5 +53,11 @@
 "delta.new" = "NEW";
 
 "section.leaderboard" = "Leaderboard";
+
+"period.short.day" = "D";
+"period.short.week" = "W";
+"period.short.month" = "M";
+"section.ai" = "AI";
+"section.friends" = "Friends";
 "widget.leaderboard.no_account" = "Enable sharing in Settings to see the leaderboard.";
 "widget.leaderboard.empty" = "No friends yet.";
