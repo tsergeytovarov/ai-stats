@@ -145,3 +145,60 @@ struct SyncStateRow: Codable, FetchableRecord, PersistableRecord, Equatable {
         case lastError = "last_error"
     }
 }
+
+/// Свой профиль aiuse — singleton, всегда одна строка с id = 1.
+struct MyProfileRow: Codable, FetchableRecord, PersistableRecord, Equatable {
+    static let databaseTableName = "my_profile"
+
+    var id: Int64 = 1
+    var friendCode: String
+    var displayName: String
+    var avatarPath: String?
+    var sharingEnabled: Bool
+    var serverUserId: Int64
+
+    enum Columns {
+        static let id = Column("id")
+        static let friendCode = Column("friend_code")
+        static let displayName = Column("display_name")
+        static let avatarPath = Column("avatar_path")
+        static let sharingEnabled = Column("sharing_enabled")
+        static let serverUserId = Column("server_user_id")
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case friendCode = "friend_code"
+        case displayName = "display_name"
+        case avatarPath = "avatar_path"
+        case sharingEnabled = "sharing_enabled"
+        case serverUserId = "server_user_id"
+    }
+}
+
+/// Snapshot ожидающий отправки на сервер. hour_bucket = unix seconds (UTC).
+struct PendingSnapshotRow: Codable, FetchableRecord, PersistableRecord, Equatable {
+    static let databaseTableName = "pending_snapshots"
+
+    var hourBucket: Int64
+    var tokensInput: Int64
+    var tokensOutput: Int64
+    var attempts: Int = 0
+    var lastError: String?
+
+    enum Columns {
+        static let hourBucket = Column("hour_bucket")
+        static let tokensInput = Column("tokens_input")
+        static let tokensOutput = Column("tokens_output")
+        static let attempts = Column("attempts")
+        static let lastError = Column("last_error")
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case hourBucket = "hour_bucket"
+        case tokensInput = "tokens_input"
+        case tokensOutput = "tokens_output"
+        case attempts
+        case lastError = "last_error"
+    }
+}
