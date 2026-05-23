@@ -4,22 +4,6 @@ import GRDB
 
 final class SyncCoordinatorSnapshotTests: XCTestCase {
 
-    override func setUp() {
-        super.setUp()
-        // Удаляем snapshot с прошлого теста, чтобы не читать чужие данные.
-        try? FileManager.default.removeItem(at: WidgetSnapshotIO.writeURL)
-    }
-
-    // MARK: - Helpers
-
-    /// Читает snapshot из writeURL (именно туда пишет SyncCoordinator).
-    private func readSnapshot() throws -> WidgetSnapshot {
-        let data = try Data(contentsOf: WidgetSnapshotIO.writeURL)
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(WidgetSnapshot.self, from: data)
-    }
-
     // MARK: - Tests
 
     /// Кладёт траты «вчера» и «сегодня», ожидает что snapshot.day.aiCostPrev = вчерашняя сумма.
@@ -46,12 +30,8 @@ final class SyncCoordinatorSnapshotTests: XCTestCase {
         }
 
         let coordinator = await SyncCoordinator(db: dbq, now: { now })
+        let snapshot = try await coordinator.buildSnapshot()
 
-        // Триггерим запись snapshot'а через runOnce с пустым фетчером (всё уже в DB).
-        let fetcher = await MockFetcher(result: .aiUsage(CcusagePayload(dayRows: [], modelRows: [])))
-        try await coordinator.runOnce(source: "ccusage", fetchers: [fetcher])
-
-        let snapshot = try readSnapshot()
         XCTAssertEqual(snapshot.day.aiCost, 250.0, accuracy: 0.001)
         XCTAssertEqual(snapshot.day.aiCostPrev, 222.40, accuracy: 0.001)
     }
@@ -90,10 +70,8 @@ final class SyncCoordinatorSnapshotTests: XCTestCase {
 
         let now = Date(timeIntervalSince1970: 1_779_873_600)
         let coordinator = await SyncCoordinator(db: dbq, now: { now })
-        let fetcher = await MockFetcher(result: .aiUsage(CcusagePayload(dayRows: [], modelRows: [])))
-        try await coordinator.runOnce(source: "ccusage", fetchers: [fetcher])
+        let snapshot = try await coordinator.buildSnapshot()
 
-        let snapshot = try readSnapshot()
         XCTAssertEqual(snapshot.myFriendCode, "me123")
         let lb = snapshot.day.leaderboard
         XCTAssertNotNil(lb)
@@ -125,10 +103,9 @@ final class SyncCoordinatorSnapshotTests: XCTestCase {
 
         let now = Date(timeIntervalSince1970: 1_779_873_600)
         let coordinator = await SyncCoordinator(db: dbq, now: { now })
-        let fetcher = await MockFetcher(result: .aiUsage(CcusagePayload(dayRows: [], modelRows: [])))
-        try await coordinator.runOnce(source: "ccusage", fetchers: [fetcher])
+        let snapshot = try await coordinator.buildSnapshot()
 
-        let lb = try readSnapshot().day.leaderboard!
+        let lb = snapshot.day.leaderboard!
         XCTAssertEqual(lb.entries.count, 1)
         XCTAssertNil(lb.meBelow)
     }
@@ -140,24 +117,9 @@ final class SyncCoordinatorSnapshotTests: XCTestCase {
 
         let now = Date(timeIntervalSince1970: 1_779_873_600)
         let coordinator = await SyncCoordinator(db: dbq, now: { now })
-        let fetcher = await MockFetcher(result: .aiUsage(CcusagePayload(dayRows: [], modelRows: [])))
-        try await coordinator.runOnce(source: "ccusage", fetchers: [fetcher])
+        let snapshot = try await coordinator.buildSnapshot()
 
-        let snapshot = try readSnapshot()
         XCTAssertNil(snapshot.day.leaderboard)
         XCTAssertNil(snapshot.myFriendCode)
-    }
-}
-
-// Локальный MockFetcher — копия из SyncCoordinatorTests (намеренно дублируем, файлы тестов независимы).
-private actor MockFetcher: Fetcher {
-    var callCount = 0
-    var lastSince: Date?
-    var result: FetchResult
-    init(result: FetchResult) { self.result = result }
-    func fetch(since: Date) async throws -> FetchResult {
-        callCount += 1
-        lastSince = since
-        return result
     }
 }

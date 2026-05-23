@@ -82,8 +82,8 @@ final class SyncCoordinator {
     }
 
     /// Считает текущие totals за Day/Week/Month, prev-cost для дельт, и leaderboard slice.
-    /// Пишет JSON в контейнер виджета.
-    private func buildAndWriteWidgetSnapshot() throws {
+    /// Чистая функция: не пишет на диск.
+    internal func buildSnapshot() throws -> WidgetSnapshot {
         let nowDate = now()
         let dayDays = DateUtils.daysRange(endingAt: nowDate, lookback: Period.day.lookbackDays)
         let weekDays = DateUtils.daysRange(endingAt: nowDate, lookback: Period.week.lookbackDays)
@@ -112,7 +112,7 @@ final class SyncCoordinator {
         let anyCommits = result.day.commits + result.week.commits + result.month.commits
         let anyRepos = max(result.day.uniqueRepos, result.week.uniqueRepos, result.month.uniqueRepos)
 
-        let snapshot = WidgetSnapshot(
+        return WidgetSnapshot(
             generatedAt: nowDate,
             day: result.day,
             week: result.week,
@@ -120,6 +120,11 @@ final class SyncCoordinator {
             githubEnabled: anyCommits > 0 || anyRepos > 0,
             myFriendCode: result.myFriendCode
         )
+    }
+
+    /// Вычисляет snapshot и пишет его в контейнер виджета.
+    private func buildAndWriteWidgetSnapshot() throws {
+        let snapshot = try buildSnapshot()
         try WidgetSnapshotIO.write(snapshot)
     }
 
@@ -162,7 +167,13 @@ final class SyncCoordinator {
         guard let row = try StatsQueries.loadLeaderboardCache(db, period: period) else { return nil }
         guard let data = row.payloadJson.data(using: .utf8) else { return nil }
         let decoder = JSONDecoder()
-        guard let resp = try? decoder.decode(LeaderboardResponse.self, from: data) else { return nil }
+        let resp: LeaderboardResponse
+        do {
+            resp = try decoder.decode(LeaderboardResponse.self, from: data)
+        } catch {
+            NSLog("ai-stats widget leaderboard decode error [\(period)]: \(error)")
+            return nil
+        }
 
         func mapEntry(_ e: LeaderboardEntry) -> WidgetSnapshot.LeaderboardSlice.Entry {
             WidgetSnapshot.LeaderboardSlice.Entry(
@@ -174,10 +185,12 @@ final class SyncCoordinator {
             )
         }
 
-        let top8 = resp.entries.prefix(8).map(mapEntry)
+        let topEntries = Array(resp.entries.prefix(8))
+        let top8 = topEntries.map(mapEntry)
+
         let meBelow: WidgetSnapshot.LeaderboardSlice.Entry?
         if let myCode = myFriendCode,
-           !top8.contains(where: { $0.isMe }),
+           !topEntries.contains(where: { $0.friendCode == myCode }),
            let mine = resp.entries.first(where: { $0.friendCode == myCode })
         {
             meBelow = mapEntry(mine)
