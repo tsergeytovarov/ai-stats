@@ -14,25 +14,34 @@ struct StatsWidgetView: View {
     }
 }
 
-struct SmallView: View {
+/// Левый блок: период, большая сумма, сабтайтлы.
+/// Используется и в Small, и в левой половине Medium — единообразно.
+struct SummaryColumn: View {
     let entry: StatsEntry
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(periodLabel).font(.caption).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 6) {
+            Text(periodLabel)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+
             Text(String(format: "$%.2f", entry.aiCost))
-                .font(.system(size: 28, weight: .semibold, design: .rounded))
+                .font(.system(size: 30, weight: .semibold, design: .rounded))
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
-            Spacer(minLength: 4)
-            Text("\(formatTokens(entry.aiTokens)) tokens")
-                .font(.caption).foregroundStyle(.secondary)
-            if entry.githubEnabled {
-                Text("\(entry.commits) commits")
-                    .font(.caption).foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(formatTokens(entry.aiTokens)) tokens")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                if entry.githubEnabled {
+                    Text(commitsText)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
-        .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
@@ -44,6 +53,12 @@ struct SmallView: View {
         }
     }
 
+    private var commitsText: String {
+        let n = entry.commits
+        let suffix = NSLocalizedString("widget.commits_suffix", comment: "")
+        return "\(n) \(suffix)"
+    }
+
     private func formatTokens(_ count: Int64) -> String {
         let value = Double(count)
         if value >= 1_000_000 { return String(format: "%.1fM", value / 1_000_000) }
@@ -52,43 +67,70 @@ struct SmallView: View {
     }
 }
 
+struct SmallView: View {
+    let entry: StatsEntry
+
+    var body: some View {
+        SummaryColumn(entry: entry)
+            .padding(14)
+    }
+}
+
 struct MediumView: View {
     let entry: StatsEntry
 
     var body: some View {
-        HStack(spacing: 12) {
-            SmallView(entry: entry)
-                .frame(maxWidth: .infinity, alignment: .leading)
+        HStack(alignment: .top, spacing: 12) {
+            SummaryColumn(entry: entry)
 
             Divider()
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("section.top_models").font(.caption).foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("section.top_models")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textCase(.uppercase)
+
                 if entry.topModels.isEmpty {
-                    Text("label.no_data").font(.caption2).foregroundStyle(.secondary)
+                    Text("label.no_data")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
                 } else {
-                    ForEach(entry.topModels.prefix(4), id: \.self) { m in
-                        HStack {
-                            Text(shortModel(m.model))
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            Spacer()
-                            Text(String(format: "$%.2f", m.costUsd))
-                                .font(.system(.caption, design: .monospaced))
+                    VStack(alignment: .leading, spacing: 3) {
+                        ForEach(entry.topModels.prefix(4), id: \.self) { m in
+                            ModelRow(model: m)
                         }
-                        .font(.caption)
                     }
                 }
-                Spacer()
+                Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .padding()
+        .padding(14)
+    }
+}
+
+private struct ModelRow: View {
+    let model: WidgetSnapshot.ModelEntry
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Text(shortName)
+                .font(.system(.caption, design: .default))
+                .lineLimit(1)
+                .truncationMode(.tail)
+            Spacer(minLength: 4)
+            Text(String(format: "$%.2f", model.costUsd))
+                .font(.system(.caption, design: .monospaced))
+        }
     }
 
-    private func shortModel(_ name: String) -> String {
-        // claude-opus-4-7 → opus-4-7; gpt-5.5 → gpt-5.5
-        if name.hasPrefix("claude-") { return String(name.dropFirst("claude-".count)) }
-        return name
+    /// claude-opus-4-7 → opus-4-7, claude-sonnet-4-6 → sonnet-4-6,
+    /// codex-auto-review → codex-review (укоротили чтоб влезало).
+    private var shortName: String {
+        var s = model.model
+        if s.hasPrefix("claude-") { s = String(s.dropFirst("claude-".count)) }
+        if s.hasPrefix("claude-haiku-4-5") { s = "haiku-4-5" }
+        return s
     }
 }

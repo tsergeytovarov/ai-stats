@@ -45,3 +45,4 @@
 "app.failed_to_start.title" = "ai-stats failed to start";
 
 "unit.never" = "never";
+"widget.commits_suffix" = "commits";

@@ -43,3 +43,4 @@
 "app.failed_to_start.title" = "ai-stats не запустилось";
 
 "unit.never" = "никогда";
+"widget.commits_suffix" = "коммитов";
