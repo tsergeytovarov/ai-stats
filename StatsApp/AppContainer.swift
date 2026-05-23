@@ -10,6 +10,7 @@ final class AppContainer {
     let syncCoordinator: SyncCoordinator
     let dropdownViewModel: DropdownViewModel
     let keychain: KeychainStore
+    let secretBox: SecretBox
     let aiuseAPI: AiuseAPIClient
     let snapshotSyncer: SnapshotSyncer
 
@@ -22,10 +23,17 @@ final class AppContainer {
         // aiuse wiring
         let kc = MacOSKeychainStore()
         self.keychain = kc
+
+        // Один Keychain prompt при старте — дальше отдаём из memory cache.
+        // Без этого macOS триггерит prompt на каждый sync-запрос (unsigned-app).
+        let box = SecretBox()
+        box.value = kc.get(account: AiuseKeychain.account, service: AiuseKeychain.service)
+        self.secretBox = box
+
         let baseURL = URL(string: cfg.aiuseApiBaseURL) ?? URL(string: "https://aiuse.popovs.tech/api")!
         let api = AiuseAPIClient(
             baseURL: baseURL,
-            secretProvider: { kc.get(account: AiuseKeychain.account, service: AiuseKeychain.service) }
+            secretProvider: { box.value }
         )
         self.aiuseAPI = api
         let syncer = SnapshotSyncer(db: dbPool, api: api)
@@ -45,7 +53,7 @@ final class AppContainer {
 
     /// Создаёт fresh AccountTabViewModel — для каждого открытия окна настроек.
     func makeAccountTabViewModel() -> AccountTabViewModel {
-        AccountTabViewModel(api: aiuseAPI, keychain: keychain, db: dbPool)
+        AccountTabViewModel(api: aiuseAPI, keychain: keychain, secretBox: secretBox, db: dbPool)
     }
 
     /// Создаёт fresh FriendsTabViewModel — для каждого открытия окна настроек.

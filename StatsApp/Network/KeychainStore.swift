@@ -96,3 +96,13 @@ enum AiuseKeychain {
     static let service = "tech.popovs.aiuse"
     static let account = "aiuse-api-secret"
 }
+
+/// Memory-кэш api_secret. Заполняется один раз при старте AppContainer
+/// (из Keychain — это вызовет один macOS prompt), дальше живёт в памяти
+/// процесса. AccountTabViewModel обновляет value после create/delete.
+/// Нужен потому что unsigned-app триггерит Keychain-prompt на каждый
+/// SecItemCopyMatching — без кэша это означает prompt каждые 5 минут.
+@MainActor
+final class SecretBox {
+    var value: String?
+}

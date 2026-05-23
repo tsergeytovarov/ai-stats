@@ -15,11 +15,13 @@ final class AccountTabViewModel: ObservableObject {
 
     private let api: AiuseAPIClient
     private let keychain: KeychainStore
+    private let secretBox: SecretBox
     private let db: any DatabaseWriter
 
-    init(api: AiuseAPIClient, keychain: KeychainStore, db: any DatabaseWriter) {
+    init(api: AiuseAPIClient, keychain: KeychainStore, secretBox: SecretBox, db: any DatabaseWriter) {
         self.api = api
         self.keychain = keychain
+        self.secretBox = secretBox
         self.db = db
     }
 
@@ -47,6 +49,7 @@ final class AccountTabViewModel: ObservableObject {
                 displayName: displayName, avatar: avatar, avatarMime: avatarMime
             )
             try keychain.set(resp.apiSecret, account: AiuseKeychain.account, service: AiuseKeychain.service)
+            secretBox.value = resp.apiSecret  // обновляем memory cache
 
             let row = MyProfileRow(
                 id: 1,
@@ -114,6 +117,7 @@ final class AccountTabViewModel: ObservableObject {
         do {
             try await api.deleteAccount()
             try keychain.delete(account: AiuseKeychain.account, service: AiuseKeychain.service)
+            secretBox.value = nil  // чистим memory cache
             try await db.write { try StatsQueries.deleteMyProfile($0) }
             state = .notCreated
         } catch {
