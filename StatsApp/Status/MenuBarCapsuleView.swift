@@ -6,13 +6,13 @@ struct MenuBarCapsuleView: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "chart.line.uptrend.xyaxis")
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 10, weight: .semibold))
             Text(priceText)
                 .font(.system(size: 11, weight: .semibold))
                 .monospacedDigit()
         }
         .foregroundStyle(.white)
-        .padding(.vertical, 3)
+        .padding(.vertical, 2)
         .padding(.horizontal, 8)
         .background(
             LinearGradient(

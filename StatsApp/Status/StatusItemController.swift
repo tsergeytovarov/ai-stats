@@ -44,15 +44,18 @@ final class StatusItemController: NSObject {
 
     private func updateCapsule(in button: NSStatusBarButton, priceText: String) {
         let hosting = NSHostingView(rootView: MenuBarCapsuleView(priceText: priceText))
-        hosting.frame.size = hosting.intrinsicContentSize
-        // Cap height to menu bar thickness so the capsule never overflows.
+        let fitting = hosting.fittingSize  // SwiftUI-aware размер, лучше чем intrinsicContentSize
+
+        // Высота menu bar item фиксированная (≈22pt на macOS). Capsule должен туда вписаться.
         let menuBarHeight = NSStatusBar.system.thickness
-        if hosting.frame.size.height > menuBarHeight {
-            hosting.frame.size.height = menuBarHeight
-        }
+
         button.subviews.forEach { $0.removeFromSuperview() }
+        hosting.frame = NSRect(x: 0, y: 0, width: fitting.width, height: menuBarHeight)
+        hosting.autoresizingMask = [.width, .height]
         button.addSubview(hosting)
-        button.frame.size = hosting.frame.size
+
+        // Явно задаём длину statusItem (а не frame button — у NSStatusItem есть length).
+        statusItem?.length = fitting.width
         button.title = ""
     }
 
