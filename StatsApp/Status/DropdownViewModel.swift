@@ -15,6 +15,21 @@ extension Period {
     }
 }
 
+enum DropdownSection: String, CaseIterable, Identifiable {
+    case ai
+    case github
+    case leaderboard
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .ai: return "AI"
+        case .github: return "GitHub"
+        case .leaderboard: return "Лидерборд"
+        }
+    }
+}
+
 @MainActor
 final class DropdownViewModel: ObservableObject {
     private let db: any DatabaseReader
@@ -29,6 +44,7 @@ final class DropdownViewModel: ObservableObject {
             Task { await loadLeaderboard() }
         }
     }
+    @Published var section: DropdownSection = .ai
     @Published var aiTotals: AITotals = .init(totalCost: 0, totalInputTokens: 0, totalOutputTokens: 0)
     @Published var bySource: [SourceTotal] = []
     @Published var topModels: [ModelTotal] = []
