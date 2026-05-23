@@ -93,7 +93,7 @@ struct WidgetSnapshot: Codable, Equatable {
 
     struct LeaderboardSlice: Codable, Equatable {
         let entries: [Entry]      // <= 8
-        let meExtra: Entry?       // nil, если я в top-8 или меня нет вовсе
+        let meBelow: Entry?       // nil, если я в top-8 или меня нет вовсе
 
         struct Entry: Codable, Equatable {
             let rank: Int

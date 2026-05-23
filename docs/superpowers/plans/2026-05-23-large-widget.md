@@ -322,7 +322,7 @@ struct WidgetSnapshot: Codable, Equatable {
 
     struct LeaderboardSlice: Codable, Equatable {
         let entries: [Entry]      // <= 8
-        let meExtra: Entry?       // nil, если я в top-8 или меня нет вовсе
+        let meBelow: Entry?       // nil, если я в top-8 или меня нет вовсе
 
         struct Entry: Codable, Equatable {
             let rank: Int
@@ -419,7 +419,7 @@ func test_roundtrip_with_full_leaderboard_slice() throws {
             .init(rank: 1, previousRank: 11, displayName: "Серёжа", tokensTotal: 12_400, isMe: false),
             .init(rank: 2, previousRank: 5,  displayName: "Вася",    tokensTotal: 9_800,  isMe: false),
         ],
-        meExtra: me
+        meBelow: me
     )
     let slice = WidgetSnapshot.PeriodSlice(
         aiCost: 250.0, aiCostPrev: 222.40,
@@ -442,7 +442,7 @@ func test_roundtrip_with_full_leaderboard_slice() throws {
     let decoded = try decoder.decode(WidgetSnapshot.self, from: data)
 
     XCTAssertEqual(decoded, snapshot)
-    XCTAssertEqual(decoded.day.leaderboard?.meExtra?.rank, 42)
+    XCTAssertEqual(decoded.day.leaderboard?.meBelow?.rank, 42)
     XCTAssertEqual(decoded.myFriendCode, "abc123")
 }
 
@@ -535,13 +535,13 @@ final class SyncCoordinatorSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot!.day.aiCostPrev, 222.40, accuracy: 0.001)
     }
 
-    /// Если в leaderboard_cache есть payload — top-N попадает в slice; если меня нет в топе, я в meExtra.
-    func test_snapshot_day_slice_contains_leaderboard_top8_and_meExtra() async throws {
+    /// Если в leaderboard_cache есть payload — top-N попадает в slice; если меня нет в топе, я в meBelow.
+    func test_snapshot_day_slice_contains_leaderboard_top8_and_meBelow() async throws {
         let dbq = try DatabaseQueue()
         try Database.migrate(dbq)
 
         try await dbq.write { db in
-            // Свой профиль — нужен для myFriendCode и meExtra.
+            // Свой профиль — нужен для myFriendCode и meBelow.
             try StatsQueries.saveMyProfile(db, MyProfileRow(
                 friendCode: "me123", displayName: "Я", avatarPath: nil, sharingEnabled: true, serverUserId: 1
             ))
@@ -580,14 +580,14 @@ final class SyncCoordinatorSnapshotTests: XCTestCase {
         XCTAssertEqual(lb!.entries.count, 8)
         XCTAssertEqual(lb!.entries.first?.rank, 1)
         XCTAssertEqual(lb!.entries.last?.rank, 8)
-        // Я — 9-й, в топ-8 не попал, должен быть в meExtra.
-        XCTAssertNotNil(lb!.meExtra)
-        XCTAssertEqual(lb!.meExtra?.rank, 9)
-        XCTAssertEqual(lb!.meExtra?.isMe, true)
+        // Я — 9-й, в топ-8 не попал, должен быть в meBelow.
+        XCTAssertNotNil(lb!.meBelow)
+        XCTAssertEqual(lb!.meBelow?.rank, 9)
+        XCTAssertEqual(lb!.meBelow?.isMe, true)
     }
 
-    /// Если меня нет в кэше вообще — meExtra = nil.
-    func test_snapshot_leaderboard_meExtra_nil_when_me_absent() async throws {
+    /// Если меня нет в кэше вообще — meBelow = nil.
+    func test_snapshot_leaderboard_meBelow_nil_when_me_absent() async throws {
         let dbq = try DatabaseQueue()
         try Database.migrate(dbq)
 
@@ -610,7 +610,7 @@ final class SyncCoordinatorSnapshotTests: XCTestCase {
 
         let lb = WidgetSnapshotIO.read()!.day.leaderboard!
         XCTAssertEqual(lb.entries.count, 1)
-        XCTAssertNil(lb.meExtra)
+        XCTAssertNil(lb.meBelow)
     }
 
     /// Если кэша лидерборда нет — leaderboard = nil.
@@ -730,7 +730,7 @@ private static func makeSlice(
     )
 }
 
-/// Парсит leaderboard_cache.payload_json в LeaderboardSlice: top-8 entries + meExtra если я ниже.
+/// Парсит leaderboard_cache.payload_json в LeaderboardSlice: top-8 entries + meBelow если я ниже.
 private static func makeLeaderboardSlice(
     in db: GRDB.Database, period: String, myFriendCode: String?
 ) throws -> WidgetSnapshot.LeaderboardSlice? {
@@ -750,17 +750,17 @@ private static func makeLeaderboardSlice(
     }
 
     let top8 = resp.entries.prefix(8).map(mapEntry)
-    let meExtra: WidgetSnapshot.LeaderboardSlice.Entry?
+    let meBelow: WidgetSnapshot.LeaderboardSlice.Entry?
     if let myCode = myFriendCode,
        !top8.contains(where: { $0.isMe }),
        let mine = resp.entries.first(where: { $0.friendCode == myCode })
     {
-        meExtra = mapEntry(mine)
+        meBelow = mapEntry(mine)
     } else {
-        meExtra = nil
+        meBelow = nil
     }
 
-    return WidgetSnapshot.LeaderboardSlice(entries: Array(top8), meExtra: meExtra)
+    return WidgetSnapshot.LeaderboardSlice(entries: Array(top8), meBelow: meBelow)
 }
 ```
 
@@ -1055,7 +1055,7 @@ struct LeaderboardColumn: View {
             } else {
                 VStack(alignment: .leading, spacing: 2) {
                     ForEach(slice.entries, id: \.rank) { LeaderboardRow(entry: $0) }
-                    if let me = slice.meExtra {
+                    if let me = slice.meBelow {
                         Text("⋯").font(.caption2).foregroundStyle(.secondary)
                         LeaderboardRow(entry: me)
                     }
@@ -1286,7 +1286,7 @@ git commit -m "docs: changelog и readme — Large widget с лидерборд�
 | Тест-файл | Что покрывает |
 |---|---|
 | `Tests/StatsAppTests/WidgetSnapshotTests.swift` (новый, 3 теста) | round-trip с полным `LeaderboardSlice`, back-compat для top-level и для `PeriodSlice` |
-| `Tests/StatsAppTests/Sync/SyncCoordinatorSnapshotTests.swift` (новый, 4 теста) | `aiCostPrev` берётся из второго `aiTotals`; leaderboard top-8 + meExtra; `meExtra=nil` если меня нет в кэше; `leaderboard=nil` если кэша нет |
+| `Tests/StatsAppTests/Sync/SyncCoordinatorSnapshotTests.swift` (новый, 4 теста) | `aiCostPrev` берётся из второго `aiTotals`; leaderboard top-8 + meBelow; `meBelow=nil` если меня нет в кэше; `leaderboard=nil` если кэша нет |
 | `Tests/StatsAppTests/UI/CostDeltaTests.swift` (существующий) | переиспользуем — `DropdownFormat.formatCostDelta` теперь в Shared, но `@testable import StatsApp` всё видит |
 | `Tests/StatsAppTests/UI/RankDeltaTests.swift` (существующий) | переиспользуем |
 

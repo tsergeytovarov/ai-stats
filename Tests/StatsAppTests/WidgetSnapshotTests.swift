@@ -33,7 +33,7 @@ final class WidgetSnapshotTests: XCTestCase {
                 .init(rank: 1, previousRank: 11, displayName: "Серёжа", tokensTotal: 12_400, isMe: false),
                 .init(rank: 2, previousRank: 5,  displayName: "Вася",    tokensTotal: 9_800,  isMe: false),
             ],
-            meExtra: me
+            meBelow: me
         )
         let slice = WidgetSnapshot.PeriodSlice(
             aiCost: 250.0, aiCostPrev: 222.40,
@@ -56,8 +56,31 @@ final class WidgetSnapshotTests: XCTestCase {
         let decoded = try decoder.decode(WidgetSnapshot.self, from: data)
 
         XCTAssertEqual(decoded, snapshot)
-        XCTAssertEqual(decoded.day.leaderboard?.meExtra?.rank, 42)
+        XCTAssertEqual(decoded.day.leaderboard?.meBelow?.rank, 42)
         XCTAssertEqual(decoded.myFriendCode, "abc123")
+    }
+
+    func test_decode_explicit_null_for_optional_fields_uses_defaults() throws {
+        // decodeIfPresent трактует explicit `null` так же, как отсутствие ключа.
+        // Фиксируем это поведение тестом, чтобы будущее изменение схемы не сломало контракт.
+        let json = """
+        {
+            "generatedAt": "2026-05-23T12:00:00Z",
+            "githubEnabled": true,
+            "myFriendCode": null,
+            "day":   { "aiCost": 10.0, "aiCostPrev": null, "aiTokens": 100, "commits": 1, "uniqueRepos": 1, "topModels": [], "leaderboard": null },
+            "week":  { "aiCost": 50.0, "aiTokens": 500, "commits": 5, "uniqueRepos": 2, "topModels": [] },
+            "month": { "aiCost": 200.0, "aiTokens": 2000, "commits": 20, "uniqueRepos": 3, "topModels": [] }
+        }
+        """.data(using: .utf8)!
+
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let snapshot = try decoder.decode(WidgetSnapshot.self, from: json)
+
+        XCTAssertEqual(snapshot.day.aiCostPrev, 0)
+        XCTAssertNil(snapshot.day.leaderboard)
+        XCTAssertNil(snapshot.myFriendCode)
     }
 
     func test_decode_legacy_json_with_partial_period_slice() throws {
