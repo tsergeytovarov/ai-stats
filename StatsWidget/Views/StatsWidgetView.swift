@@ -9,6 +9,7 @@ struct StatsWidgetView: View {
         switch family {
         case .systemSmall: SmallView(entry: entry)
         case .systemMedium: MediumView(entry: entry)
+        case .systemLarge: LargeView(entry: entry)
         default: SmallView(entry: entry)
         }
     }
@@ -119,7 +120,7 @@ struct MediumView: View {
     }
 }
 
-private struct ModelRow: View {
+struct ModelRow: View {
     let model: WidgetSnapshot.ModelEntry
 
     var body: some View {
