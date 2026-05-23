@@ -159,4 +159,17 @@ final class StatsQueriesTests: XCTestCase {
         XCTAssertEqual(result[0].model, "claude-opus-4-7")
         XCTAssertEqual(result[0].costUsd, 8.0, accuracy: 0.001)
     }
+
+    /// Контракт для дельты по периодам: два вызова с непересекающимися диапазонами
+    /// возвращают независимые суммы — нет общего стейта между вызовами.
+    func test_aiTotals_disjointDayRanges_giveIndependentSums() throws {
+        let current = try dbq.read { db in
+            try StatsQueries.aiTotals(in: db, days: ["2024-05-22"])
+        }
+        let previous = try dbq.read { db in
+            try StatsQueries.aiTotals(in: db, days: ["2024-05-20"])
+        }
+        XCTAssertEqual(current.totalCost, 5.0)   // 2.0 (claude) + 3.0 (codex)
+        XCTAssertEqual(previous.totalCost, 1.5)  // 1.5 (claude)
+    }
 }

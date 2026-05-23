@@ -46,6 +46,7 @@ final class DropdownViewModel: ObservableObject {
     }
     @Published var section: DropdownSection = .ai
     @Published var aiTotals: AITotals = .init(totalCost: 0, totalInputTokens: 0, totalOutputTokens: 0)
+    @Published var aiTotalsPrev: AITotals = .init(totalCost: 0, totalInputTokens: 0, totalOutputTokens: 0)
     @Published var bySource: [SourceTotal] = []
     @Published var topModels: [ModelTotal] = []
     @Published var githubTotals: GitHubTotals = .init(totalCommits: 0, uniqueRepos: 0)
@@ -76,11 +77,13 @@ final class DropdownViewModel: ObservableObject {
     func reload() async {
         let now = Date()
         let periodDays = DateUtils.daysRange(endingAt: now, lookback: period.lookbackDays)
+        let prevPeriodDays = DateUtils.previousPeriodDays(endingAt: now, lookback: period.lookbackDays)
         let sparkDays = DateUtils.daysRange(endingAt: now, lookback: 29)
 
         do {
-            let snapshot = try await db.read { db -> (AITotals, [SourceTotal], [ModelTotal], GitHubTotals, GitHubLOC, [RepoTotal], [Double], [Double]) in
+            let snapshot = try await db.read { db -> (AITotals, AITotals, [SourceTotal], [ModelTotal], GitHubTotals, GitHubLOC, [RepoTotal], [Double], [Double]) in
                 let totals = try StatsQueries.aiTotals(in: db, days: periodDays)
+                let totalsPrev = try StatsQueries.aiTotals(in: db, days: prevPeriodDays)
                 let bySource = try StatsQueries.aiTotalsBySource(in: db, days: periodDays)
                 let models = try StatsQueries.topModels(in: db, days: periodDays, limit: 5)
                 let gh = try StatsQueries.githubTotals(in: db, days: periodDays)
@@ -88,16 +91,17 @@ final class DropdownViewModel: ObservableObject {
                 let repos = try StatsQueries.topRepos(in: db, days: periodDays, limit: 5)
                 let costSeries = try StatsQueries.dailyAICostSeries(in: db, days: sparkDays)
                 let addsSeries = try StatsQueries.dailyAdditionsSeries(in: db, days: sparkDays)
-                return (totals, bySource, models, gh, loc, repos, costSeries, addsSeries)
+                return (totals, totalsPrev, bySource, models, gh, loc, repos, costSeries, addsSeries)
             }
             self.aiTotals = snapshot.0
-            self.bySource = snapshot.1
-            self.topModels = snapshot.2
-            self.githubTotals = snapshot.3
-            self.loc = snapshot.4
-            self.topRepos = snapshot.5
-            self.sparklineSeries = snapshot.6
-            self.additionsSeries = snapshot.7
+            self.aiTotalsPrev = snapshot.1
+            self.bySource = snapshot.2
+            self.topModels = snapshot.3
+            self.githubTotals = snapshot.4
+            self.loc = snapshot.5
+            self.topRepos = snapshot.6
+            self.sparklineSeries = snapshot.7
+            self.additionsSeries = snapshot.8
             self.lastSyncDescription = relativeDescription(for: syncCoordinator?.lastSyncAt.values.max())
         } catch {
             NSLog("ai-stats reload error: \(error)")

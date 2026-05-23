@@ -44,3 +44,8 @@
 
 "unit.never" = "никогда";
 "widget.commits_suffix" = "коммитов";
+
+"delta.vs_yesterday" = "vs вчера";
+"delta.vs_prev_week" = "vs прошлой недели";
+"delta.vs_prev_month" = "vs прошлого месяца";
+"delta.new" = "NEW";

@@ -46,3 +46,8 @@
 
 "unit.never" = "never";
 "widget.commits_suffix" = "commits";
+
+"delta.vs_yesterday" = "vs yesterday";
+"delta.vs_prev_week" = "vs last week";
+"delta.vs_prev_month" = "vs last month";
+"delta.new" = "NEW";

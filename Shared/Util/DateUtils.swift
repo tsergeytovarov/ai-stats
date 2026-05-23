@@ -56,4 +56,15 @@ enum DateUtils {
         }
         return days
     }
+
+    /// Возвращает `lookback + 1` ISO-дней для окна, непосредственно предшествующего
+    /// `daysRange(endingAt: end, lookback: lookback)` — той же длины.
+    /// lookback=0 → [yesterday]
+    /// lookback=6 → 7 дней, [end-13 ... end-7]
+    /// lookback=29 → 30 дней, [end-59 ... end-30]
+    static func previousPeriodDays(endingAt end: Date, lookback: Int) -> [String] {
+        let cal = Calendar(identifier: .gregorian)
+        guard let prevEnd = cal.date(byAdding: .day, value: -(lookback + 1), to: end) else { return [] }
+        return daysRange(endingAt: prevEnd, lookback: lookback)
+    }
 }

@@ -126,6 +126,7 @@ struct LeaderboardEntry: Codable, Identifiable, Equatable {
     let friendCode: String
     let displayName: String
     let rank: Int
+    let previousRank: Int?
     let tokensTotal: Int64
     let isMe: Bool
 
@@ -135,6 +136,7 @@ struct LeaderboardEntry: Codable, Identifiable, Equatable {
         case friendCode = "friend_code"
         case displayName = "display_name"
         case rank
+        case previousRank = "previous_rank"
         case tokensTotal = "tokens_total"
         case isMe = "is_me"
     }

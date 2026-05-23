@@ -1,5 +1,27 @@
 import SwiftUI
 
+// MARK: - delta content types
+
+enum DeltaDirection: Equatable {
+    case up
+    case down
+}
+
+struct CostDeltaContent: Equatable {
+    let arrow: String       // "▲" или "▼"
+    let amount: String      // "+$27.60" или "−$50.00"
+    let labelKey: String    // ключ для NSLocalizedString
+    let direction: DeltaDirection
+}
+
+struct RankDeltaContent: Equatable {
+    enum Kind: Equatable {
+        case change(magnitude: Int, direction: DeltaDirection)
+        case new
+    }
+    let kind: Kind
+}
+
 // MARK: - helpers (shared between sections)
 
 enum DropdownFormat {
@@ -22,6 +44,88 @@ enum DropdownFormat {
         guard let slash = full.firstIndex(of: "/") else { return full }
         return String(full[full.index(after: slash)...])
     }
+
+    static func formatCostDelta(current: Double, previous: Double, period: Period) -> CostDeltaContent? {
+        guard current > 0 else { return nil }
+        let diff = current - previous
+        // Скрываем дельту, если разница меньше копейки — после округления до $0.00 показывать стрелку бессмысленно.
+        guard abs(diff) >= 0.005 else { return nil }
+        let direction: DeltaDirection = diff > 0 ? .up : .down
+        let arrow = diff > 0 ? "▲" : "▼"
+        let sign = diff > 0 ? "+" : "−"
+        let amount = String(format: "%@$%.2f", sign, abs(diff))
+        let labelKey: String
+        switch period {
+        case .day:   labelKey = "delta.vs_yesterday"
+        case .week:  labelKey = "delta.vs_prev_week"
+        case .month: labelKey = "delta.vs_prev_month"
+        }
+        return CostDeltaContent(arrow: arrow, amount: amount, labelKey: labelKey, direction: direction)
+    }
+
+    static func formatRankDelta(current: Int, previous: Int?) -> RankDeltaContent? {
+        guard let previous else {
+            return RankDeltaContent(kind: .new)
+        }
+        let diff = previous - current   // подъём в рейтинге = current уменьшился = diff положительный
+        guard diff != 0 else { return nil }
+        let direction: DeltaDirection = diff > 0 ? .up : .down
+        return RankDeltaContent(kind: .change(magnitude: abs(diff), direction: direction))
+    }
+}
+
+// MARK: - delta views
+
+private extension DeltaDirection {
+    var color: Color {
+        switch self {
+        case .up:   return .green
+        case .down: return .red
+        }
+    }
+}
+
+struct CostDelta: View {
+    let current: Double
+    let previous: Double
+    let period: Period
+
+    var body: some View {
+        if let content = DropdownFormat.formatCostDelta(current: current, previous: previous, period: period) {
+            HStack(spacing: 4) {
+                Text(content.arrow + " " + content.amount)
+                    .foregroundStyle(content.direction.color)
+                Text(NSLocalizedString(content.labelKey, comment: ""))
+                    .foregroundStyle(.secondary)
+            }
+            .font(.caption)
+        }
+    }
+}
+
+struct RankDelta: View {
+    let current: Int
+    let previous: Int?
+
+    var body: some View {
+        Group {
+            if let content = DropdownFormat.formatRankDelta(current: current, previous: previous) {
+                switch content.kind {
+                case .new:
+                    Text(NSLocalizedString("delta.new", comment: ""))
+                        .foregroundStyle(.secondary)
+                case .change(let magnitude, let direction):
+                    let arrow = direction == .up ? "▲" : "▼"
+                    Text("\(arrow)\(magnitude)")
+                        .foregroundStyle(direction.color)
+                }
+            } else {
+                Text(" ")   // зарезервировать место, чтобы аватарки не прыгали
+            }
+        }
+        .font(.system(.caption, design: .monospaced))
+        .frame(width: 32, alignment: .leading)
+    }
 }
 
 // MARK: - AI section
@@ -34,6 +138,11 @@ struct DropdownAISection: View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(String(format: "$%.2f", viewModel.aiTotals.totalCost))
                     .font(.system(size: 32, weight: .semibold, design: .rounded))
+                CostDelta(
+                    current: viewModel.aiTotals.totalCost,
+                    previous: viewModel.aiTotalsPrev.totalCost,
+                    period: viewModel.period
+                )
                 Text(DropdownFormat.tokens(viewModel.aiTotals.totalInputTokens + viewModel.aiTotals.totalOutputTokens) + " tokens")
                     .foregroundStyle(.secondary)
                     .font(.caption)
@@ -173,6 +282,7 @@ struct DropdownLeaderboardSection: View {
                                 .frame(width: 22, alignment: .trailing)
                                 .foregroundStyle(.secondary)
                                 .font(.system(.body, design: .monospaced))
+                            RankDelta(current: entry.rank, previous: entry.previousRank)
                             AvatarView(data: viewModel.friendAvatars[entry.friendCode], size: 28)
                             Text(entry.isMe ? "Я" : entry.displayName)
                                 .fontWeight(entry.isMe ? .semibold : .regular)

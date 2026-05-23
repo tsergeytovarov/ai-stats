@@ -58,4 +58,38 @@ final class DateUtilsTests: XCTestCase {
         XCTAssertEqual(days.last, DateUtils.isoDayLocal(end))
     }
 
+    // MARK: - previousPeriodDays
+
+    /// Якорь — 2024-05-22 12:00 UTC. В любой разумной TZ это всё ещё 2024-05-22.
+    private var anchor: Date { Date(timeIntervalSince1970: 1716379200) }
+
+    func test_previousPeriodDays_day_returns_yesterday() {
+        let result = DateUtils.previousPeriodDays(endingAt: anchor, lookback: 0)
+        XCTAssertEqual(result, ["2024-05-21"])
+    }
+
+    func test_previousPeriodDays_week_returns_seven_prior_days() {
+        let result = DateUtils.previousPeriodDays(endingAt: anchor, lookback: 6)
+        XCTAssertEqual(result.count, 7)
+        XCTAssertEqual(result.first, "2024-05-09")
+        XCTAssertEqual(result.last, "2024-05-15")
+    }
+
+    func test_previousPeriodDays_month_returns_thirty_prior_days() {
+        let result = DateUtils.previousPeriodDays(endingAt: anchor, lookback: 29)
+        XCTAssertEqual(result.count, 30)
+        XCTAssertEqual(result.first, "2024-03-24")
+        XCTAssertEqual(result.last, "2024-04-22")
+    }
+
+    /// Окна не пересекаются и стыкуются встык с current.
+    func test_previousPeriodDays_does_not_overlap_with_current_range() {
+        for lookback in [0, 6, 29] {
+            let current = DateUtils.daysRange(endingAt: anchor, lookback: lookback)
+            let previous = DateUtils.previousPeriodDays(endingAt: anchor, lookback: lookback)
+            XCTAssertEqual(current.count, previous.count, "lookback=\(lookback): длины должны совпадать")
+            XCTAssertTrue(Set(current).isDisjoint(with: Set(previous)), "lookback=\(lookback): окна не должны пересекаться")
+        }
+    }
+
 }
