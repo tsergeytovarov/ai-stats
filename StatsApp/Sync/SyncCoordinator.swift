@@ -7,12 +7,16 @@ import WidgetKit
 final class SyncCoordinator {
     private let db: any DatabaseWriter
     private let now: () -> Date
+    private let snapshotSyncer: SnapshotSyncer?
     private var inFlight: Set<String> = []
     private var timer: Timer?
     private(set) var lastSyncAt: [String: Date] = [:]
 
-    init(db: any DatabaseWriter, now: @escaping () -> Date = Date.init) {
+    init(db: any DatabaseWriter,
+         snapshotSyncer: SnapshotSyncer? = nil,
+         now: @escaping () -> Date = Date.init) {
         self.db = db
+        self.snapshotSyncer = snapshotSyncer
         self.now = now
     }
 
@@ -52,6 +56,16 @@ final class SyncCoordinator {
         lastSyncAt[source] = now()
         try? buildAndWriteWidgetSnapshot()
         WidgetCenter.shared.reloadAllTimelines()
+
+        // После ccusage-sync пушим snapshot'ы на aiuse-сервер (если syncer wired
+        // и есть профиль + sharing). Ошибки тут не должны ронять общий тик.
+        if source == "ccusage", let syncer = snapshotSyncer {
+            do {
+                _ = try await syncer.runOnce()
+            } catch {
+                NSLog("ai-stats aiuse sync error: \(error)")
+            }
+        }
     }
 
     /// Считает текущие totals за Day/Week/Month из DB, пишет JSON в контейнер виджета.
