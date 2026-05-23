@@ -10,7 +10,7 @@
 
 **Спека:** [docs/superpowers/specs/2026-05-23-large-widget-design.md](../specs/2026-05-23-large-widget-design.md)
 
-**Контекст:** работаем на ветке `feat/delta-and-rank` (уже содержит `DropdownFormat`, `previousRank` в `LeaderboardEntry`, `previousPeriodDays`). Все изменения коммитим в неё.
+**Контекст:** дельта-and-rank уже в main (`DropdownFormat` в `StatsApp/Status/DropdownSections.swift`, `previousRank` в `LeaderboardEntry`, `previousPeriodDays` в `DateUtils`). Работаем с новой ветки `feat/large-widget` от текущего main.
 
 ---
 
