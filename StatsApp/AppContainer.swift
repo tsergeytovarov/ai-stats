@@ -33,12 +33,28 @@ final class AppContainer {
 
         let coordinator = SyncCoordinator(db: dbPool, snapshotSyncer: syncer)
         self.syncCoordinator = coordinator
-        self.dropdownViewModel = DropdownViewModel(db: dbPool, syncCoordinator: coordinator, githubEnabled: cfg.githubEnabled)
+        let dbPoolRef = dbPool
+        self.dropdownViewModel = DropdownViewModel(
+            db: dbPool,
+            syncCoordinator: coordinator,
+            api: api,
+            hasAccount: { (try? dbPoolRef.read { try StatsQueries.loadMyProfile($0) }) ?? nil != nil },
+            githubEnabled: cfg.githubEnabled
+        )
     }
 
     /// Создаёт fresh AccountTabViewModel — для каждого открытия окна настроек.
     func makeAccountTabViewModel() -> AccountTabViewModel {
         AccountTabViewModel(api: aiuseAPI, keychain: keychain, db: dbPool)
+    }
+
+    /// Создаёт fresh FriendsTabViewModel — для каждого открытия окна настроек.
+    func makeFriendsTabViewModel() -> FriendsTabViewModel {
+        let dbPoolRef = dbPool
+        return FriendsTabViewModel(
+            api: aiuseAPI,
+            hasAccount: { (try? dbPoolRef.read { try StatsQueries.loadMyProfile($0) }) ?? nil != nil }
+        )
     }
 
     func buildFetchers() -> [(name: String, fetchers: [any Fetcher])] {

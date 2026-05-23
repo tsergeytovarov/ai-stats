@@ -13,8 +13,9 @@ struct SettingsView: View {
     let onImport: () -> Void
     let onRefreshNow: () -> Void
 
-    // AccountTab dependencies
+    // AccountTab + FriendsTab dependencies
     @StateObject var accountViewModel: AccountTabViewModel
+    @StateObject var friendsViewModel: FriendsTabViewModel
 
     var body: some View {
         TabView {
@@ -32,6 +33,9 @@ struct SettingsView: View {
 
             AccountTabView(viewModel: accountViewModel)
                 .tabItem { Label("Аккаунт", systemImage: "person.crop.circle") }
+
+            FriendsTabView(viewModel: friendsViewModel)
+                .tabItem { Label("Друзья", systemImage: "person.2") }
         }
         .padding()
         .frame(width: 540, height: 480)
