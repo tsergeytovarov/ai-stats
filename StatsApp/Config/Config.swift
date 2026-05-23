@@ -6,6 +6,7 @@ struct Config: Equatable {
     let syncIntervalMinutes: Int
     let ccusageCommand: [String]
     let enabledProviders: [String]
+    let aiuseApiBaseURL: String
 
     var githubEnabled: Bool { !githubToken.isEmpty && !githubLogin.isEmpty }
 
@@ -15,6 +16,7 @@ struct Config: Equatable {
         case syncIntervalMinutes = "sync_interval_minutes"
         case ccusageCommand = "ccusage_command"
         case enabledProviders = "enabled_providers"
+        case aiuseApiBaseURL = "aiuse_api_base_url"
     }
 
     static func decode(from data: Data) throws -> Config {
@@ -24,7 +26,8 @@ struct Config: Equatable {
             githubLogin: container.githubLogin,
             syncIntervalMinutes: container.syncIntervalMinutes ?? 15,
             ccusageCommand: container.ccusageCommand ?? ["npx", "-y", "ccusage@latest"],
-            enabledProviders: container.enabledProviders ?? ["claude", "codex"]
+            enabledProviders: container.enabledProviders ?? ["claude", "codex"],
+            aiuseApiBaseURL: container.aiuseApiBaseURL ?? "https://aiuse.popovs.tech/api"
         )
     }
 
@@ -34,6 +37,7 @@ struct Config: Equatable {
         let syncIntervalMinutes: Int?
         let ccusageCommand: [String]?
         let enabledProviders: [String]?
+        let aiuseApiBaseURL: String?
 
         enum CodingKeys: String, CodingKey {
             case githubToken = "github_token"
@@ -41,6 +45,7 @@ struct Config: Equatable {
             case syncIntervalMinutes = "sync_interval_minutes"
             case ccusageCommand = "ccusage_command"
             case enabledProviders = "enabled_providers"
+            case aiuseApiBaseURL = "aiuse_api_base_url"
         }
     }
 
@@ -50,7 +55,8 @@ struct Config: Equatable {
       "github_login": "",
       "sync_interval_minutes": 15,
       "ccusage_command": ["npx", "-y", "ccusage@latest"],
-      "enabled_providers": ["claude", "codex"]
+      "enabled_providers": ["claude", "codex"],
+      "aiuse_api_base_url": "https://aiuse.popovs.tech/api"
     }
 
     """.data(using: .utf8)!

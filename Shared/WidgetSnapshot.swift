@@ -32,19 +32,25 @@ enum WidgetSnapshotIO {
     /// Должен совпадать с PRODUCT_BUNDLE_IDENTIFIER StatsWidget в project.yml.
     static let widgetBundleID = "com.sergeytovarov.aistats.widget"
 
-    /// Путь до snapshot.json внутри sandbox-контейнера виджета.
-    /// App (unsandboxed) кладёт сюда напрямую, виджет (sandboxed) видит этот
-    /// путь как свой `~/Library/Application Support/`.
-    static var snapshotURL: URL {
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        return home
+    /// Путь для записи snapshot'а из app (unsandboxed): абсолютный путь
+    /// до Application Support в контейнере виджета.
+    static var writeURL: URL {
+        let realHome = URL(fileURLWithPath: NSHomeDirectoryForUser(NSUserName()) ?? NSHomeDirectory())
+        return realHome
             .appendingPathComponent("Library/Containers/\(widgetBundleID)/Data/Library/Application Support/ai-stats")
             .appendingPathComponent("snapshot.json")
     }
 
+    /// Путь для чтения snapshot'а из виджета (sandboxed): widget видит
+    /// свой контейнер как обычный ~/Library/Application Support.
+    static var readURL: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        return base.appendingPathComponent("ai-stats/snapshot.json")
+    }
+
     /// Пишется app'ом. Создаёт промежуточные директории если их нет.
     static func write(_ snapshot: WidgetSnapshot) throws {
-        let url = snapshotURL
+        let url = writeURL
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -52,10 +58,9 @@ enum WidgetSnapshotIO {
         try data.write(to: url, options: .atomic)
     }
 
-    /// Читается виджетом. Возвращает nil если файла нет (snapshot ещё не написан).
+    /// Читается виджетом. Возвращает nil если файла нет.
     static func read() -> WidgetSnapshot? {
-        let url = snapshotURL
-        guard let data = try? Data(contentsOf: url) else { return nil }
+        guard let data = try? Data(contentsOf: readURL) else { return nil }
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return try? decoder.decode(WidgetSnapshot.self, from: data)
