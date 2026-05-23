@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+### Добавлено — aiuse backend integration (v0.2.0 leaderboard client)
+- `AiuseAPIClient` и `KeychainStore` для взаимодействия с `aiuse.popovs.tech/api`.
+- Новая вкладка «Аккаунт» в Settings: создание профиля, friend_code с копированием, шаринг toggle, регенерация ID, удаление аккаунта.
+- `SnapshotSyncer` интегрирован в `SyncCoordinator` — после ccusage-тика шлёт daily-агрегаты на сервер.
+- Локальные таблицы `my_profile` и `pending_snapshots` (миграция v5).
+- Тесты: `KeychainStoreTests`, `AiuseAPIClientTests` (через MockURLProtocol), `SnapshotSyncerTests` (happy path, sharing off, retry, sum по providers).
+
+Известное расхождение: шлём один snapshot/день с `hour_bucket = midnight UTC` (локальная БД хранит daily, ccusage не даёт hourly). Сервер хранит данные с hourly precision — `SUM` по day/week/month работает корректно.
+
 ## [0.2.0] — 2026-05-23
 
 ### Добавлено
