@@ -18,11 +18,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             configPath: Paths.configURL.path,
             dbPath: Paths.databaseURL.path,
             dbSizeBytes: dbSize(),
-            version: "0.1.0",
+            version: "0.2.0",
             onOpenConfig: { NSWorkspace.shared.open(Paths.configURL) },
             onExport: { [weak self] in self?.doExport() },
             onImport: { [weak self] in self?.doImport() },
-            onRefreshNow: { [weak self] in self?.doRefresh() }
+            onRefreshNow: { [weak self] in self?.doRefresh() },
+            accountViewModel: self.container.makeAccountTabViewModel()
         )
         let hosting = NSHostingController(rootView: view)
         let win = NSWindow(contentViewController: hosting)

@@ -9,15 +9,36 @@ final class AppContainer {
     let dbPool: DatabasePool
     let syncCoordinator: SyncCoordinator
     let dropdownViewModel: DropdownViewModel
+    let keychain: KeychainStore
+    let aiuseAPI: AiuseAPIClient
+    let snapshotSyncer: SnapshotSyncer
 
     init() throws {
         let (cfg, wasCreated) = try ConfigLoader.loadOrCreate()
         self.config = cfg
         self.configWasCreated = wasCreated
         self.dbPool = try Database.openPool()
-        let coordinator = SyncCoordinator(db: dbPool)
+
+        // aiuse wiring
+        let kc = MacOSKeychainStore()
+        self.keychain = kc
+        let baseURL = URL(string: cfg.aiuseApiBaseURL) ?? URL(string: "https://aiuse.popovs.tech/api")!
+        let api = AiuseAPIClient(
+            baseURL: baseURL,
+            secretProvider: { kc.get(account: AiuseKeychain.account, service: AiuseKeychain.service) }
+        )
+        self.aiuseAPI = api
+        let syncer = SnapshotSyncer(db: dbPool, api: api)
+        self.snapshotSyncer = syncer
+
+        let coordinator = SyncCoordinator(db: dbPool, snapshotSyncer: syncer)
         self.syncCoordinator = coordinator
         self.dropdownViewModel = DropdownViewModel(db: dbPool, syncCoordinator: coordinator, githubEnabled: cfg.githubEnabled)
+    }
+
+    /// Создаёт fresh AccountTabViewModel — для каждого открытия окна настроек.
+    func makeAccountTabViewModel() -> AccountTabViewModel {
+        AccountTabViewModel(api: aiuseAPI, keychain: keychain, db: dbPool)
     }
 
     func buildFetchers() -> [(name: String, fetchers: [any Fetcher])] {
