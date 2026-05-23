@@ -31,7 +31,7 @@ struct LargeView: View {
                 VStack(alignment: .leading, spacing: 0) {
                     Text("section.top_models").font(BrandFont.lbl).tracking(1.2).textCase(.uppercase)
                         .foregroundStyle(BrandColor.cyanLight.opacity(0.7)).padding(.bottom, 4)
-                    ForEach(entry.topModels.prefix(4), id: \.model) { m in
+                    ForEach(entry.topModels.prefix(3), id: \.model) { m in
                         HStack {
                             Text(m.model).font(.system(size: 11)).lineLimit(1).truncationMode(.middle)
                             Spacer()
@@ -45,7 +45,6 @@ struct LargeView: View {
                 .padding(14)
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
-            .frame(height: 140)
 
             Rectangle().fill(SurfaceColor.dividerSubtle).frame(height: 0.5)
 
@@ -54,10 +53,10 @@ struct LargeView: View {
                 Text("section.trend")
                     .font(.system(size: 9, weight: .medium))
                     .foregroundStyle(.white.opacity(0.5))
-                Sparkline(values: [], variant: .ai).frame(height: 28)
+                Sparkline(values: [], variant: .ai).frame(height: 24)
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 8)
+            .padding(.vertical, 6)
 
             Rectangle().fill(SurfaceColor.dividerSubtle).frame(height: 0.5)
 
@@ -70,7 +69,7 @@ struct LargeView: View {
                     .padding(.bottom, 4)
 
                 if let board = entry.leaderboard, !board.entries.isEmpty {
-                    ForEach(Array(board.entries.prefix(5).enumerated()), id: \.offset) { idx, peer in
+                    ForEach(Array(board.entries.prefix(4).enumerated()), id: \.offset) { idx, peer in
                         FriendRow(rank: idx + 1, name: peer.displayName,
                                   valueText: DropdownFormat.tokens(peer.tokensTotal),
                                   isMe: peer.isMe)
@@ -81,7 +80,7 @@ struct LargeView: View {
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 14).padding(.vertical, 8)
+            .padding(.horizontal, 14).padding(.vertical, 6)
         }
         .containerBackground(for: .widget) { BrandSurface { Color.clear } }
     }

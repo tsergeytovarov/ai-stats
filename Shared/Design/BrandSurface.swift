@@ -67,6 +67,7 @@ struct BrandSurface<Content: View>: View {
             // Layer 3: content
             content
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .overlay(
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .strokeBorder(SurfaceColor.borderGlass, lineWidth: 0.5)
