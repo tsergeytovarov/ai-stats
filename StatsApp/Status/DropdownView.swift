@@ -6,58 +6,47 @@ struct DropdownView: View {
     let onOpenSettings: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Period picker (общий для всех вкладок)
-            Picker("", selection: $viewModel.period) {
-                ForEach(Period.allCases) { p in Text(p.titleKey).tag(p) }
-            }
-            .pickerStyle(.segmented)
+        ZStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 0) {
+                content
+                    .padding(.horizontal, 18)
+                    .padding(.top, 16)
 
-            // Section picker — AI / GitHub / Лидерборд
-            Picker("", selection: $viewModel.section) {
-                ForEach(availableSections) { section in
-                    Text(section.title).tag(section)
+                Spacer(minLength: 0)
+
+                Divider().background(SurfaceColor.dividerSubtle).padding(.horizontal, 18)
+
+                HStack {
+                    Text(String(format: NSLocalizedString("footer.last_sync %@", comment: ""),
+                                viewModel.lastSyncDescription))
+                        .font(BrandFont.caption)
+                        .foregroundStyle(TextColor.muted)
+                    Spacer()
+                    SyncIconButton(systemImage: "arrow.clockwise", action: onRefresh)
+                    SyncIconButton(systemImage: "gearshape", action: onOpenSettings)
                 }
+                .padding(.horizontal, 18)
+                .padding(.top, 10)
+                .padding(.bottom, BrandSpacing.islandClearance)
             }
-            .pickerStyle(.segmented)
+            .frame(width: 400, height: 560, alignment: .topLeading)
+            .brandSurface()
 
-            // Содержимое выбранной секции
-            switch viewModel.section {
-            case .ai:
-                DropdownAISection(viewModel: viewModel)
-            case .github:
-                DropdownGitHubSection(viewModel: viewModel)
-            case .leaderboard:
-                DropdownLeaderboardSection(viewModel: viewModel)
-            }
-
-            Divider()
-
-            HStack {
-                Text(String(format: NSLocalizedString("footer.last_sync %@", comment: ""),
-                            viewModel.lastSyncDescription))
-                    .font(.caption).foregroundStyle(.secondary)
-                Spacer()
-                Button(action: onRefresh) { Image(systemName: "arrow.clockwise") }.buttonStyle(.borderless)
-                Button(action: onOpenSettings) { Image(systemName: "gearshape") }.buttonStyle(.borderless)
-            }
+            FloatingIsland(section: $viewModel.section, period: $viewModel.period)
+                .padding(.bottom, BrandSpacing.islandBottomOffset)
         }
-        .padding(16)
-        .frame(width: 400)
-        .background(Color(nsColor: .windowBackgroundColor))
-        .task {
-            await viewModel.loadLeaderboard()
-        }
+        .frame(width: 400, height: 560)
+        .task { await viewModel.loadLeaderboard() }
     }
 
-    /// Список секций, доступных в текущей конфигурации.
-    /// GitHub — только если githubEnabled. Лидерборд — всегда (показывает hint если нет аккаунта).
-    private var availableSections: [DropdownSection] {
-        var sections: [DropdownSection] = [.ai]
-        if viewModel.githubEnabled {
-            sections.append(.github)
+    @ViewBuilder private var content: some View {
+        switch viewModel.section {
+        case .ai:
+            DropdownAISection(viewModel: viewModel)
+        case .github:
+            DropdownGitHubSection(viewModel: viewModel)
+        case .leaderboard:
+            DropdownLeaderboardSection(viewModel: viewModel)
         }
-        sections.append(.leaderboard)
-        return sections
     }
 }

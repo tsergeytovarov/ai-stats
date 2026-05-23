@@ -43,6 +43,9 @@
 "app.failed_to_start.title" = "ai-stats не запустилось";
 
 "unit.never" = "никогда";
+"unit.commits" = "коммитов";
+"unit.lines" = "строк";
+"unit.repos_active %d" = "%d репозиторий активен";
 "widget.commits_suffix" = "коммитов";
 
 "delta.vs_yesterday" = "vs вчера";
@@ -50,6 +53,13 @@
 "delta.vs_prev_month" = "vs прошлого месяца";
 "delta.new" = "NEW";
 
-"section.leaderboard" = "Лидерборд";
+"section.leaderboard" = "Друзья";
+"label.leaderboard.heading" = "Рейтинг по токенам";
+
+"period.short.day" = "Д";
+"period.short.week" = "Н";
+"period.short.month" = "М";
+"section.ai" = "AI";
+"section.friends" = "Друзья";
 "widget.leaderboard.no_account" = "Включи sharing в Настройках, чтобы увидеть лидерборд.";
 "widget.leaderboard.empty" = "Пока никого. Добавь друзей.";

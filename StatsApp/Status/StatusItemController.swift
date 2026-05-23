@@ -18,11 +18,10 @@ final class StatusItemController: NSObject {
     func install() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
-            button.image = NSImage(systemSymbolName: "chart.line.uptrend.xyaxis", accessibilityDescription: "ai-stats")
-            button.imagePosition = .imageLeading
-            button.title = " $0.00"
+            button.title = ""
             button.target = self
             button.action = #selector(togglePopover(_:))
+            updateCapsule(in: button, priceText: "$0.00")
         }
         statusItem = item
 
@@ -38,7 +37,26 @@ final class StatusItemController: NSObject {
 
     func refreshTitle() async {
         let cost = await viewModel.todayCost()
-        statusItem?.button?.title = String(format: " $%.2f", cost)
+        let formatted = String(format: "$%.2f", cost)
+        guard let button = statusItem?.button else { return }
+        updateCapsule(in: button, priceText: formatted)
+    }
+
+    private func updateCapsule(in button: NSStatusBarButton, priceText: String) {
+        let hosting = NSHostingView(rootView: MenuBarCapsuleView(priceText: priceText))
+        let fitting = hosting.fittingSize  // SwiftUI-aware размер, лучше чем intrinsicContentSize
+
+        // Высота menu bar item фиксированная (≈22pt на macOS). Capsule должен туда вписаться.
+        let menuBarHeight = NSStatusBar.system.thickness
+
+        button.subviews.forEach { $0.removeFromSuperview() }
+        hosting.frame = NSRect(x: 0, y: 0, width: fitting.width, height: menuBarHeight)
+        hosting.autoresizingMask = [.width, .height]
+        button.addSubview(hosting)
+
+        // Явно задаём длину statusItem (а не frame button — у NSStatusItem есть length).
+        statusItem?.length = fitting.width
+        button.title = ""
     }
 
     private func observeTotals() {

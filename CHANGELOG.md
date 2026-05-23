@@ -5,6 +5,19 @@
 
 ## [Unreleased]
 
+### Полная переделка визуала — Liquid Glass + Neon Duo (B2)
+- Поповер: единый floating glass island внизу объединяет категорию (AI / GitHub / Друзья) и период (Д/Н/М). Два отдельных segmented picker удалены. Цвет crumb меняется по вкладке: pink / cyan / нейтрал.
+- Главное число — gradient text (white → pink/cyan), фон каждой поверхности — 3-слойный (Tahoe `.glassEffect()` + внутренний radial pink top-left + radial cyan bottom-right), идентичность держится на любых обоях.
+- Виджеты Small/Medium/Large переведены на единый visual language с поповером (общий `BrandSurface`, `HeroNumber`, `FriendRow`, `Crumb`). Цены в виджетах округляются до доллара, в поповере — с копейками.
+- Menu bar item — capsule с pink→cyan градиентом и SF Symbol `chart.line.uptrend.xyaxis` вместо plain title.
+- Sync/⚙ кнопки — квадраты 28×28 в glass-tile с hover.
+- Sparkline получил variant API (`.ai` pink / `.github` cyan) и gradient stroke + area fill.
+- Дизайн-токены (Color, Font, Spacing, Radius) вынесены в `Shared/Design/Tokens.swift`.
+- Лейбл «Лидерборд» в UI заменён на «Друзья» (в коде сущность остаётся `Leaderboard`).
+
+### Удалено
+- Поддержка macOS 14/15. Минимум — **macOS 26 Tahoe** (для нативных Liquid Glass API).
+
 ### Large виджет + дельта в виджетах поменьше
 - Новый Large виджет на десктопе: совмещённый экран «мои траты + лидерборд». Слева — сумма с дельтой и top-3 моделей за период, справа — топ-8 лидерборда с дельтой ранга (`▲N` / `▼N` / `NEW`), моя строка подсвечена. Если меня нет в топ-8 — добавляется отдельной строкой ниже после `⋯`. Без аккаунта sharing — справа подсказка «Включи sharing в Настройках».
 - Дельта трат vs прошлый период в Small и Medium виджетах: под суммой появляется строка вида `▲ +$27.60 vs prev day` (зелёная — рост, красная — падение). Скрывается при отсутствии данных за прошлый период или при разнице меньше копейки.

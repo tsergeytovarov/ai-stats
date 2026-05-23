@@ -60,67 +60,58 @@ struct DropdownAISection: View {
     @ObservedObject var viewModel: DropdownViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(String(format: "$%.2f", viewModel.aiTotals.totalCost))
-                    .font(.system(size: 32, weight: .semibold, design: .rounded))
-                CostDelta(
-                    current: viewModel.aiTotals.totalCost,
-                    previous: viewModel.aiTotalsPrev.totalCost,
-                    period: viewModel.period
-                )
-                Text(DropdownFormat.tokens(viewModel.aiTotals.totalInputTokens + viewModel.aiTotals.totalOutputTokens) + " tokens")
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            Crumb(category: .ai, title: "AI", period: viewModel.period.localizedTitle)
 
-            Divider()
+            HeroNumber(MoneyFormatter.popover(viewModel.aiTotals.totalCost), variant: .pink)
+                .padding(.top, 4)
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("section.ai_usage").font(.headline)
-                if viewModel.bySource.isEmpty {
-                    Text("label.no_data").font(.caption).foregroundStyle(.secondary)
-                } else {
-                    ForEach(viewModel.bySource, id: \.source) { src in
-                        HStack {
-                            Text(src.source)
-                            Spacer()
-                            Text(String(format: "$%.2f", src.costUsd))
-                            Text(DropdownFormat.tokens(src.inputTokens + src.outputTokens) + " tok")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 80, alignment: .trailing)
-                        }
-                        .font(.system(.body, design: .monospaced))
+            CostDelta(
+                current: viewModel.aiTotals.totalCost,
+                previous: viewModel.aiTotalsPrev.totalCost,
+                period: viewModel.period
+            )
+            .foregroundStyle(BrandColor.cyanLight)
+            .padding(.top, 4)
+
+            Text(DropdownFormat.tokens(viewModel.aiTotals.totalInputTokens + viewModel.aiTotals.totalOutputTokens) + " tokens")
+                .font(BrandFont.caption)
+                .foregroundStyle(BrandColor.cyanLight.opacity(0.75))
+                .padding(.top, 2)
+
+            Text("section.top_models")
+                .font(BrandFont.lbl)
+                .tracking(1.2)
+                .textCase(.uppercase)
+                .foregroundStyle(BrandColor.cyanLight.opacity(0.7))
+                .padding(.top, 14)
+                .padding(.bottom, 6)
+
+            if viewModel.topModels.isEmpty {
+                Text("label.no_data").font(BrandFont.caption).foregroundStyle(TextColor.muted)
+            } else {
+                ForEach(viewModel.topModels.prefix(5), id: \.self) { m in
+                    HStack {
+                        Text(m.model).font(BrandFont.body)
+                        Spacer()
+                        Text(MoneyFormatter.popover(m.costUsd))
+                            .font(BrandFont.body)
+                            .monospacedDigit()
+                            .foregroundStyle(.white.opacity(0.8))
                     }
+                    .padding(.vertical, 3)
                 }
             }
 
-            Divider()
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text("section.top_models").font(.headline)
-                if viewModel.topModels.isEmpty {
-                    Text("label.no_data").font(.caption).foregroundStyle(.secondary)
-                } else {
-                    ForEach(viewModel.topModels, id: \.self) { m in
-                        HStack {
-                            Text(m.model)
-                            Spacer()
-                            Text(String(format: "$%.2f", m.costUsd))
-                            Text(DropdownFormat.tokens(m.inputTokens + m.outputTokens) + " tok")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 80, alignment: .trailing)
-                        }
-                        .font(.system(.body, design: .monospaced))
-                    }
-                }
-            }
-
-            Divider()
+            Spacer(minLength: 14)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("section.trend").font(.caption).foregroundStyle(.secondary)
-                Sparkline(values: viewModel.sparklineSeries)
+                Text("section.trend")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .tracking(0.5)
+                Sparkline(values: viewModel.sparklineSeries, variant: .ai)
+                    .frame(height: 38)
             }
         }
     }
@@ -132,53 +123,56 @@ struct DropdownGitHubSection: View {
     @ObservedObject var viewModel: DropdownViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("\(viewModel.githubTotals.totalCommits)")
-                    .font(.system(size: 32, weight: .semibold, design: .rounded))
-                Text("commits • \(viewModel.githubTotals.uniqueRepos) repos")
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            Crumb(category: .github, title: "GitHub", period: viewModel.period.localizedTitle)
 
-            Divider()
+            HeroNumberWithUnit(
+                number: "\(viewModel.githubTotals.totalCommits)",
+                unit: NSLocalizedString("unit.commits", comment: "")
+            )
+            .padding(.top, 4)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("section.github").font(.headline)
-                Text(String(format: NSLocalizedString("github.loc %@ %@", comment: ""),
-                            DropdownFormat.loc(viewModel.loc.additions),
-                            DropdownFormat.loc(viewModel.loc.deletions)))
-                    .font(.system(.body, design: .monospaced))
-                    .foregroundStyle(.secondary)
-            }
+            Text("+\(viewModel.loc.additions) / −\(viewModel.loc.deletions) " + NSLocalizedString("unit.lines", comment: ""))
+                .font(BrandFont.delta)
+                .foregroundStyle(BrandColor.cyanLight)
+                .padding(.top, 4)
 
-            if viewModel.githubTotals.totalCommits > 0 && !viewModel.topRepos.isEmpty {
-                Divider()
+            Text(String(format: NSLocalizedString("unit.repos_active %d", comment: ""), viewModel.topRepos.count))
+                .font(BrandFont.caption)
+                .foregroundStyle(TextColor.muted)
+                .padding(.top, 2)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("section.top_repos").font(.headline)
-                    ForEach(viewModel.topRepos, id: \.self) { r in
-                        HStack {
-                            Text(DropdownFormat.repoShortName(r.repo))
-                                .lineLimit(1)
-                                .truncationMode(.middle)
-                            Spacer()
-                            Text("\(r.commits) c")
-                            Text(DropdownFormat.loc(r.additions) + " +")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 90, alignment: .trailing)
-                        }
-                        .font(.system(.body, design: .monospaced))
-                    }
+            Text("section.top_repos")
+                .font(BrandFont.lbl)
+                .tracking(1.2)
+                .textCase(.uppercase)
+                .foregroundStyle(BrandColor.cyanLight.opacity(0.7))
+                .padding(.top, 14)
+                .padding(.bottom, 6)
+
+            ForEach(viewModel.topRepos.prefix(5), id: \.self) { r in
+                HStack {
+                    Text(DropdownFormat.repoShortName(r.repo))
+                        .font(BrandFont.body)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Spacer()
+                    Text("\(r.commits) c · +\(r.additions)")
+                        .font(BrandFont.body)
+                        .monospacedDigit()
+                        .foregroundStyle(.white.opacity(0.8))
                 }
+                .padding(.vertical, 3)
             }
 
-            if viewModel.additionsSeries.contains(where: { $0 > 0 }) {
-                Divider()
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("section.trend_additions").font(.caption).foregroundStyle(.secondary)
-                    Sparkline(values: viewModel.additionsSeries, tint: .githubGreen)
-                }
+            Spacer(minLength: 14)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("section.trend_additions")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
+                Sparkline(values: viewModel.additionsSeries, variant: .github)
+                    .frame(height: 38)
             }
         }
     }
@@ -190,44 +184,37 @@ struct DropdownLeaderboardSection: View {
     @ObservedObject var viewModel: DropdownViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if viewModel.leaderboardLoading && viewModel.leaderboard.isEmpty {
-                HStack { Spacer(); ProgressView(); Spacer() }
-                    .padding(.vertical, 20)
-            } else if let err = viewModel.leaderboardError, viewModel.leaderboard.isEmpty {
-                Text(err).font(.callout).foregroundStyle(.red)
+        VStack(alignment: .leading, spacing: 0) {
+            Crumb(category: .friends,
+                  title: NSLocalizedString("section.leaderboard", comment: ""),
+                  period: viewModel.period.localizedTitle)
+
+            Text("label.leaderboard.heading")
+                .font(BrandFont.lbl)
+                .tracking(1.2)
+                .textCase(.uppercase)
+                .foregroundStyle(BrandColor.cyanLight.opacity(0.7))
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+
+            if let error = viewModel.leaderboardError {
+                Text(error).font(BrandFont.caption).foregroundStyle(BrandColor.danger)
             } else if viewModel.leaderboard.isEmpty {
-                Text("Создай аккаунт в Настройки → Аккаунт и шарь статистику чтобы увидеть лидерборд.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                Text("widget.leaderboard.empty")
+                    .font(BrandFont.caption)
+                    .foregroundStyle(TextColor.muted)
             } else {
-                VStack(spacing: 8) {
-                    ForEach(viewModel.leaderboard) { entry in
-                        HStack(spacing: 10) {
-                            Text("\(entry.rank).")
-                                .frame(width: 22, alignment: .trailing)
-                                .foregroundStyle(.secondary)
-                                .font(.system(.body, design: .monospaced))
-                            RankDelta(current: entry.rank, previous: entry.previousRank)
-                            AvatarView(data: viewModel.friendAvatars[entry.friendCode], size: 28)
-                            Text(entry.isMe ? "Я" : entry.displayName)
-                                .fontWeight(entry.isMe ? .semibold : .regular)
-                            Spacer()
-                            Text(DropdownFormat.tokens(entry.tokensTotal) + " tok")
-                                .foregroundStyle(.secondary)
-                                .font(.system(.body, design: .monospaced))
-                        }
-                    }
-                }
-                if viewModel.leaderboard.count == 1 {
-                    Text("Добавь друзей в Настройки → Друзья, чтобы увидеть других.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                if let err = viewModel.leaderboardError {
-                    Text(err).font(.caption).foregroundStyle(.orange)
+                ForEach(Array(viewModel.leaderboard.prefix(10).enumerated()), id: \.offset) { idx, entry in
+                    FriendRow(
+                        rank: idx + 1,
+                        name: entry.displayName,
+                        valueText: DropdownFormat.tokens(entry.tokensTotal),
+                        isMe: entry.isMe
+                    )
                 }
             }
+
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

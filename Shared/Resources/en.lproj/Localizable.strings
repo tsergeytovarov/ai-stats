@@ -45,6 +45,9 @@
 "app.failed_to_start.title" = "ai-stats failed to start";
 
 "unit.never" = "never";
+"unit.commits" = "commits";
+"unit.lines" = "lines";
+"unit.repos_active %d" = "%d active repo(s)";
 "widget.commits_suffix" = "commits";
 
 "delta.vs_yesterday" = "vs yesterday";
@@ -52,6 +55,13 @@
 "delta.vs_prev_month" = "vs last month";
 "delta.new" = "NEW";
 
-"section.leaderboard" = "Leaderboard";
+"section.leaderboard" = "Friends";
+"label.leaderboard.heading" = "Token ranking";
+
+"period.short.day" = "D";
+"period.short.week" = "W";
+"period.short.month" = "M";
+"section.ai" = "AI";
+"section.friends" = "Friends";
 "widget.leaderboard.no_account" = "Enable sharing in Settings to see the leaderboard.";
 "widget.leaderboard.empty" = "No friends yet.";

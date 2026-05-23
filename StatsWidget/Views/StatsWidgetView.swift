@@ -15,132 +15,131 @@ struct StatsWidgetView: View {
     }
 }
 
-/// Левый блок: период, большая сумма, строка дельты, сабтайтлы.
-/// Используется в Small, в левой половине Medium и в левой колонке Large — единообразно.
-struct SummaryColumn: View {
-    let entry: StatsEntry
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(periodLabel)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-
-            Text(String(format: "$%.2f", entry.aiCost))
-                .font(.system(size: 30, weight: .semibold, design: .rounded))
-                .minimumScaleFactor(0.5)
-                .lineLimit(1)
-
-            if let delta = DropdownFormat.formatCostDelta(
-                current: entry.aiCost,
-                previous: entry.aiCostPrev,
-                period: entry.period
-            ) {
-                HStack(spacing: 4) {
-                    Text(delta.arrow + " " + delta.amount)
-                        .foregroundStyle(delta.direction == .up ? .green : .red)
-                    Text(NSLocalizedString(delta.labelKey, comment: ""))
-                        .foregroundStyle(.secondary)
-                }
-                .font(.caption2)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text("\(DropdownFormat.tokens(entry.aiTokens)) tokens")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                if entry.githubEnabled {
-                    Text(commitsText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var periodLabel: LocalizedStringKey {
-        switch entry.period {
-        case .day: return "period.day"
-        case .week: return "period.week"
-        case .month: return "period.month"
-        }
-    }
-
-    private var commitsText: String {
-        let n = entry.commits
-        let suffix = NSLocalizedString("widget.commits_suffix", comment: "")
-        return "\(n) \(suffix)"
-    }
-}
+// MARK: - Small
 
 struct SmallView: View {
     let entry: StatsEntry
 
     var body: some View {
-        SummaryColumn(entry: entry)
-            .padding(14)
+        VStack(alignment: .leading, spacing: 0) {
+            Crumb(category: .ai, title: "AI", period: entry.period.localizedTitle)
+
+            HeroNumber(MoneyFormatter.widget(entry.aiCost),
+                       font: BrandFont.displayM,
+                       variant: .pink)
+                .padding(.top, 6)
+
+            if entry.aiCostPrev > 0 {
+                Text(MoneyFormatter.widgetDelta(entry.aiCost - entry.aiCostPrev))
+                    .font(BrandFont.caption)
+                    .foregroundStyle(BrandColor.cyanLight)
+                    .padding(.top, 2)
+            }
+
+            Text(DropdownFormat.tokens(entry.aiTokens) + " tok · \(entry.commits) c")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(BrandColor.cyanLight.opacity(0.75))
+                .padding(.top, 2)
+
+            Spacer(minLength: 4)
+
+            Sparkline(values: [], variant: .ai)
+                .frame(height: 22)
+        }
+        .padding(14)
+        .containerBackground(for: .widget) {
+            ZStack {
+                Color(red: 20/255, green: 8/255, blue: 30/255)
+                LinearGradient(
+                    gradient: Gradient(stops: [
+                        .init(color: Color(red: 1.0, green: 45/255, blue: 109/255).opacity(0.55), location: 0),
+                        .init(color: .clear, location: 0.7)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                LinearGradient(
+                    gradient: Gradient(stops: [
+                        .init(color: .clear, location: 0.3),
+                        .init(color: Color(red: 0, green: 184/255, blue: 230/255).opacity(0.45), location: 1.0)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        }
     }
 }
+
+// MARK: - Medium
 
 struct MediumView: View {
     let entry: StatsEntry
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            SummaryColumn(entry: entry)
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
+                Crumb(category: .ai, title: "AI", period: entry.period.localizedTitle)
+                HeroNumber(MoneyFormatter.widget(entry.aiCost), font: BrandFont.displayL, variant: .pink)
+                    .padding(.top, 4)
+                if entry.aiCostPrev > 0 {
+                    Text(MoneyFormatter.widgetDelta(entry.aiCost - entry.aiCostPrev) + " " + NSLocalizedString("delta.vs_yesterday", comment: ""))
+                        .font(BrandFont.caption)
+                        .foregroundStyle(BrandColor.cyanLight)
+                        .padding(.top, 2)
+                }
+                Text(DropdownFormat.tokens(entry.aiTokens) + " tok · \(entry.commits) c")
+                    .font(.system(size: 10))
+                    .foregroundStyle(BrandColor.cyanLight.opacity(0.75))
+                    .padding(.top, 2)
+                Spacer(minLength: 0)
+                Sparkline(values: [], variant: .ai).frame(height: 22)
+            }
+            .padding(14)
 
-            Divider()
+            Rectangle().fill(SurfaceColor.dividerSubtle).frame(width: 0.5)
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 0) {
                 Text("section.top_models")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .textCase(.uppercase)
-
-                if entry.topModels.isEmpty {
-                    Text("label.no_data")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                } else {
-                    VStack(alignment: .leading, spacing: 3) {
-                        ForEach(entry.topModels.prefix(4), id: \.self) { m in
-                            ModelRow(model: m)
-                        }
+                    .font(BrandFont.lbl).tracking(1.2).textCase(.uppercase)
+                    .foregroundStyle(BrandColor.cyanLight.opacity(0.7))
+                    .padding(.bottom, 4)
+                ForEach(entry.topModels.prefix(4), id: \.model) { m in
+                    HStack {
+                        Text(m.model).font(.system(size: 11)).lineLimit(1).truncationMode(.middle)
+                        Spacer()
+                        Text(MoneyFormatter.widget(m.costUsd))
+                            .font(.system(size: 11))
+                            .monospacedDigit()
+                            .foregroundStyle(.white.opacity(0.8))
                     }
+                    .padding(.vertical, 2)
                 }
                 Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding(14)
-    }
-}
-
-struct ModelRow: View {
-    let model: WidgetSnapshot.ModelEntry
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Text(shortName)
-                .font(.system(.caption, design: .default))
-                .lineLimit(1)
-                .truncationMode(.tail)
-            Spacer(minLength: 4)
-            Text(String(format: "$%.2f", model.costUsd))
-                .font(.system(.caption, design: .monospaced))
+        .containerBackground(for: .widget) {
+            ZStack {
+                Color(red: 20/255, green: 8/255, blue: 30/255)
+                LinearGradient(
+                    gradient: Gradient(stops: [
+                        .init(color: Color(red: 1.0, green: 45/255, blue: 109/255).opacity(0.55), location: 0),
+                        .init(color: .clear, location: 0.7)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                LinearGradient(
+                    gradient: Gradient(stops: [
+                        .init(color: .clear, location: 0.3),
+                        .init(color: Color(red: 0, green: 184/255, blue: 230/255).opacity(0.45), location: 1.0)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
         }
-    }
-
-    /// claude-opus-4-7 → opus-4-7, claude-sonnet-4-6 → sonnet-4-6,
-    /// codex-auto-review → codex-review (укоротили чтоб влезало).
-    private var shortName: String {
-        var s = model.model
-        if s.hasPrefix("claude-") { s = String(s.dropFirst("claude-".count)) }
-        if s.hasPrefix("claude-haiku-4-5") { s = "haiku-4-5" }
-        return s
     }
 }
