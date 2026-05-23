@@ -82,6 +82,26 @@ struct LargeView: View {
             }
             .padding(.horizontal, 14).padding(.vertical, 6)
         }
-        .containerBackground(for: .widget) { BrandSurface { Color.clear } }
+        .containerBackground(for: .widget) {
+            ZStack {
+                Color(red: 20/255, green: 8/255, blue: 30/255)
+                LinearGradient(
+                    gradient: Gradient(stops: [
+                        .init(color: Color(red: 1.0, green: 45/255, blue: 109/255).opacity(0.55), location: 0),
+                        .init(color: .clear, location: 0.7)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                LinearGradient(
+                    gradient: Gradient(stops: [
+                        .init(color: .clear, location: 0.3),
+                        .init(color: Color(red: 0, green: 184/255, blue: 230/255).opacity(0.45), location: 1.0)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        }
     }
 }

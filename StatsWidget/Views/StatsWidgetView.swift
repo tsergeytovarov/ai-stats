@@ -48,7 +48,25 @@ struct SmallView: View {
         }
         .padding(14)
         .containerBackground(for: .widget) {
-            BrandSurface { Color.clear }
+            ZStack {
+                Color(red: 20/255, green: 8/255, blue: 30/255)
+                LinearGradient(
+                    gradient: Gradient(stops: [
+                        .init(color: Color(red: 1.0, green: 45/255, blue: 109/255).opacity(0.55), location: 0),
+                        .init(color: .clear, location: 0.7)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                LinearGradient(
+                    gradient: Gradient(stops: [
+                        .init(color: .clear, location: 0.3),
+                        .init(color: Color(red: 0, green: 184/255, blue: 230/255).opacity(0.45), location: 1.0)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
         }
     }
 }
@@ -102,6 +120,26 @@ struct MediumView: View {
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .containerBackground(for: .widget) { BrandSurface { Color.clear } }
+        .containerBackground(for: .widget) {
+            ZStack {
+                Color(red: 20/255, green: 8/255, blue: 30/255)
+                LinearGradient(
+                    gradient: Gradient(stops: [
+                        .init(color: Color(red: 1.0, green: 45/255, blue: 109/255).opacity(0.55), location: 0),
+                        .init(color: .clear, location: 0.7)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                LinearGradient(
+                    gradient: Gradient(stops: [
+                        .init(color: .clear, location: 0.3),
+                        .init(color: Color(red: 0, green: 184/255, blue: 230/255).opacity(0.45), location: 1.0)
+                    ]),
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            }
+        }
     }
 }
