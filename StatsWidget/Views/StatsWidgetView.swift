@@ -15,6 +15,8 @@ struct StatsWidgetView: View {
     }
 }
 
+// MARK: - Small
+
 struct SmallView: View {
     let entry: StatsEntry
 
@@ -50,6 +52,8 @@ struct SmallView: View {
         }
     }
 }
+
+// MARK: - Medium
 
 struct MediumView: View {
     let entry: StatsEntry
