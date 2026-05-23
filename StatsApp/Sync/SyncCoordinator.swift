@@ -81,42 +81,64 @@ final class SyncCoordinator {
         }
     }
 
-    /// Считает текущие totals за Day/Week/Month из DB, пишет JSON в контейнер виджета.
+    /// Считает текущие totals за Day/Week/Month, prev-cost для дельт, и leaderboard slice.
+    /// Пишет JSON в контейнер виджета.
     private func buildAndWriteWidgetSnapshot() throws {
         let nowDate = now()
-        let dayRange = DateUtils.daysRange(endingAt: nowDate, lookback: Period.day.lookbackDays)
-        let weekRange = DateUtils.daysRange(endingAt: nowDate, lookback: Period.week.lookbackDays)
-        let monthRange = DateUtils.daysRange(endingAt: nowDate, lookback: Period.month.lookbackDays)
+        let dayDays = DateUtils.daysRange(endingAt: nowDate, lookback: Period.day.lookbackDays)
+        let weekDays = DateUtils.daysRange(endingAt: nowDate, lookback: Period.week.lookbackDays)
+        let monthDays = DateUtils.daysRange(endingAt: nowDate, lookback: Period.month.lookbackDays)
+        let dayPrev = DateUtils.previousPeriodDays(endingAt: nowDate, lookback: Period.day.lookbackDays)
+        let weekPrev = DateUtils.previousPeriodDays(endingAt: nowDate, lookback: Period.week.lookbackDays)
+        let monthPrev = DateUtils.previousPeriodDays(endingAt: nowDate, lookback: Period.month.lookbackDays)
 
-        let slices: (WidgetSnapshot.PeriodSlice, WidgetSnapshot.PeriodSlice, WidgetSnapshot.PeriodSlice) = try db.read { db in
-            (
-                try Self.makeSlice(in: db, days: dayRange),
-                try Self.makeSlice(in: db, days: weekRange),
-                try Self.makeSlice(in: db, days: monthRange)
+        struct BuildResult {
+            let day: WidgetSnapshot.PeriodSlice
+            let week: WidgetSnapshot.PeriodSlice
+            let month: WidgetSnapshot.PeriodSlice
+            let myFriendCode: String?
+        }
+
+        let result: BuildResult = try db.read { db in
+            let myCode = try StatsQueries.loadMyProfile(db)?.friendCode
+            return BuildResult(
+                day: try Self.makeSlice(in: db, days: dayDays, prevDays: dayPrev, leaderboardPeriod: "day", myFriendCode: myCode),
+                week: try Self.makeSlice(in: db, days: weekDays, prevDays: weekPrev, leaderboardPeriod: "week", myFriendCode: myCode),
+                month: try Self.makeSlice(in: db, days: monthDays, prevDays: monthPrev, leaderboardPeriod: "month", myFriendCode: myCode),
+                myFriendCode: myCode
             )
         }
 
-        let anyCommits = slices.0.commits + slices.1.commits + slices.2.commits
-        let anyRepos = max(slices.0.uniqueRepos, slices.1.uniqueRepos, slices.2.uniqueRepos)
+        let anyCommits = result.day.commits + result.week.commits + result.month.commits
+        let anyRepos = max(result.day.uniqueRepos, result.week.uniqueRepos, result.month.uniqueRepos)
 
         let snapshot = WidgetSnapshot(
             generatedAt: nowDate,
-            day: slices.0,
-            week: slices.1,
-            month: slices.2,
+            day: result.day,
+            week: result.week,
+            month: result.month,
             githubEnabled: anyCommits > 0 || anyRepos > 0,
-            myFriendCode: nil              // TODO(large-widget T3): real value
+            myFriendCode: result.myFriendCode
         )
         try WidgetSnapshotIO.write(snapshot)
     }
 
-    private static func makeSlice(in db: GRDB.Database, days: [String]) throws -> WidgetSnapshot.PeriodSlice {
+    private static func makeSlice(
+        in db: GRDB.Database,
+        days: [String],
+        prevDays: [String],
+        leaderboardPeriod: String,
+        myFriendCode: String?
+    ) throws -> WidgetSnapshot.PeriodSlice {
         let totals = try StatsQueries.aiTotals(in: db, days: days)
+        let totalsPrev = try StatsQueries.aiTotals(in: db, days: prevDays)
         let gh = try StatsQueries.githubTotals(in: db, days: days)
         let models = try StatsQueries.topModels(in: db, days: days, limit: 4)
+        let lb = try Self.makeLeaderboardSlice(in: db, period: leaderboardPeriod, myFriendCode: myFriendCode)
+
         return WidgetSnapshot.PeriodSlice(
             aiCost: totals.totalCost,
-            aiCostPrev: 0,                // TODO(large-widget T3): real value
+            aiCostPrev: totalsPrev.totalCost,
             aiTokens: totals.totalInputTokens + totals.totalOutputTokens,
             commits: gh.totalCommits,
             uniqueRepos: gh.uniqueRepos,
@@ -129,8 +151,41 @@ final class SyncCoordinator {
                     outputTokens: $0.outputTokens
                 )
             },
-            leaderboard: nil               // TODO(large-widget T3): real value
+            leaderboard: lb
         )
+    }
+
+    /// Парсит leaderboard_cache.payload_json в LeaderboardSlice: top-8 entries + meBelow если я ниже.
+    private static func makeLeaderboardSlice(
+        in db: GRDB.Database, period: String, myFriendCode: String?
+    ) throws -> WidgetSnapshot.LeaderboardSlice? {
+        guard let row = try StatsQueries.loadLeaderboardCache(db, period: period) else { return nil }
+        guard let data = row.payloadJson.data(using: .utf8) else { return nil }
+        let decoder = JSONDecoder()
+        guard let resp = try? decoder.decode(LeaderboardResponse.self, from: data) else { return nil }
+
+        func mapEntry(_ e: LeaderboardEntry) -> WidgetSnapshot.LeaderboardSlice.Entry {
+            WidgetSnapshot.LeaderboardSlice.Entry(
+                rank: e.rank,
+                previousRank: e.previousRank,
+                displayName: e.displayName,
+                tokensTotal: e.tokensTotal,
+                isMe: e.isMe
+            )
+        }
+
+        let top8 = resp.entries.prefix(8).map(mapEntry)
+        let meBelow: WidgetSnapshot.LeaderboardSlice.Entry?
+        if let myCode = myFriendCode,
+           !top8.contains(where: { $0.isMe }),
+           let mine = resp.entries.first(where: { $0.friendCode == myCode })
+        {
+            meBelow = mapEntry(mine)
+        } else {
+            meBelow = nil
+        }
+
+        return WidgetSnapshot.LeaderboardSlice(entries: Array(top8), meBelow: meBelow)
     }
 
     private func syncWindowStart(source: String) throws -> Date {
