@@ -13,6 +13,8 @@ final class AppContainer {
     let secretBox: SecretBox
     let aiuseAPI: AiuseAPIClient
     let snapshotSyncer: SnapshotSyncer
+    let friendsPullSyncer: FriendsPullSyncer
+    let leaderboardPullSyncer: LeaderboardPullSyncer
 
     init() throws {
         let (cfg, wasCreated) = try ConfigLoader.loadOrCreate()
@@ -39,7 +41,21 @@ final class AppContainer {
         let syncer = SnapshotSyncer(db: dbPool, api: api)
         self.snapshotSyncer = syncer
 
-        let coordinator = SyncCoordinator(db: dbPool, snapshotSyncer: syncer)
+        let dbPoolRefForSyncers = dbPool
+        let hasAccountCheck: () -> Bool = {
+            (try? dbPoolRefForSyncers.read { try StatsQueries.loadMyProfile($0) }) ?? nil != nil
+        }
+        let friendsPull = FriendsPullSyncer(db: dbPool, api: api, hasAccount: hasAccountCheck)
+        let lbPull = LeaderboardPullSyncer(db: dbPool, api: api, hasAccount: hasAccountCheck)
+        self.friendsPullSyncer = friendsPull
+        self.leaderboardPullSyncer = lbPull
+
+        let coordinator = SyncCoordinator(
+            db: dbPool,
+            snapshotSyncer: syncer,
+            friendsPullSyncer: friendsPull,
+            leaderboardPullSyncer: lbPull
+        )
         self.syncCoordinator = coordinator
         let dbPoolRef = dbPool
         self.dropdownViewModel = DropdownViewModel(
