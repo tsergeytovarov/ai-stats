@@ -12,8 +12,8 @@ struct MenuBarCapsuleView: View {
                 .monospacedDigit()
         }
         .foregroundStyle(.white)
-        .padding(.vertical, 4)
-        .padding(.horizontal, 10)
+        .padding(.vertical, 3)
+        .padding(.horizontal, 8)
         .background(
             LinearGradient(
                 colors: [BrandColor.pink.opacity(0.25), BrandColor.cyan.opacity(0.25)],

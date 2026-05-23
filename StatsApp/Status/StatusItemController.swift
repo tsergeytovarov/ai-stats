@@ -45,6 +45,11 @@ final class StatusItemController: NSObject {
     private func updateCapsule(in button: NSStatusBarButton, priceText: String) {
         let hosting = NSHostingView(rootView: MenuBarCapsuleView(priceText: priceText))
         hosting.frame.size = hosting.intrinsicContentSize
+        // Cap height to menu bar thickness so the capsule never overflows.
+        let menuBarHeight = NSStatusBar.system.thickness
+        if hosting.frame.size.height > menuBarHeight {
+            hosting.frame.size.height = menuBarHeight
+        }
         button.subviews.forEach { $0.removeFromSuperview() }
         button.addSubview(hosting)
         button.frame.size = hosting.frame.size
