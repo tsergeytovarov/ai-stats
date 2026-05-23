@@ -121,6 +121,34 @@ struct DropdownView: View {
                 }
             }
 
+            if !viewModel.leaderboard.isEmpty || viewModel.leaderboardError != nil {
+                Divider()
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Лидерборд").font(.headline)
+                    if let err = viewModel.leaderboardError {
+                        Text(err).font(.caption).foregroundStyle(.red)
+                    } else {
+                        ForEach(Array(viewModel.leaderboard.prefix(5))) { entry in
+                            HStack {
+                                Text("\(entry.rank).")
+                                    .frame(width: 18, alignment: .trailing)
+                                    .foregroundStyle(.secondary)
+                                Text(entry.displayName)
+                                    .fontWeight(entry.isMe ? .semibold : .regular)
+                                Spacer()
+                                Text(formatTokens(entry.tokensTotal) + " tok")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .font(.system(.body, design: .monospaced))
+                        }
+                        if viewModel.leaderboard.count == 1 {
+                            Text("Добавь друзей в Настройки → Друзья, чтобы увидеть других.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+
             Divider()
 
             HStack {
@@ -132,6 +160,7 @@ struct DropdownView: View {
                 Button(action: onOpenSettings) { Image(systemName: "gearshape") }.buttonStyle(.borderless)
             }
         }
+        .task { await viewModel.loadLeaderboard() }
     }
 
     private var summarySubtitle: String {

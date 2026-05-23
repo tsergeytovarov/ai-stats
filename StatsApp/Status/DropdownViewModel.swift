@@ -19,9 +19,16 @@ extension Period {
 final class DropdownViewModel: ObservableObject {
     private let db: any DatabaseReader
     private weak var syncCoordinator: SyncCoordinator?
+    private let api: AiuseAPIClient?
+    private let hasAccount: () -> Bool
     let githubEnabled: Bool
 
-    @Published var period: Period = .day { didSet { Task { await reload() } } }
+    @Published var period: Period = .day {
+        didSet {
+            Task { await reload() }
+            Task { await loadLeaderboard() }
+        }
+    }
     @Published var aiTotals: AITotals = .init(totalCost: 0, totalInputTokens: 0, totalOutputTokens: 0)
     @Published var bySource: [SourceTotal] = []
     @Published var topModels: [ModelTotal] = []
@@ -32,9 +39,20 @@ final class DropdownViewModel: ObservableObject {
     @Published var additionsSeries: [Double] = []
     @Published var lastSyncDescription: String = "never"
 
-    init(db: any DatabaseReader, syncCoordinator: SyncCoordinator, githubEnabled: Bool = true) {
+    // Leaderboard (v0.3.0)
+    @Published var leaderboard: [LeaderboardEntry] = []
+    @Published var leaderboardError: String?
+    @Published var leaderboardLoading: Bool = false
+
+    init(db: any DatabaseReader,
+         syncCoordinator: SyncCoordinator,
+         api: AiuseAPIClient? = nil,
+         hasAccount: @escaping () -> Bool = { false },
+         githubEnabled: Bool = true) {
         self.db = db
         self.syncCoordinator = syncCoordinator
+        self.api = api
+        self.hasAccount = hasAccount
         self.githubEnabled = githubEnabled
     }
 
@@ -80,6 +98,30 @@ final class DropdownViewModel: ObservableObject {
             try? await coord.runOnce(source: name, fetchers: fetchers)
         }
         await reload()
+        await loadLeaderboard()
+    }
+
+    func loadLeaderboard() async {
+        guard let api, hasAccount() else {
+            leaderboard = []
+            leaderboardError = nil
+            return
+        }
+        leaderboardLoading = true
+        defer { leaderboardLoading = false }
+        leaderboardError = nil
+        do {
+            let apiPeriod: String
+            switch period {
+            case .day: apiPeriod = "day"
+            case .week: apiPeriod = "week"
+            case .month: apiPeriod = "month"
+            }
+            let resp = try await api.getLeaderboard(period: apiPeriod)
+            leaderboard = resp.entries
+        } catch {
+            leaderboardError = "Не удалось загрузить лидерборд: \(error.localizedDescription)"
+        }
     }
 
     private func relativeDescription(for date: Date?) -> String {
