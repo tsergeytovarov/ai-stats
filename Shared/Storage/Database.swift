@@ -121,6 +121,30 @@ enum Database {
             """)
             try db.execute(sql: "CREATE INDEX idx_github_loc_daily_day ON github_loc_daily(day)")
         }
+        migrator.registerMigration("v5_aiuse_tables") { db in
+            // Свой профиль для aiuse — singleton (id всегда = 1).
+            try db.execute(sql: """
+                CREATE TABLE my_profile (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    friend_code TEXT NOT NULL,
+                    display_name TEXT NOT NULL,
+                    avatar_path TEXT,
+                    sharing_enabled INTEGER NOT NULL DEFAULT 1,
+                    server_user_id INTEGER NOT NULL
+                )
+            """)
+
+            // Очередь snapshot'ов для отправки на сервер. hour_bucket = unix seconds.
+            try db.execute(sql: """
+                CREATE TABLE pending_snapshots (
+                    hour_bucket INTEGER PRIMARY KEY,
+                    tokens_input INTEGER NOT NULL,
+                    tokens_output INTEGER NOT NULL,
+                    attempts INTEGER NOT NULL DEFAULT 0,
+                    last_error TEXT
+                )
+            """)
+        }
         try migrator.migrate(writer)
     }
 
