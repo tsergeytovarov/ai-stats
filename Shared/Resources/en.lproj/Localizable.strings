@@ -55,7 +55,8 @@
 "delta.vs_prev_month" = "vs last month";
 "delta.new" = "NEW";
 
-"section.leaderboard" = "Leaderboard";
+"section.leaderboard" = "Friends";
+"label.leaderboard.heading" = "Token ranking";
 
 "period.short.day" = "D";
 "period.short.week" = "W";

@@ -53,7 +53,8 @@
 "delta.vs_prev_month" = "vs прошлого месяца";
 "delta.new" = "NEW";
 
-"section.leaderboard" = "Лидерборд";
+"section.leaderboard" = "Друзья";
+"label.leaderboard.heading" = "Рейтинг по токенам";
 
 "period.short.day" = "Д";
 "period.short.week" = "Н";

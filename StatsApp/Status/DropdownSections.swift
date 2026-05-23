@@ -184,44 +184,37 @@ struct DropdownLeaderboardSection: View {
     @ObservedObject var viewModel: DropdownViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if viewModel.leaderboardLoading && viewModel.leaderboard.isEmpty {
-                HStack { Spacer(); ProgressView(); Spacer() }
-                    .padding(.vertical, 20)
-            } else if let err = viewModel.leaderboardError, viewModel.leaderboard.isEmpty {
-                Text(err).font(.callout).foregroundStyle(.red)
+        VStack(alignment: .leading, spacing: 0) {
+            Crumb(category: .friends,
+                  title: NSLocalizedString("section.leaderboard", comment: ""),
+                  period: viewModel.period.localizedTitle)
+
+            Text("label.leaderboard.heading")
+                .font(BrandFont.lbl)
+                .tracking(1.2)
+                .textCase(.uppercase)
+                .foregroundStyle(BrandColor.cyanLight.opacity(0.7))
+                .padding(.top, 10)
+                .padding(.bottom, 6)
+
+            if let error = viewModel.leaderboardError {
+                Text(error).font(BrandFont.caption).foregroundStyle(BrandColor.danger)
             } else if viewModel.leaderboard.isEmpty {
-                Text("Создай аккаунт в Настройки → Аккаунт и шарь статистику чтобы увидеть лидерборд.")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                Text("widget.leaderboard.empty")
+                    .font(BrandFont.caption)
+                    .foregroundStyle(TextColor.muted)
             } else {
-                VStack(spacing: 8) {
-                    ForEach(viewModel.leaderboard) { entry in
-                        HStack(spacing: 10) {
-                            Text("\(entry.rank).")
-                                .frame(width: 22, alignment: .trailing)
-                                .foregroundStyle(.secondary)
-                                .font(.system(.body, design: .monospaced))
-                            RankDelta(current: entry.rank, previous: entry.previousRank)
-                            AvatarView(data: viewModel.friendAvatars[entry.friendCode], size: 28)
-                            Text(entry.isMe ? "Я" : entry.displayName)
-                                .fontWeight(entry.isMe ? .semibold : .regular)
-                            Spacer()
-                            Text(DropdownFormat.tokens(entry.tokensTotal) + " tok")
-                                .foregroundStyle(.secondary)
-                                .font(.system(.body, design: .monospaced))
-                        }
-                    }
-                }
-                if viewModel.leaderboard.count == 1 {
-                    Text("Добавь друзей в Настройки → Друзья, чтобы увидеть других.")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                if let err = viewModel.leaderboardError {
-                    Text(err).font(.caption).foregroundStyle(.orange)
+                ForEach(Array(viewModel.leaderboard.prefix(10).enumerated()), id: \.offset) { idx, entry in
+                    FriendRow(
+                        rank: idx + 1,
+                        name: entry.displayName,
+                        valueText: DropdownFormat.tokens(entry.tokensTotal),
+                        isMe: entry.isMe
+                    )
                 }
             }
+
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
