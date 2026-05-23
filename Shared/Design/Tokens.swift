@@ -45,3 +45,43 @@ enum TextColor {
     /// нейтрал для Друзей
     static let crumbFriends = Color.white.opacity(0.7)
 }
+
+/// Font tokens — все system, SF Pro Display для display.*, SF Pro Text для остального.
+enum BrandFont {
+    static let displayXXL = Font.system(size: 44, weight: .bold, design: .default).monospacedDigit()
+    static let displayXL = Font.system(size: 46, weight: .bold, design: .default).monospacedDigit()
+    static let displayL = Font.system(size: 38, weight: .bold, design: .default).monospacedDigit()
+    static let displayM = Font.system(size: 30, weight: .bold, design: .default).monospacedDigit()
+
+    static let unitL = Font.system(size: 18, weight: .semibold)
+    static let delta = Font.system(size: 12, weight: .semibold).monospacedDigit()
+    static let body = Font.system(size: 13, weight: .regular)
+    static let caption = Font.system(size: 11, weight: .medium)
+    static let crumb = Font.system(size: 11, weight: .semibold)
+    static let lbl = Font.system(size: 10, weight: .semibold)
+    static let pillBody = Font.system(size: 11, weight: .semibold)
+    static let pillPeriod = Font.system(size: 10, weight: .semibold)
+}
+
+/// Spacing — 4pt grid.
+enum BrandSpacing {
+    static let xs: CGFloat = 4
+    static let s: CGFloat = 6
+    static let m: CGFloat = 8
+    static let l: CGFloat = 12
+    static let xl: CGFloat = 16
+    static let xxl: CGFloat = 22
+
+    /// Резерв снизу popover'а под floating island (~ 46 + 32 воздуха).
+    static let islandClearance: CGFloat = 78
+    /// Островок offset от bottom edge.
+    static let islandBottomOffset: CGFloat = 14
+}
+
+/// Radii.
+enum BrandRadius {
+    static let surface: CGFloat = 22
+    static let pill: CGFloat = 999       // capsule
+    static let button: CGFloat = 9
+    static let field: CGFloat = 10
+}
