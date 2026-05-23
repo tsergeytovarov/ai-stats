@@ -18,11 +18,10 @@ final class StatusItemController: NSObject {
     func install() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = item.button {
-            button.image = NSImage(systemSymbolName: "chart.line.uptrend.xyaxis", accessibilityDescription: "ai-stats")
-            button.imagePosition = .imageLeading
-            button.title = " $0.00"
+            button.title = ""
             button.target = self
             button.action = #selector(togglePopover(_:))
+            updateCapsule(in: button, priceText: "$0.00")
         }
         statusItem = item
 
@@ -38,7 +37,18 @@ final class StatusItemController: NSObject {
 
     func refreshTitle() async {
         let cost = await viewModel.todayCost()
-        statusItem?.button?.title = String(format: " $%.2f", cost)
+        let formatted = String(format: "$%.2f", cost)
+        guard let button = statusItem?.button else { return }
+        updateCapsule(in: button, priceText: formatted)
+    }
+
+    private func updateCapsule(in button: NSStatusBarButton, priceText: String) {
+        let hosting = NSHostingView(rootView: MenuBarCapsuleView(priceText: priceText))
+        hosting.frame.size = hosting.intrinsicContentSize
+        button.subviews.forEach { $0.removeFromSuperview() }
+        button.addSubview(hosting)
+        button.frame.size = hosting.frame.size
+        button.title = ""
     }
 
     private func observeTotals() {
