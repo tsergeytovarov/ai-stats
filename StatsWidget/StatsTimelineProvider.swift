@@ -5,11 +5,14 @@ struct StatsEntry: TimelineEntry {
     let date: Date
     let period: Period
     let aiCost: Double
+    let aiCostPrev: Double
     let aiTokens: Int64
     let commits: Int64
     let uniqueRepos: Int
     let topModels: [WidgetSnapshot.ModelEntry]
     let githubEnabled: Bool
+    let leaderboard: WidgetSnapshot.LeaderboardSlice?
+    let myFriendCode: String?
 }
 
 struct StatsTimelineProvider: AppIntentTimelineProvider {
@@ -44,24 +47,25 @@ struct StatsTimelineProvider: AppIntentTimelineProvider {
             date: snapshot.generatedAt,
             period: period,
             aiCost: slice.aiCost,
+            aiCostPrev: slice.aiCostPrev,
             aiTokens: slice.aiTokens,
             commits: slice.commits,
             uniqueRepos: slice.uniqueRepos,
             topModels: slice.topModels,
-            githubEnabled: snapshot.githubEnabled
+            githubEnabled: snapshot.githubEnabled,
+            leaderboard: slice.leaderboard,
+            myFriendCode: snapshot.myFriendCode
         )
     }
 
     private func emptyEntry(period: Period, date: Date, githubEnabled: Bool) -> StatsEntry {
         StatsEntry(
-            date: date,
-            period: period,
-            aiCost: 0,
-            aiTokens: 0,
-            commits: 0,
-            uniqueRepos: 0,
-            topModels: [],
-            githubEnabled: githubEnabled
+            date: date, period: period,
+            aiCost: 0, aiCostPrev: 0, aiTokens: 0,
+            commits: 0, uniqueRepos: 0, topModels: [],
+            githubEnabled: githubEnabled,
+            leaderboard: nil,
+            myFriendCode: nil
         )
     }
 }
