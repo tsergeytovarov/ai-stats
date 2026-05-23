@@ -85,3 +85,69 @@ struct SnapshotsBatch: Codable {
 struct SnapshotsResponse: Codable {
     let accepted: Int
 }
+
+// MARK: - friends
+
+struct AddFriendRequest: Codable {
+    let friendCode: String
+
+    enum CodingKeys: String, CodingKey {
+        case friendCode = "friend_code"
+    }
+}
+
+struct RemoveFriendRequest: Codable {
+    let block: Bool
+}
+
+struct FriendDTO: Codable, Identifiable, Equatable {
+    let friendCode: String
+    let displayName: String
+    let sharingEnabled: Bool
+    let addedAt: String
+
+    var id: String { friendCode }
+
+    enum CodingKeys: String, CodingKey {
+        case friendCode = "friend_code"
+        case displayName = "display_name"
+        case sharingEnabled = "sharing_enabled"
+        case addedAt = "added_at"
+    }
+}
+
+struct FriendsListResponse: Codable {
+    let friends: [FriendDTO]
+}
+
+// MARK: - leaderboard
+
+struct LeaderboardEntry: Codable, Identifiable, Equatable {
+    let friendCode: String
+    let displayName: String
+    let rank: Int
+    let tokensTotal: Int64
+    let isMe: Bool
+
+    var id: String { friendCode }
+
+    enum CodingKeys: String, CodingKey {
+        case friendCode = "friend_code"
+        case displayName = "display_name"
+        case rank
+        case tokensTotal = "tokens_total"
+        case isMe = "is_me"
+    }
+}
+
+struct LeaderboardResponse: Codable {
+    let period: String
+    let asOf: String
+    let entries: [LeaderboardEntry]
+
+    enum CodingKeys: String, CodingKey {
+        case period
+        case asOf = "as_of"
+        case entries
+    }
+}

@@ -72,6 +72,49 @@ final class AiuseAPIClient {
         )
     }
 
+    // MARK: - friends
+
+    func addFriend(friendCode: String) async throws -> FriendDTO {
+        return try await request(
+            path: "/friends",
+            method: "POST",
+            body: AddFriendRequest(friendCode: friendCode),
+            authed: true,
+            decodeAs: FriendDTO.self
+        )
+    }
+
+    func listFriends() async throws -> [FriendDTO] {
+        let resp = try await request(
+            path: "/friends",
+            method: "GET",
+            authed: true,
+            decodeAs: FriendsListResponse.self
+        )
+        return resp.friends
+    }
+
+    func removeFriend(friendCode: String, block: Bool = false) async throws {
+        _ = try await request(
+            path: "/friends/\(friendCode)",
+            method: "DELETE",
+            body: RemoveFriendRequest(block: block),
+            authed: true,
+            decodeAs: EmptyResponse.self
+        )
+    }
+
+    // MARK: - leaderboard
+
+    func getLeaderboard(period: String) async throws -> LeaderboardResponse {
+        return try await request(
+            path: "/leaderboard?period=\(period)",
+            method: "GET",
+            authed: true,
+            decodeAs: LeaderboardResponse.self
+        )
+    }
+
     // MARK: - snapshots
 
     func sendSnapshots(_ batch: [SnapshotItem]) async throws -> SnapshotsResponse {
