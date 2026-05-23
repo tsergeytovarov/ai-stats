@@ -5,6 +5,15 @@
 
 ## [Unreleased]
 
+### Backend v0.3.0 — friends + blocks + leaderboard + avatars endpoints
+- `POST /api/friends`, `GET /api/friends`, `DELETE /api/friends/{code}` (с опц. block).
+- `GET /api/blocks`, `DELETE /api/blocks/{code}`.
+- `GET /api/leaderboard?period={day|week|month|24h}` — SUM tokens среди друзей + я, фильтрация неактивных профилей.
+- `GET /api/avatars/{code}` — отдача bytea с ETag/304.
+- Симметричная friendship одной строкой `(min(a,b), max(a,b))`, JOIN через `or_`.
+- Блок маскируется под 404 (не палим факт блокировки).
+- Backend `ai-stats-api` 0.3.0 задеплоен на aiuse.popovs.tech, 58 тестов passed.
+
 ### Добавлено — aiuse backend integration (v0.2.0 leaderboard client)
 - `AiuseAPIClient` и `KeychainStore` для взаимодействия с `aiuse.popovs.tech/api`.
 - Новая вкладка «Аккаунт» в Settings: создание профиля, friend_code с копированием, шаринг toggle, регенерация ID, удаление аккаунта.
