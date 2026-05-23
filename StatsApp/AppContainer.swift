@@ -61,6 +61,7 @@ final class AppContainer {
         let dbPoolRef = dbPool
         return FriendsTabViewModel(
             api: aiuseAPI,
+            db: dbPool,
             hasAccount: { (try? dbPoolRef.read { try StatsQueries.loadMyProfile($0) }) ?? nil != nil }
         )
     }

@@ -43,6 +43,7 @@ final class DropdownViewModel: ObservableObject {
     @Published var leaderboard: [LeaderboardEntry] = []
     @Published var leaderboardError: String?
     @Published var leaderboardLoading: Bool = false
+    @Published var friendAvatars: [String: Data] = [:]   // friend_code → avatar bytes
 
     init(db: any DatabaseReader,
          syncCoordinator: SyncCoordinator,
@@ -110,18 +111,53 @@ final class DropdownViewModel: ObservableObject {
         leaderboardLoading = true
         defer { leaderboardLoading = false }
         leaderboardError = nil
+
+        let apiPeriod: String
+        switch period {
+        case .day: apiPeriod = "day"
+        case .week: apiPeriod = "week"
+        case .month: apiPeriod = "month"
+        }
+
+        // Сначала кэш (мгновенный рендер если есть)
+        if let cached = try? await db.read({ try StatsQueries.loadLeaderboardCache($0, period: apiPeriod) }),
+           let data = cached.payloadJson.data(using: .utf8),
+           let decoded = try? JSONDecoder().decode(LeaderboardResponse.self, from: data) {
+            leaderboard = decoded.entries
+        }
+
+        // Затем свежее с сервера. На ошибке оставляем cached (если был).
         do {
-            let apiPeriod: String
-            switch period {
-            case .day: apiPeriod = "day"
-            case .week: apiPeriod = "week"
-            case .month: apiPeriod = "month"
-            }
             let resp = try await api.getLeaderboard(period: apiPeriod)
             leaderboard = resp.entries
+            // Параллельно сохраняем в локальный кэш + подгружаем аватарки
+            if let data = try? JSONEncoder().encode(resp),
+               let json = String(data: data, encoding: .utf8),
+               let writer = db as? any DatabaseWriter {
+                try? await writer.write { try StatsQueries.saveLeaderboardCache($0, period: apiPeriod, payloadJson: json) }
+            }
         } catch {
-            leaderboardError = "Не удалось загрузить лидерборд: \(error.localizedDescription)"
+            // Если кэша не было — показываем ошибку. Иначе тихо живём с кэшем.
+            if leaderboard.isEmpty {
+                leaderboardError = "Не удалось загрузить лидерборд: \(error.localizedDescription)"
+            }
         }
+
+        await reloadAvatars()
+    }
+
+    /// Подгружает avatar_blob из friend_profiles для всех entries в текущем лидерборде.
+    func reloadAvatars() async {
+        let codes = leaderboard.map { $0.friendCode }
+        guard !codes.isEmpty else { friendAvatars = [:]; return }
+        let rows: [FriendProfileRow] = (try? await db.read { db in
+            try FriendProfileRow.filter(codes.contains(FriendProfileRow.Columns.friendCode)).fetchAll(db)
+        }) ?? []
+        var map: [String: Data] = [:]
+        for row in rows {
+            if let blob = row.avatarBlob { map[row.friendCode] = blob }
+        }
+        friendAvatars = map
     }
 
     private func relativeDescription(for date: Date?) -> String {

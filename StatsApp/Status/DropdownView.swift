@@ -129,10 +129,11 @@ struct DropdownView: View {
                         Text(err).font(.caption).foregroundStyle(.red)
                     } else {
                         ForEach(Array(viewModel.leaderboard.prefix(5))) { entry in
-                            HStack {
+                            HStack(spacing: 8) {
                                 Text("\(entry.rank).")
                                     .frame(width: 18, alignment: .trailing)
                                     .foregroundStyle(.secondary)
+                                AvatarView(data: viewModel.friendAvatars[entry.friendCode], size: 20)
                                 Text(entry.displayName)
                                     .fontWeight(entry.isMe ? .semibold : .regular)
                                 Spacer()

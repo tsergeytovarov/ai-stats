@@ -44,9 +44,9 @@ struct FriendsTabView: View {
                 .foregroundStyle(.secondary).font(.callout)
         } else {
             VStack(spacing: 0) {
-                ForEach(viewModel.friends) { friend in
+                ForEach(viewModel.friends, id: \.friendCode) { friend in
                     friendRow(friend)
-                    if friend.id != viewModel.friends.last?.id {
+                    if friend.friendCode != viewModel.friends.last?.friendCode {
                         Divider()
                     }
                 }
@@ -55,11 +55,9 @@ struct FriendsTabView: View {
     }
 
     @ViewBuilder
-    private func friendRow(_ friend: FriendDTO) -> some View {
+    private func friendRow(_ friend: FriendProfileRow) -> some View {
         HStack(spacing: 10) {
-            Image(systemName: "person.crop.circle")
-                .resizable().frame(width: 28, height: 28)
-                .foregroundStyle(.secondary)
+            AvatarView(data: friend.avatarBlob, size: 32)
             VStack(alignment: .leading, spacing: 2) {
                 Text(friend.displayName).font(.body)
                 Text(formatFriendCode(friend.friendCode))
