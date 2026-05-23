@@ -104,7 +104,8 @@ final class SyncCoordinator {
             day: slices.0,
             week: slices.1,
             month: slices.2,
-            githubEnabled: anyCommits > 0 || anyRepos > 0
+            githubEnabled: anyCommits > 0 || anyRepos > 0,
+            myFriendCode: nil              // placeholder, заполняется в Task 3
         )
         try WidgetSnapshotIO.write(snapshot)
     }
@@ -115,6 +116,7 @@ final class SyncCoordinator {
         let models = try StatsQueries.topModels(in: db, days: days, limit: 4)
         return WidgetSnapshot.PeriodSlice(
             aiCost: totals.totalCost,
+            aiCostPrev: 0,                // placeholder, заполняется в Task 3
             aiTokens: totals.totalInputTokens + totals.totalOutputTokens,
             commits: gh.totalCommits,
             uniqueRepos: gh.uniqueRepos,
@@ -126,7 +128,8 @@ final class SyncCoordinator {
                     inputTokens: $0.inputTokens,
                     outputTokens: $0.outputTokens
                 )
-            }
+            },
+            leaderboard: nil               // placeholder, заполняется в Task 3
         )
     }
 
