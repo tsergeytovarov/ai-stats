@@ -36,3 +36,4 @@ config.json
 ai-stats.xcodeproj/
 *.profraw
 .superpowers/
+.worktrees/
