@@ -60,67 +60,58 @@ struct DropdownAISection: View {
     @ObservedObject var viewModel: DropdownViewModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(String(format: "$%.2f", viewModel.aiTotals.totalCost))
-                    .font(.system(size: 32, weight: .semibold, design: .rounded))
-                CostDelta(
-                    current: viewModel.aiTotals.totalCost,
-                    previous: viewModel.aiTotalsPrev.totalCost,
-                    period: viewModel.period
-                )
-                Text(DropdownFormat.tokens(viewModel.aiTotals.totalInputTokens + viewModel.aiTotals.totalOutputTokens) + " tokens")
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
-            }
+        VStack(alignment: .leading, spacing: 0) {
+            Crumb(category: .ai, title: "AI", period: viewModel.period.localizedTitle)
 
-            Divider()
+            HeroNumber(MoneyFormatter.popover(viewModel.aiTotals.totalCost), variant: .pink)
+                .padding(.top, 4)
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("section.ai_usage").font(.headline)
-                if viewModel.bySource.isEmpty {
-                    Text("label.no_data").font(.caption).foregroundStyle(.secondary)
-                } else {
-                    ForEach(viewModel.bySource, id: \.source) { src in
-                        HStack {
-                            Text(src.source)
-                            Spacer()
-                            Text(String(format: "$%.2f", src.costUsd))
-                            Text(DropdownFormat.tokens(src.inputTokens + src.outputTokens) + " tok")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 80, alignment: .trailing)
-                        }
-                        .font(.system(.body, design: .monospaced))
+            CostDelta(
+                current: viewModel.aiTotals.totalCost,
+                previous: viewModel.aiTotalsPrev.totalCost,
+                period: viewModel.period
+            )
+            .foregroundStyle(BrandColor.cyanLight)
+            .padding(.top, 4)
+
+            Text(DropdownFormat.tokens(viewModel.aiTotals.totalInputTokens + viewModel.aiTotals.totalOutputTokens) + " tokens")
+                .font(BrandFont.caption)
+                .foregroundStyle(BrandColor.cyanLight.opacity(0.75))
+                .padding(.top, 2)
+
+            Text("section.top_models")
+                .font(BrandFont.lbl)
+                .tracking(1.2)
+                .textCase(.uppercase)
+                .foregroundStyle(BrandColor.cyanLight.opacity(0.7))
+                .padding(.top, 14)
+                .padding(.bottom, 6)
+
+            if viewModel.topModels.isEmpty {
+                Text("label.no_data").font(BrandFont.caption).foregroundStyle(TextColor.muted)
+            } else {
+                ForEach(viewModel.topModels.prefix(5), id: \.self) { m in
+                    HStack {
+                        Text(m.model).font(BrandFont.body)
+                        Spacer()
+                        Text(MoneyFormatter.popover(m.costUsd))
+                            .font(BrandFont.body)
+                            .monospacedDigit()
+                            .foregroundStyle(.white.opacity(0.8))
                     }
+                    .padding(.vertical, 3)
                 }
             }
 
-            Divider()
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text("section.top_models").font(.headline)
-                if viewModel.topModels.isEmpty {
-                    Text("label.no_data").font(.caption).foregroundStyle(.secondary)
-                } else {
-                    ForEach(viewModel.topModels, id: \.self) { m in
-                        HStack {
-                            Text(m.model)
-                            Spacer()
-                            Text(String(format: "$%.2f", m.costUsd))
-                            Text(DropdownFormat.tokens(m.inputTokens + m.outputTokens) + " tok")
-                                .foregroundStyle(.secondary)
-                                .frame(width: 80, alignment: .trailing)
-                        }
-                        .font(.system(.body, design: .monospaced))
-                    }
-                }
-            }
-
-            Divider()
+            Spacer(minLength: 14)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("section.trend").font(.caption).foregroundStyle(.secondary)
+                Text("section.trend")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .tracking(0.5)
                 Sparkline(values: viewModel.sparklineSeries, variant: .ai)
+                    .frame(height: 38)
             }
         }
     }
