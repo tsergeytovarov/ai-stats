@@ -174,15 +174,8 @@ struct DropdownLeaderboardSection: View {
                                 .foregroundStyle(.secondary)
                                 .font(.system(.body, design: .monospaced))
                             AvatarView(data: viewModel.friendAvatars[entry.friendCode], size: 28)
-                            if entry.isMe {
-                                Text("Я")
-                                    .fontWeight(.semibold)
-                                Text("(\(entry.displayName))")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            } else {
-                                Text(entry.displayName)
-                            }
+                            Text(entry.isMe ? "Я" : entry.displayName)
+                                .fontWeight(entry.isMe ? .semibold : .regular)
                             Spacer()
                             Text(DropdownFormat.tokens(entry.tokensTotal) + " tok")
                                 .foregroundStyle(.secondary)
