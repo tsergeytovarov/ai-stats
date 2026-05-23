@@ -22,6 +22,6 @@ struct StatsWidget: Widget {
         }
         .configurationDisplayName("ai-stats")
         .description("AI usage и GitHub активность за выбранный период.")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
 }
