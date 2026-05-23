@@ -34,3 +34,4 @@ config.json
 
 ## Xcode-generated project
 ai-stats.xcodeproj/
+*.profraw
