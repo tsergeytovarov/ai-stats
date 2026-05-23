@@ -115,6 +115,45 @@ final class AiuseAPIClient {
         )
     }
 
+    // MARK: - avatars
+
+    /// Запрос аватарки. Возвращает (data, mime, etag) — или nil если 304 / 404.
+    /// ifNoneMatch — ETag из предыдущего ответа для conditional GET.
+    func getAvatar(friendCode: String, ifNoneMatch: String? = nil) async throws -> (data: Data, mime: String?, etag: String?)? {
+        guard let secret = secretProvider() else { throw AiuseAPIError.missingSecret }
+
+        var url = baseURL
+        url.append(path: "/avatars/\(friendCode)")
+        var req = URLRequest(url: url)
+        req.httpMethod = "GET"
+        req.setValue("Bearer \(secret)", forHTTPHeaderField: "Authorization")
+        if let ifNoneMatch {
+            req.setValue(ifNoneMatch, forHTTPHeaderField: "If-None-Match")
+        }
+
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await session.data(for: req)
+        } catch {
+            throw AiuseAPIError.transport(error.localizedDescription)
+        }
+
+        guard let http = response as? HTTPURLResponse else {
+            throw AiuseAPIError.unexpected
+        }
+
+        if http.statusCode == 304 || http.statusCode == 404 {
+            return nil
+        }
+        guard (200..<300).contains(http.statusCode) else {
+            throw AiuseAPIError.http(status: http.statusCode, body: "")
+        }
+        let mime = http.value(forHTTPHeaderField: "Content-Type")
+        let etag = http.value(forHTTPHeaderField: "ETag")
+        return (data, mime, etag)
+    }
+
     // MARK: - snapshots
 
     func sendSnapshots(_ batch: [SnapshotItem]) async throws -> SnapshotsResponse {
