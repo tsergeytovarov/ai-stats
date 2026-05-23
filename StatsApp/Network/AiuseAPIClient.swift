@@ -108,8 +108,9 @@ final class AiuseAPIClient {
 
     func getLeaderboard(period: String) async throws -> LeaderboardResponse {
         return try await request(
-            path: "/leaderboard?period=\(period)",
+            path: "/leaderboard",
             method: "GET",
+            query: ["period": period],
             authed: true,
             decodeAs: LeaderboardResponse.self
         )
@@ -193,12 +194,21 @@ final class AiuseAPIClient {
     private func request<R: Decodable>(
         path: String,
         method: String,
+        query: [String: String] = [:],
         body: Encodable? = nil,
         authed: Bool = true,
         decodeAs: R.Type
     ) async throws -> R {
         var url = baseURL
         url.append(path: path)
+        if !query.isEmpty {
+            guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+                throw AiuseAPIError.invalidURL
+            }
+            components.queryItems = query.map { URLQueryItem(name: $0.key, value: $0.value) }
+            guard let finalURL = components.url else { throw AiuseAPIError.invalidURL }
+            url = finalURL
+        }
         var req = URLRequest(url: url)
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
