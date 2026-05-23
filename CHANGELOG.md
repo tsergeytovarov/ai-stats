@@ -5,6 +5,16 @@
 
 ## [Unreleased]
 
+### Client v0.3.0 — friends + leaderboard + blocked в app
+- Новая вкладка «Друзья» в Settings: добавить по коду, список с аватарками, удалить / удалить+заблокировать.
+- Новая вкладка «Заблокированные»: список + разблокировка.
+- Новая секция «Лидерборд» в menu bar dropdown — top-5, аватарки, твоя строка bold.
+- Лидерборд автоматически переключается при смене period (день/неделя/месяц).
+- Локальный кэш: `friend_profiles` (миграция v7) с avatar_blob + ETag, `leaderboard_cache` за все 4 периода. Оффлайн-фолбэк.
+- `FriendsPullSyncer` + `LeaderboardPullSyncer` интегрированы в общий sync-тик (после snapshot push).
+- `AiuseAPIClient.getAvatar` с conditional GET по If-None-Match.
+- Memory-cache для `api_secret` в `SecretBox` — один Keychain prompt за сессию вместо потока (unsigned-app проблема).
+
 ### Backend v0.3.0 — friends + blocks + leaderboard + avatars endpoints
 - `POST /api/friends`, `GET /api/friends`, `DELETE /api/friends/{code}` (с опц. block).
 - `GET /api/blocks`, `DELETE /api/blocks/{code}`.
