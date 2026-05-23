@@ -42,7 +42,7 @@ targets:
     entitlements:
       path: StatsApp/StatsApp.entitlements
       properties:
-        com.apple.security.application-groups: ["group.com.sergeytovarov.aistats"]
+        com.apple.security.app-sandbox: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.sergeytovarov.aistats
@@ -69,7 +69,7 @@ targets:
     entitlements:
       path: StatsWidget/StatsWidget.entitlements
       properties:
-        com.apple.security.application-groups: ["group.com.sergeytovarov.aistats"]
+        com.apple.security.app-sandbox: false
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.sergeytovarov.aistats.widget
