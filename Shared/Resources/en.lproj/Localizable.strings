@@ -51,3 +51,7 @@
 "delta.vs_prev_week" = "vs last week";
 "delta.vs_prev_month" = "vs last month";
 "delta.new" = "NEW";
+
+"section.leaderboard" = "Leaderboard";
+"widget.leaderboard.no_account" = "Enable sharing in Settings to see the leaderboard.";
+"widget.leaderboard.empty" = "No friends yet.";

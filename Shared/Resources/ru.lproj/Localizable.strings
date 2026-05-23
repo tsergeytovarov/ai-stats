@@ -49,3 +49,7 @@
 "delta.vs_prev_week" = "vs прошлой недели";
 "delta.vs_prev_month" = "vs прошлого месяца";
 "delta.new" = "NEW";
+
+"section.leaderboard" = "Лидерборд";
+"widget.leaderboard.no_account" = "Включи sharing в Настройках, чтобы увидеть лидерборд.";
+"widget.leaderboard.empty" = "Пока никого. Добавь друзей.";
