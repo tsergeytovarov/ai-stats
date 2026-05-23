@@ -9,6 +9,8 @@ struct AccountTabView: View {
     @State private var pickedAvatarMime: String? = nil
     @State private var showRegenerateConfirm = false
     @State private var showDeleteConfirm = false
+    @State private var editingName: String = ""
+    @State private var isEditingName: Bool = false
 
     var body: some View {
         ScrollView {
@@ -68,7 +70,26 @@ struct AccountTabView: View {
                 .resizable().frame(width: 48, height: 48)
                 .foregroundStyle(.secondary)
             VStack(alignment: .leading, spacing: 2) {
-                Text(profile.displayName).font(.headline)
+                if isEditingName {
+                    HStack {
+                        TextField("Имя", text: $editingName)
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit { Task { await saveName() } }
+                        Button("Сохранить") { Task { await saveName() } }
+                            .disabled(editingName.trimmingCharacters(in: .whitespaces).isEmpty || viewModel.isWorking)
+                        Button("Отмена") { isEditingName = false }
+                    }
+                } else {
+                    HStack {
+                        Text(profile.displayName).font(.headline)
+                        Button("Изменить") {
+                            editingName = profile.displayName
+                            isEditingName = true
+                        }
+                        .buttonStyle(.borderless)
+                        .font(.caption)
+                    }
+                }
                 Text("server_user_id: \(profile.serverUserId)").font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -129,6 +150,15 @@ struct AccountTabView: View {
     }
 
     /// "XK7P3M9Q2A" → "XK7P-3M9Q-2A"
+    private func saveName() async {
+        let name = editingName.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        await viewModel.updateName(name)
+        if viewModel.errorMessage == nil {
+            isEditingName = false
+        }
+    }
+
     private func formatFriendCode(_ raw: String) -> String {
         guard raw.count == 10 else { return raw }
         let i1 = raw.index(raw.startIndex, offsetBy: 4)
