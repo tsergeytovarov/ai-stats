@@ -151,3 +151,23 @@ struct LeaderboardResponse: Codable {
         case entries
     }
 }
+
+// MARK: - blocks
+
+struct BlockDTO: Codable, Identifiable, Equatable {
+    let friendCode: String
+    let displayName: String
+    let blockedAt: String
+
+    var id: String { friendCode }
+
+    enum CodingKeys: String, CodingKey {
+        case friendCode = "friend_code"
+        case displayName = "display_name"
+        case blockedAt = "blocked_at"
+    }
+}
+
+struct BlocksListResponse: Codable {
+    let blocked: [BlockDTO]
+}

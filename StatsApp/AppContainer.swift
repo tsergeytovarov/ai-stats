@@ -66,6 +66,15 @@ final class AppContainer {
         )
     }
 
+    /// Создаёт fresh BlockedTabViewModel.
+    func makeBlockedTabViewModel() -> BlockedTabViewModel {
+        let dbPoolRef = dbPool
+        return BlockedTabViewModel(
+            api: aiuseAPI,
+            hasAccount: { (try? dbPoolRef.read { try StatsQueries.loadMyProfile($0) }) ?? nil != nil }
+        )
+    }
+
     func buildFetchers() -> [(name: String, fetchers: [any Fetcher])] {
         var sources: [(String, [any Fetcher])] = []
         let ccFetchers: [any Fetcher] = config.enabledProviders.map { provider in

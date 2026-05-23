@@ -115,6 +115,27 @@ final class AiuseAPIClient {
         )
     }
 
+    // MARK: - blocks
+
+    func listBlocks() async throws -> [BlockDTO] {
+        let resp = try await request(
+            path: "/blocks",
+            method: "GET",
+            authed: true,
+            decodeAs: BlocksListResponse.self
+        )
+        return resp.blocked
+    }
+
+    func unblock(friendCode: String) async throws {
+        _ = try await request(
+            path: "/blocks/\(friendCode)",
+            method: "DELETE",
+            authed: true,
+            decodeAs: EmptyResponse.self
+        )
+    }
+
     // MARK: - avatars
 
     /// Запрос аватарки. Возвращает (data, mime, etag) — или nil если 304 / 404.
