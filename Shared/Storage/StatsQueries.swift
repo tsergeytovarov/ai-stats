@@ -258,6 +258,55 @@ enum StatsQueries {
         }
     }
 
+    // MARK: - aiuse: friend_profiles
+
+    static func upsertFriendProfile(_ db: GRDB.Database, _ row: FriendProfileRow) throws {
+        try row.save(db)
+    }
+
+    static func loadFriendProfiles(_ db: GRDB.Database) throws -> [FriendProfileRow] {
+        try FriendProfileRow.order(FriendProfileRow.Columns.displayName).fetchAll(db)
+    }
+
+    static func loadFriendProfile(_ db: GRDB.Database, friendCode: String) throws -> FriendProfileRow? {
+        try FriendProfileRow.fetchOne(db, key: friendCode)
+    }
+
+    static func deleteFriendProfilesNotIn(_ db: GRDB.Database, friendCodes: [String]) throws {
+        if friendCodes.isEmpty {
+            _ = try FriendProfileRow.deleteAll(db)
+        } else {
+            _ = try FriendProfileRow
+                .filter(!friendCodes.contains(FriendProfileRow.Columns.friendCode))
+                .deleteAll(db)
+        }
+    }
+
+    static func updateFriendAvatar(
+        _ db: GRDB.Database, friendCode: String, blob: Data?, mime: String?, etag: String?
+    ) throws {
+        guard var row = try FriendProfileRow.fetchOne(db, key: friendCode) else { return }
+        row.avatarBlob = blob
+        row.avatarMime = mime
+        row.avatarEtag = etag
+        try row.update(db)
+    }
+
+    // MARK: - aiuse: leaderboard_cache
+
+    static func saveLeaderboardCache(_ db: GRDB.Database, period: String, payloadJson: String) throws {
+        let row = LeaderboardCacheRow(
+            period: period,
+            fetchedAt: Date().timeIntervalSince1970,
+            payloadJson: payloadJson
+        )
+        try row.save(db)
+    }
+
+    static func loadLeaderboardCache(_ db: GRDB.Database, period: String) throws -> LeaderboardCacheRow? {
+        try LeaderboardCacheRow.fetchOne(db, key: period)
+    }
+
     /// "2026-05-23" → unix seconds полночи UTC.
     static func midnightUTCUnixTimestamp(fromIsoDay day: String) -> Int64? {
         let parts = day.split(separator: "-").compactMap { Int($0) }

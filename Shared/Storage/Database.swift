@@ -151,6 +151,31 @@ enum Database {
             try db.execute(sql: "ALTER TABLE ai_usage ADD COLUMN input_tokens_no_cache INTEGER NOT NULL DEFAULT 0")
             try db.execute(sql: "ALTER TABLE ai_usage_model ADD COLUMN input_tokens_no_cache INTEGER NOT NULL DEFAULT 0")
         }
+        migrator.registerMigration("v7_aiuse_friend_cache") { db in
+            // Кэш профилей друзей — для отображения имени/аватарки в UI и виджете
+            // без сетевого запроса. Обновляется FriendsPullSyncer'ом.
+            try db.execute(sql: """
+                CREATE TABLE friend_profiles (
+                    friend_code TEXT PRIMARY KEY,
+                    display_name TEXT NOT NULL,
+                    sharing_enabled INTEGER NOT NULL DEFAULT 1,
+                    avatar_blob BLOB,
+                    avatar_mime TEXT,
+                    avatar_etag TEXT,
+                    last_fetched_at REAL NOT NULL
+                )
+            """)
+
+            // Кэш лидерборда — для оффлайн-фолбэка и быстрого рендера.
+            // payload_json содержит JSON-encoded LeaderboardResponse.
+            try db.execute(sql: """
+                CREATE TABLE leaderboard_cache (
+                    period TEXT PRIMARY KEY,
+                    fetched_at REAL NOT NULL,
+                    payload_json TEXT NOT NULL
+                )
+            """)
+        }
         try migrator.migrate(writer)
     }
 

@@ -182,6 +182,60 @@ struct MyProfileRow: Codable, FetchableRecord, PersistableRecord, Equatable {
     }
 }
 
+/// Кэш профиля друга — имя/аватарка/sharing для оффлайн-рендера.
+struct FriendProfileRow: Codable, FetchableRecord, PersistableRecord, Equatable {
+    static let databaseTableName = "friend_profiles"
+
+    var friendCode: String
+    var displayName: String
+    var sharingEnabled: Bool
+    var avatarBlob: Data?
+    var avatarMime: String?
+    var avatarEtag: String?
+    var lastFetchedAt: Double
+
+    enum Columns {
+        static let friendCode = Column("friend_code")
+        static let displayName = Column("display_name")
+        static let sharingEnabled = Column("sharing_enabled")
+        static let avatarBlob = Column("avatar_blob")
+        static let avatarMime = Column("avatar_mime")
+        static let avatarEtag = Column("avatar_etag")
+        static let lastFetchedAt = Column("last_fetched_at")
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case friendCode = "friend_code"
+        case displayName = "display_name"
+        case sharingEnabled = "sharing_enabled"
+        case avatarBlob = "avatar_blob"
+        case avatarMime = "avatar_mime"
+        case avatarEtag = "avatar_etag"
+        case lastFetchedAt = "last_fetched_at"
+    }
+}
+
+/// Кэш ответов /api/leaderboard за каждый period. payload_json = encoded LeaderboardResponse.
+struct LeaderboardCacheRow: Codable, FetchableRecord, PersistableRecord, Equatable {
+    static let databaseTableName = "leaderboard_cache"
+
+    var period: String
+    var fetchedAt: Double
+    var payloadJson: String
+
+    enum Columns {
+        static let period = Column("period")
+        static let fetchedAt = Column("fetched_at")
+        static let payloadJson = Column("payload_json")
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case period
+        case fetchedAt = "fetched_at"
+        case payloadJson = "payload_json"
+    }
+}
+
 /// Snapshot ожидающий отправки на сервер. hour_bucket = unix seconds (UTC).
 struct PendingSnapshotRow: Codable, FetchableRecord, PersistableRecord, Equatable {
     static let databaseTableName = "pending_snapshots"
