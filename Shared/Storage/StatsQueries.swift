@@ -173,4 +173,99 @@ enum StatsQueries {
         for row in rows { map[row["day"]] = row["c"] }
         return days.map { map[$0] ?? 0.0 }
     }
+
+    // MARK: - aiuse: my_profile
+
+    static func loadMyProfile(_ db: GRDB.Database) throws -> MyProfileRow? {
+        try MyProfileRow.fetchOne(db, key: 1)
+    }
+
+    static func saveMyProfile(_ db: GRDB.Database, _ profile: MyProfileRow) throws {
+        try profile.save(db)
+    }
+
+    static func deleteMyProfile(_ db: GRDB.Database) throws {
+        _ = try MyProfileRow.deleteOne(db, key: 1)
+    }
+
+    // MARK: - aiuse: pending_snapshots
+
+    /// Daily aggregates из ai_usage за период → upsert в pending_snapshots.
+    /// hour_bucket = unix seconds полночи UTC соответствующего дня.
+    /// SUM по всем providers (claude+codex и т.д.) — лидерборду интересен суммарный объём.
+    static func refreshPendingSnapshots(in db: GRDB.Database, sinceDay: String) throws {
+        let rows = try Row.fetchAll(db, sql: """
+            SELECT day,
+                   COALESCE(SUM(input_tokens), 0) AS sum_input,
+                   COALESCE(SUM(output_tokens), 0) AS sum_output
+            FROM ai_usage
+            WHERE day >= ?
+            GROUP BY day
+            """, arguments: [sinceDay])
+
+        for row in rows {
+            let day: String = row["day"]
+            let input: Int64 = row["sum_input"]
+            let output: Int64 = row["sum_output"]
+            guard let bucket = midnightUTCUnixTimestamp(fromIsoDay: day) else { continue }
+            // Upsert: если запись существует — обновляем counts, если нет — создаём.
+            if var existing = try PendingSnapshotRow.fetchOne(db, key: bucket) {
+                existing.tokensInput = input
+                existing.tokensOutput = output
+                // attempts/last_error не сбрасываем — retry поведение сохраняется.
+                try existing.update(db)
+            } else {
+                let row = PendingSnapshotRow(
+                    hourBucket: bucket,
+                    tokensInput: input,
+                    tokensOutput: output,
+                    attempts: 0,
+                    lastError: nil
+                )
+                try row.insert(db)
+            }
+        }
+    }
+
+    static func loadReadyPendingSnapshots(_ db: GRDB.Database,
+                                          maxAttempts: Int = 5,
+                                          limit: Int = 168) throws -> [PendingSnapshotRow] {
+        try PendingSnapshotRow
+            .filter(PendingSnapshotRow.Columns.attempts < maxAttempts)
+            .order(PendingSnapshotRow.Columns.hourBucket.desc)
+            .limit(limit)
+            .fetchAll(db)
+    }
+
+    static func deletePendingSnapshots(_ db: GRDB.Database, hourBuckets: [Int64]) throws {
+        guard !hourBuckets.isEmpty else { return }
+        _ = try PendingSnapshotRow
+            .filter(hourBuckets.contains(PendingSnapshotRow.Columns.hourBucket))
+            .deleteAll(db)
+    }
+
+    static func incrementPendingAttempts(_ db: GRDB.Database,
+                                         hourBuckets: [Int64],
+                                         lastError: String) throws {
+        guard !hourBuckets.isEmpty else { return }
+        for bucket in hourBuckets {
+            guard var row = try PendingSnapshotRow.fetchOne(db, key: bucket) else { continue }
+            row.attempts += 1
+            row.lastError = lastError
+            try row.update(db)
+        }
+    }
+
+    /// "2026-05-23" → unix seconds полночи UTC.
+    static func midnightUTCUnixTimestamp(fromIsoDay day: String) -> Int64? {
+        let parts = day.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 3 else { return nil }
+        var components = DateComponents()
+        components.year = parts[0]
+        components.month = parts[1]
+        components.day = parts[2]
+        components.timeZone = TimeZone(identifier: "UTC")
+        guard let date = Calendar(identifier: .gregorian).date(from: components) else { return nil }
+        return Int64(date.timeIntervalSince1970)
+    }
 }
