@@ -20,15 +20,15 @@ struct SmallView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(periodLabel).font(.caption).foregroundStyle(.secondary)
-            Text(String(format: "$%.2f", entry.aiTotals.totalCost))
+            Text(String(format: "$%.2f", entry.aiCost))
                 .font(.system(size: 28, weight: .semibold, design: .rounded))
                 .minimumScaleFactor(0.5)
                 .lineLimit(1)
             Spacer(minLength: 4)
-            Text("\(formatTokens(entry.aiTotals.totalInputTokens + entry.aiTotals.totalOutputTokens)) tokens")
+            Text("\(formatTokens(entry.aiTokens)) tokens")
                 .font(.caption).foregroundStyle(.secondary)
             if entry.githubEnabled {
-                Text("\(entry.githubTotals.totalCommits) commits")
+                Text("\(entry.commits) commits")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

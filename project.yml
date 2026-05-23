@@ -9,9 +9,12 @@ settings:
   base:
     SWIFT_VERSION: "5.9"
     MACOSX_DEPLOYMENT_TARGET: "14.0"
-    ENABLE_HARDENED_RUNTIME: YES
-    CODE_SIGN_STYLE: Automatic
+    ENABLE_HARDENED_RUNTIME: NO
+    CODE_SIGN_STYLE: Manual
     CODE_SIGN_IDENTITY: "-"
+    CODE_SIGNING_REQUIRED: NO
+    CODE_SIGNING_ALLOWED: YES
+    DEVELOPMENT_TEAM: ""
 packages:
   GRDB:
     url: https://github.com/groue/GRDB.swift
@@ -69,7 +72,7 @@ targets:
     entitlements:
       path: StatsWidget/StatsWidget.entitlements
       properties:
-        com.apple.security.app-sandbox: false
+        com.apple.security.app-sandbox: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.sergeytovarov.aistats.widget

@@ -50,7 +50,57 @@ final class SyncCoordinator {
 
         try recordSyncState(source: source, error: capturedError)
         lastSyncAt[source] = now()
+        try? buildAndWriteWidgetSnapshot()
         WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    /// Считает текущие totals за Day/Week/Month из DB, пишет JSON в контейнер виджета.
+    private func buildAndWriteWidgetSnapshot() throws {
+        let nowDate = now()
+        let dayRange = DateUtils.daysRange(endingAt: nowDate, lookback: Period.day.lookbackDays)
+        let weekRange = DateUtils.daysRange(endingAt: nowDate, lookback: Period.week.lookbackDays)
+        let monthRange = DateUtils.daysRange(endingAt: nowDate, lookback: Period.month.lookbackDays)
+
+        let slices: (WidgetSnapshot.PeriodSlice, WidgetSnapshot.PeriodSlice, WidgetSnapshot.PeriodSlice) = try db.read { db in
+            (
+                try Self.makeSlice(in: db, days: dayRange),
+                try Self.makeSlice(in: db, days: weekRange),
+                try Self.makeSlice(in: db, days: monthRange)
+            )
+        }
+
+        let anyCommits = slices.0.commits + slices.1.commits + slices.2.commits
+        let anyRepos = max(slices.0.uniqueRepos, slices.1.uniqueRepos, slices.2.uniqueRepos)
+
+        let snapshot = WidgetSnapshot(
+            generatedAt: nowDate,
+            day: slices.0,
+            week: slices.1,
+            month: slices.2,
+            githubEnabled: anyCommits > 0 || anyRepos > 0
+        )
+        try WidgetSnapshotIO.write(snapshot)
+    }
+
+    private static func makeSlice(in db: GRDB.Database, days: [String]) throws -> WidgetSnapshot.PeriodSlice {
+        let totals = try StatsQueries.aiTotals(in: db, days: days)
+        let gh = try StatsQueries.githubTotals(in: db, days: days)
+        let models = try StatsQueries.topModels(in: db, days: days, limit: 4)
+        return WidgetSnapshot.PeriodSlice(
+            aiCost: totals.totalCost,
+            aiTokens: totals.totalInputTokens + totals.totalOutputTokens,
+            commits: gh.totalCommits,
+            uniqueRepos: gh.uniqueRepos,
+            topModels: models.map {
+                WidgetSnapshot.ModelEntry(
+                    model: $0.model,
+                    source: $0.source,
+                    costUsd: $0.costUsd,
+                    inputTokens: $0.inputTokens,
+                    outputTokens: $0.outputTokens
+                )
+            }
+        )
     }
 
     private func syncWindowStart(source: String) throws -> Date {
