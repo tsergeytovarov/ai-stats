@@ -56,13 +56,15 @@ final class SnapshotSyncerTests: XCTestCase {
         )
     }
 
-    /// helper для вставки фиктивной usage-записи (ai_usage с UNIQUE day,source)
+    /// helper для вставки фиктивной usage-записи (ai_usage с UNIQUE day,source).
+    /// input → input_tokens_no_cache (то, что лидерборду интересно).
+    /// input_tokens с кэшем мы не используем в SnapshotSyncer.
     private func insertUsage(day: String, input: Int64, output: Int64, source: String = "claude") throws {
         try db.write { db in
             try db.execute(sql: """
-                INSERT INTO ai_usage (day, source, models_json, input_tokens, output_tokens, cost_usd, updated_at)
-                VALUES (?, ?, '[]', ?, ?, 0.0, '2026-05-23T00:00:00Z')
-                """, arguments: [day, source, input, output])
+                INSERT INTO ai_usage (day, source, models_json, input_tokens, input_tokens_no_cache, output_tokens, cost_usd, updated_at)
+                VALUES (?, ?, '[]', ?, ?, ?, 0.0, '2026-05-23T00:00:00Z')
+                """, arguments: [day, source, input, input, output])
         }
     }
 

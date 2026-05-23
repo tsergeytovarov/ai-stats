@@ -145,6 +145,12 @@ enum Database {
                 )
             """)
         }
+        migrator.registerMigration("v6_input_tokens_no_cache") { db in
+            // Колонка с чистым "input без кэша" — нужна aiuse-лидерборду
+            // (input_tokens хранит с кэшем для cost-расчётов, его не меняем).
+            try db.execute(sql: "ALTER TABLE ai_usage ADD COLUMN input_tokens_no_cache INTEGER NOT NULL DEFAULT 0")
+            try db.execute(sql: "ALTER TABLE ai_usage_model ADD COLUMN input_tokens_no_cache INTEGER NOT NULL DEFAULT 0")
+        }
         try migrator.migrate(writer)
     }
 

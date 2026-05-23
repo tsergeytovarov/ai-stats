@@ -194,9 +194,11 @@ enum StatsQueries {
     /// hour_bucket = unix seconds полночи UTC соответствующего дня.
     /// SUM по всем providers (claude+codex и т.д.) — лидерборду интересен суммарный объём.
     static func refreshPendingSnapshots(in db: GRDB.Database, sinceDay: String) throws {
+        // Берём input_tokens_no_cache (без cache reads/writes) — это то что
+        // спек называет "input без кэша". output_tokens у нас итак без кэша.
         let rows = try Row.fetchAll(db, sql: """
             SELECT day,
-                   COALESCE(SUM(input_tokens), 0) AS sum_input,
+                   COALESCE(SUM(input_tokens_no_cache), 0) AS sum_input,
                    COALESCE(SUM(output_tokens), 0) AS sum_output
             FROM ai_usage
             WHERE day >= ?

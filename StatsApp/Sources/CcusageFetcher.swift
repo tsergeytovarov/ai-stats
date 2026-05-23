@@ -22,6 +22,7 @@ enum CcusageParser {
                     source: source,
                     modelsJson: modelsJson,
                     inputTokens: day.inputTokens + day.cachedInputTokens,
+                    inputTokensNoCache: day.inputTokens,
                     outputTokens: day.outputTokens + reasoningOut,
                     costUsd: cost,
                     updatedAt: nowString
@@ -42,6 +43,7 @@ enum CcusageParser {
                             source: source,
                             model: name,
                             inputTokens: stats.inputTokens + (stats.cachedInputTokens ?? 0),
+                            inputTokensNoCache: stats.inputTokens,
                             outputTokens: stats.outputTokens + reasoningOutModel,
                             costUsd: modelCost,
                             updatedAt: nowString
@@ -63,6 +65,7 @@ enum CcusageParser {
                     source: source,
                     modelsJson: modelsJson,
                     inputTokens: day.inputTokens + day.cacheCreationTokens + day.cacheReadTokens,
+                    inputTokensNoCache: day.inputTokens,
                     outputTokens: day.outputTokens,
                     costUsd: cost,
                     updatedAt: nowString
@@ -82,6 +85,7 @@ enum CcusageParser {
                             source: source,
                             model: b.modelName,
                             inputTokens: b.inputTokens + b.cacheCreationTokens + b.cacheReadTokens,
+                            inputTokensNoCache: b.inputTokens,
                             outputTokens: b.outputTokens,
                             costUsd: modelCost,
                             updatedAt: nowString

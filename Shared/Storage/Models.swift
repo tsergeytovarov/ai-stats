@@ -8,7 +8,8 @@ struct AIUsageRow: Codable, FetchableRecord, PersistableRecord, Equatable {
     var day: String
     var source: String
     var modelsJson: String
-    var inputTokens: Int64
+    var inputTokens: Int64           // включает cache (для cost/UI)
+    var inputTokensNoCache: Int64 = 0   // только без cache (для aiuse-лидерборда; default — existing rows)
     var outputTokens: Int64
     var costUsd: Double
     var updatedAt: String
@@ -19,6 +20,7 @@ struct AIUsageRow: Codable, FetchableRecord, PersistableRecord, Equatable {
         static let source = Column("source")
         static let modelsJson = Column("models_json")
         static let inputTokens = Column("input_tokens")
+        static let inputTokensNoCache = Column("input_tokens_no_cache")
         static let outputTokens = Column("output_tokens")
         static let costUsd = Column("cost_usd")
         static let updatedAt = Column("updated_at")
@@ -30,6 +32,7 @@ struct AIUsageRow: Codable, FetchableRecord, PersistableRecord, Equatable {
         case source
         case modelsJson = "models_json"
         case inputTokens = "input_tokens"
+        case inputTokensNoCache = "input_tokens_no_cache"
         case outputTokens = "output_tokens"
         case costUsd = "cost_usd"
         case updatedAt = "updated_at"
@@ -98,7 +101,8 @@ struct AIUsageModelRow: Codable, FetchableRecord, PersistableRecord, Equatable {
     var day: String
     var source: String
     var model: String
-    var inputTokens: Int64
+    var inputTokens: Int64           // включает cache (для cost/UI)
+    var inputTokensNoCache: Int64 = 0   // только без cache (для aiuse-лидерборда; default — existing rows)
     var outputTokens: Int64
     var costUsd: Double
     var updatedAt: String
@@ -109,6 +113,7 @@ struct AIUsageModelRow: Codable, FetchableRecord, PersistableRecord, Equatable {
         static let source = Column("source")
         static let model = Column("model")
         static let inputTokens = Column("input_tokens")
+        static let inputTokensNoCache = Column("input_tokens_no_cache")
         static let outputTokens = Column("output_tokens")
         static let costUsd = Column("cost_usd")
         static let updatedAt = Column("updated_at")
@@ -120,6 +125,7 @@ struct AIUsageModelRow: Codable, FetchableRecord, PersistableRecord, Equatable {
         case source
         case model
         case inputTokens = "input_tokens"
+        case inputTokensNoCache = "input_tokens_no_cache"
         case outputTokens = "output_tokens"
         case costUsd = "cost_usd"
         case updatedAt = "updated_at"
