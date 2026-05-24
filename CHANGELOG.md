@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-05-24
+
 ### Distribution: DMG-сборка + Homebrew Cask
 
 - **`scripts/build-dmg.sh`** — собирает Release-сборку через xcodebuild (ad-hoc подпись из `project.yml`), упаковывает в DMG через `create-dmg` с drag-to-Applications layout. На выходе печатает SHA256 для Cask formula. Без notarization (требует Apple Developer Program $99/год — пока пропускаем; для distribution через `brew install --cask` достаточно ad-hoc подписи + cask автоматически снимает quarantine).
