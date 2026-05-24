@@ -4,6 +4,10 @@ import Foundation
 /// `secretProvider` — closure которая лезет в Keychain (чтобы клиент не зависел
 /// от KeychainStore API напрямую — тестируется через моки).
 final class AiuseAPIClient {
+    /// Жёсткий кап на размер JSON-ответа от aiuse. Защита от malicious/compromised
+    /// сервера, который попытается съесть память клиента.
+    static let maxResponseBytes = 1 * 1024 * 1024   // 1 MB
+
     /// Жёсткий кап на размер аватарки. Сами пикаем при создании профиля максимум
     /// 200 KB (AccountTabView), поэтому 512 KB на ответ — щедрый запас.
     static let maxAvatarBytes = 512 * 1024          // 512 KB
@@ -279,10 +283,10 @@ final class AiuseAPIClient {
             req.httpBody = try encoder.encode(AnyEncodable(body))
         }
 
-        let data: Data
+        let bytes: URLSession.AsyncBytes
         let response: URLResponse
         do {
-            (data, response) = try await session.data(for: req)
+            (bytes, response) = try await session.bytes(for: req)
         } catch {
             throw AiuseAPIError.transport(error.localizedDescription)
         }
@@ -290,6 +294,18 @@ final class AiuseAPIClient {
         guard let http = response as? HTTPURLResponse else {
             throw AiuseAPIError.unexpected
         }
+
+        // Content-Length precheck: можно отвалиться до чтения тела (на случай
+        // компрометированного aiuse, который захочет залить нам GB JSON-а).
+        if let lenStr = http.value(forHTTPHeaderField: "Content-Length"),
+           let len = Int(lenStr), len > Self.maxResponseBytes {
+            throw AiuseAPIError.responseTooLarge(bytes: len)
+        }
+
+        let data = try await Self.readWithCap(bytes, cap: Self.maxResponseBytes, onOverflow: { count in
+            AiuseAPIError.responseTooLarge(bytes: count)
+        })
+
         guard (200..<300).contains(http.statusCode) else {
             let bodyString = String(data: data, encoding: .utf8) ?? ""
             throw AiuseAPIError.http(status: http.statusCode, body: bodyString)
