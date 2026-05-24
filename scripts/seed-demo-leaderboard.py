@@ -94,6 +94,39 @@ def _seed_previous_ranks(entries: list[dict]) -> list[dict]:
     return out
 
 
+def _seed_tokens(entries: list[dict]) -> list[dict]:
+    """
+    Подставляет реалистичные tokens_total по rank. fake-друзья на сервере
+    имеют 0 токенов (они не шарят данные), а для скриншотов нужны цифры
+    которые выглядят живыми.
+
+    Шкала уменьшается экспоненциально — реалистично для leaderboard'а
+    активных AI-пользователей: лидер шпарит сильно больше последних.
+
+    Не трогаем entries с уже непустым tokens_total > 0 — это сохраняет
+    реальные данные тех, кто реально шарит (например меня самого).
+    """
+    rank_to_tokens = {
+        1: 80_000_000,
+        2: 52_000_000,
+        3: 38_000_000,
+        4: 21_000_000,
+        5: 9_500_000,
+        6: 4_200_000,
+        7: 1_800_000,
+        8: 700_000,
+    }
+    out = []
+    for e in entries:
+        rank = e.get("rank", 0)
+        current_tokens = e.get("tokens_total", 0) or 0
+        new = dict(e)
+        if current_tokens == 0 and rank in rank_to_tokens:
+            new["tokens_total"] = rank_to_tokens[rank]
+        out.append(new)
+    return out
+
+
 def seed() -> None:
     """Перезаписывает leaderboard_cache.payload_json — добавляет previous_rank."""
     conn = _open_db()
@@ -118,7 +151,9 @@ def seed() -> None:
             print(f"⚠  [{period}] нет entries, пропускаю")
             continue
 
-        payload["entries"] = _seed_previous_ranks(entries)
+        seeded = _seed_previous_ranks(entries)
+        seeded = _seed_tokens(seeded)
+        payload["entries"] = seeded
         # Также обновим as_of чтобы UI не показывал «вчера»
         payload["as_of"] = now_iso
 
