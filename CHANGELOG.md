@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+### Dev tooling: seed-скрипт для скриншотов лидерборда
+
+- `scripts/seed-demo-leaderboard.py` — подмешивает `previous_rank` в `leaderboard_cache.payload_json` всех 4 periods так, чтобы у каждой строки была своя стрелка (▲N / ▼N / NEW / без изменений). Раньше cache хранил entries без previous_rank → стрелок в popover'е не было → screenshots выглядели плоско.
+- Команды: `--backup` (полный bin-копия stats.db), `--seed` (правка cache), `--restore` (откат из backup'а).
+- README обновлён — новая секция «Скриншоты» с placeholder-ссылками на `docs/screenshots/*.png` + `docs/screenshots/README.md` с инструкцией как снять каждый кадр.
+
 ## [0.4.1] — 2026-05-24
 
 ### Fix: menu bar capsule + кнопка Quit

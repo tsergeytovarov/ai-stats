@@ -9,6 +9,12 @@ struct FriendRow: View {
     /// Реальная аватарка (JPEG/PNG bytes). Если nil — рисуется brand-градиент.
     /// Defaults to nil — call sites без аватарок (например, widget) не трогаются.
     var avatarData: Data? = nil
+    /// Прошлый rank для отображения ▲N / ▼N / NEW. nil → строка без значка
+    /// (зарезервированное место сохраняется, чтобы соседние строки не прыгали).
+    var previousRank: Int? = nil
+    /// Если true — рисуется значок дельты. Outside-call sites (widget без данных)
+    /// могут пропускать это поле, тогда дельта не выводится вообще.
+    var showsRankDelta: Bool = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -28,6 +34,10 @@ struct FriendRow: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
 
+            if showsRankDelta {
+                rankDeltaView
+            }
+
             Spacer()
 
             Text(valueText)
@@ -36,6 +46,27 @@ struct FriendRow: View {
                 .foregroundStyle(.white.opacity(0.78))
         }
         .padding(.vertical, 5)
+    }
+
+    @ViewBuilder
+    private var rankDeltaView: some View {
+        Group {
+            if let content = DropdownFormat.formatRankDelta(current: rank, previous: previousRank) {
+                switch content.kind {
+                case .new:
+                    Text(NSLocalizedString("delta.new", comment: ""))
+                        .foregroundStyle(.secondary)
+                case .change(let magnitude, let direction):
+                    let arrow = direction == .up ? "▲" : "▼"
+                    Text("\(arrow)\(magnitude)")
+                        .foregroundStyle(direction == .up ? Color.green : Color.red)
+                }
+            } else {
+                Text(" ")   // reserve space — другие строки не должны двигаться
+            }
+        }
+        .font(.system(.caption, design: .monospaced))
+        .frame(width: 32, alignment: .leading)
     }
 
     @ViewBuilder

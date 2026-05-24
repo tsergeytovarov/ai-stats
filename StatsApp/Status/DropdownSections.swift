@@ -204,13 +204,15 @@ struct DropdownLeaderboardSection: View {
                     .font(BrandFont.caption)
                     .foregroundStyle(TextColor.muted)
             } else {
-                ForEach(Array(viewModel.leaderboard.prefix(10).enumerated()), id: \.offset) { idx, entry in
+                ForEach(Array(viewModel.leaderboard.prefix(10).enumerated()), id: \.offset) { _, entry in
                     FriendRow(
-                        rank: idx + 1,
+                        rank: entry.rank,
                         name: entry.displayName,
                         valueText: DropdownFormat.tokens(entry.tokensTotal),
                         isMe: entry.isMe,
-                        avatarData: viewModel.friendAvatars[entry.friendCode]
+                        avatarData: viewModel.friendAvatars[entry.friendCode],
+                        previousRank: entry.previousRank,
+                        showsRankDelta: true
                     )
                 }
             }

@@ -75,12 +75,28 @@ final class AppContainer {
         self.friendsPullSyncer = friendsPull
         self.leaderboardPullSyncer = lbPull
 
-        let coordinator = SyncCoordinator(
-            db: dbPool,
-            snapshotSyncer: syncer,
-            friendsPullSyncer: friendsPull,
-            leaderboardPullSyncer: lbPull
-        )
+        // demo_mode=true → передаём nil syncers в координатор, чтобы он не дёргал
+        // aiuse-сервер и не затирал seed-данные leaderboard'а. Сами FriendsPullSyncer/
+        // LeaderboardPullSyncer/SnapshotSyncer существуют в container'е (через них
+        // ViewModel может make-call'ы по запросу пользователя), но из автоматического
+        // sync-тика они исключены.
+        let coordinator: SyncCoordinator
+        if cfg.demoMode {
+            AppLogger.sync.info("demo_mode=true — aiuse syncs отключены (snapshot/friends/leaderboard)")
+            coordinator = SyncCoordinator(
+                db: dbPool,
+                snapshotSyncer: nil,
+                friendsPullSyncer: nil,
+                leaderboardPullSyncer: nil
+            )
+        } else {
+            coordinator = SyncCoordinator(
+                db: dbPool,
+                snapshotSyncer: syncer,
+                friendsPullSyncer: friendsPull,
+                leaderboardPullSyncer: lbPull
+            )
+        }
         self.syncCoordinator = coordinator
         let dbPoolRef = dbPool
         // githubEnabled теперь определяется runtime-токеном (из Keychain), а не полем конфига.
@@ -90,7 +106,8 @@ final class AppContainer {
             syncCoordinator: coordinator,
             api: api,
             hasAccount: { (try? dbPoolRef.read { try StatsQueries.loadMyProfile($0) }) ?? nil != nil },
-            githubEnabled: githubEnabledNow
+            githubEnabled: githubEnabledNow,
+            demoMode: cfg.demoMode
         )
     }
 

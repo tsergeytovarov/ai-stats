@@ -10,7 +10,7 @@ struct LargeView: View {
             HStack(spacing: 0) {
                 VStack(alignment: .leading, spacing: 0) {
                     Crumb(category: .ai, title: "AI", period: entry.period.localizedTitle)
-                    HeroNumber(MoneyFormatter.widget(entry.aiCost), font: BrandFont.displayXL, variant: .pink)
+                    HeroNumber(MoneyFormatter.widget(entry.aiCost), font: BrandFont.widgetHeroLarge, variant: .pink)
                         .padding(.top, 4)
                     if entry.aiCostPrev > 0 {
                         Text(MoneyFormatter.widgetDelta(entry.aiCost - entry.aiCostPrev) + " " + NSLocalizedString("delta.vs_yesterday", comment: ""))
