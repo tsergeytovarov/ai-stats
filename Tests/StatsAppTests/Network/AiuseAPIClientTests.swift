@@ -160,4 +160,183 @@ final class AiuseAPIClientTests: XCTestCase {
         let resp = try await client.getLeaderboard(period: "day")
         XCTAssertNil(resp.entries[0].previousRank)
     }
+
+    // MARK: - getAvatar: MIME + size caps
+
+    /// Хелпер: HTTPURLResponse для /avatars с заданным mime и опц. Content-Length.
+    private func avatarResponse(mime: String, contentLength: Int? = nil, status: Int = 200) -> HTTPURLResponse {
+        var headers: [String: String] = ["Content-Type": mime, "ETag": "W/\"abc\""]
+        if let contentLength {
+            headers["Content-Length"] = String(contentLength)
+        }
+        return HTTPURLResponse(
+            url: URL(string: "https://test.local/api/avatars/XK7P3M9Q2A")!,
+            statusCode: status, httpVersion: "HTTP/1.1", headerFields: headers
+        )!
+    }
+
+    func testGetAvatar_acceptsImagePNG() async throws {
+        let body = Data(repeating: 0x42, count: 100)
+        MockURLProtocol.responder = { _ in
+            return (self.avatarResponse(mime: "image/png", contentLength: body.count), body)
+        }
+        let result = try await client.getAvatar(friendCode: "XK7P3M9Q2A")
+        XCTAssertEqual(result?.data, body)
+        XCTAssertEqual(result?.mime, "image/png")
+    }
+
+    func testGetAvatar_acceptsImageJPEG() async throws {
+        let body = Data(repeating: 0x55, count: 100)
+        MockURLProtocol.responder = { _ in
+            return (self.avatarResponse(mime: "image/jpeg", contentLength: body.count), body)
+        }
+        let result = try await client.getAvatar(friendCode: "XK7P3M9Q2A")
+        XCTAssertEqual(result?.mime, "image/jpeg")
+    }
+
+    func testGetAvatar_stripsCharsetSuffixFromMime() async throws {
+        let body = Data(repeating: 0x42, count: 50)
+        MockURLProtocol.responder = { _ in
+            return (self.avatarResponse(mime: "image/png; charset=binary"), body)
+        }
+        let result = try await client.getAvatar(friendCode: "XK7P3M9Q2A")
+        XCTAssertEqual(result?.mime, "image/png", "charset-довесок отрезается, в стораджа MIME без него")
+    }
+
+    func testGetAvatar_rejectsHtmlMime() async {
+        MockURLProtocol.responder = { _ in
+            return (self.avatarResponse(mime: "text/html"), Data("<script>".utf8))
+        }
+        do {
+            _ = try await client.getAvatar(friendCode: "XK7P3M9Q2A")
+            XCTFail("ожидали avatarBadMime")
+        } catch AiuseAPIError.avatarBadMime(let mime) {
+            XCTAssertEqual(mime, "text/html")
+        } catch {
+            XCTFail("неожиданная ошибка: \(error)")
+        }
+    }
+
+    func testGetAvatar_rejectsImageSvgXml() async {
+        // SVG может содержать JS / external refs — отдельный класс уязвимостей, не пускаем.
+        MockURLProtocol.responder = { _ in
+            return (self.avatarResponse(mime: "image/svg+xml"), Data("<svg/>".utf8))
+        }
+        do {
+            _ = try await client.getAvatar(friendCode: "XK7P3M9Q2A")
+            XCTFail("ожидали avatarBadMime")
+        } catch AiuseAPIError.avatarBadMime {
+            // OK
+        } catch {
+            XCTFail("неожиданная ошибка: \(error)")
+        }
+    }
+
+    func testGetAvatar_rejectsViaContentLengthPrecheck() async {
+        // Сервер заявляет в Content-Length, что ответ огромный → отваливаемся ДО чтения тела.
+        MockURLProtocol.responder = { _ in
+            let big = 600 * 1024  // > 512 KB кап
+            return (self.avatarResponse(mime: "image/png", contentLength: big), Data())
+        }
+        do {
+            _ = try await client.getAvatar(friendCode: "XK7P3M9Q2A")
+            XCTFail("ожидали avatarTooLarge")
+        } catch AiuseAPIError.avatarTooLarge(let bytes) {
+            XCTAssertGreaterThan(bytes, 512 * 1024)
+        } catch {
+            XCTFail("неожиданная ошибка: \(error)")
+        }
+    }
+
+    func testGetAvatar_rejectsViaStreamCap() async {
+        // Сервер врёт в Content-Length (или его нет), но реально шлёт > 512 KB.
+        // Streaming-cap режет на лету.
+        let bigBody = Data(repeating: 0xAA, count: 600 * 1024)
+        MockURLProtocol.responder = { _ in
+            // Намеренно без Content-Length чтобы выйти на streaming-чтение.
+            return (self.avatarResponse(mime: "image/png", contentLength: nil), bigBody)
+        }
+        do {
+            _ = try await client.getAvatar(friendCode: "XK7P3M9Q2A")
+            XCTFail("ожидали avatarTooLarge")
+        } catch AiuseAPIError.avatarTooLarge {
+            // OK
+        } catch {
+            XCTFail("неожиданная ошибка: \(error)")
+        }
+    }
+
+    func testGetAvatar_passes304Through() async throws {
+        MockURLProtocol.responder = { _ in
+            // 304 — нет тела, MIME-чек не должен сработать.
+            return (self.avatarResponse(mime: "", status: 304), Data())
+        }
+        let result = try await client.getAvatar(friendCode: "XK7P3M9Q2A", ifNoneMatch: "W/\"abc\"")
+        XCTAssertNil(result, "304 → nil")
+    }
+
+    func testGetAvatar_passes404Through() async throws {
+        MockURLProtocol.responder = { _ in
+            return (self.avatarResponse(mime: "", status: 404), Data())
+        }
+        let result = try await client.getAvatar(friendCode: "XK7P3M9Q2A")
+        XCTAssertNil(result, "404 → nil")
+    }
+
+    // MARK: - request: response size cap
+
+    func testRequest_rejectsHugeJSONViaContentLength() async {
+        // Сервер заявляет о 2 MB → отваливаемся ДО чтения тела.
+        MockURLProtocol.responder = { _ in
+            let resp = HTTPURLResponse(
+                url: URL(string: "https://test.local/api/friends")!,
+                statusCode: 200, httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json", "Content-Length": String(2 * 1024 * 1024)]
+            )!
+            return (resp, Data())
+        }
+        do {
+            _ = try await client.listFriends()
+            XCTFail("ожидали responseTooLarge")
+        } catch AiuseAPIError.responseTooLarge(let bytes) {
+            XCTAssertGreaterThan(bytes, 1024 * 1024)
+        } catch {
+            XCTFail("неожиданная ошибка: \(error)")
+        }
+    }
+
+    func testRequest_rejectsHugeJSONViaStreamCap() async {
+        // Без Content-Length, но реальный body > 1 MB.
+        let bigBody = Data(repeating: 0x7B, count: 1_200_000) // 1.2 MB
+        MockURLProtocol.responder = { _ in
+            let resp = HTTPURLResponse(
+                url: URL(string: "https://test.local/api/friends")!,
+                statusCode: 200, httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (resp, bigBody)
+        }
+        do {
+            _ = try await client.listFriends()
+            XCTFail("ожидали responseTooLarge")
+        } catch AiuseAPIError.responseTooLarge {
+            // OK
+        } catch {
+            XCTFail("неожиданная ошибка: \(error)")
+        }
+    }
+
+    func testRequest_passesSmallResponseThrough() async throws {
+        // Регрессионный — на маленьких ответах ничего не сломалось после refactor'а на bytes(for:).
+        MockURLProtocol.responder = { _ in
+            let resp = HTTPURLResponse(
+                url: URL(string: "https://test.local/api/friends")!,
+                statusCode: 200, httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (resp, Data(#"{"friends":[]}"#.utf8))
+        }
+        let friends = try await client.listFriends()
+        XCTAssertEqual(friends.count, 0)
+    }
 }

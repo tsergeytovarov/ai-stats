@@ -25,7 +25,7 @@ struct Config: Equatable {
             githubToken: container.githubToken,
             githubLogin: container.githubLogin,
             syncIntervalMinutes: container.syncIntervalMinutes ?? 15,
-            ccusageCommand: container.ccusageCommand ?? ["npx", "-y", "ccusage@latest"],
+            ccusageCommand: container.ccusageCommand ?? ["npx", "-y", "ccusage@20"],
             enabledProviders: container.enabledProviders ?? ["claude", "codex"],
             aiuseApiBaseURL: container.aiuseApiBaseURL ?? "https://aiuse.popovs.tech/api"
         )
@@ -54,7 +54,7 @@ struct Config: Equatable {
       "github_token": "",
       "github_login": "",
       "sync_interval_minutes": 15,
-      "ccusage_command": ["npx", "-y", "ccusage@latest"],
+      "ccusage_command": ["npx", "-y", "ccusage@20"],
       "enabled_providers": ["claude", "codex"],
       "aiuse_api_base_url": "https://aiuse.popovs.tech/api"
     }

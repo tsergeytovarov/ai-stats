@@ -4,6 +4,18 @@ import Foundation
 /// `secretProvider` — closure которая лезет в Keychain (чтобы клиент не зависел
 /// от KeychainStore API напрямую — тестируется через моки).
 final class AiuseAPIClient {
+    /// Жёсткий кап на размер JSON-ответа от aiuse. Защита от malicious/compromised
+    /// сервера, который попытается съесть память клиента.
+    static let maxResponseBytes = 1 * 1024 * 1024   // 1 MB
+
+    /// Жёсткий кап на размер аватарки. Сами пикаем при создании профиля максимум
+    /// 200 KB (AccountTabView), поэтому 512 KB на ответ — щедрый запас.
+    static let maxAvatarBytes = 512 * 1024          // 512 KB
+
+    /// MIME allowlist для /avatars. Всё остальное (image/svg+xml, image/webp, etc.)
+    /// отбрасываем — историчecки в ImageIO ловили CVE на парсинг разных форматов.
+    static let allowedAvatarMimes: Set<String> = ["image/png", "image/jpeg"]
+
     private let baseURL: URL
     private let session: URLSession
     private let secretProvider: () -> String?
@@ -144,6 +156,11 @@ final class AiuseAPIClient {
 
     /// Запрос аватарки. Возвращает (data, mime, etag) — или nil если 304 / 404.
     /// ifNoneMatch — ETag из предыдущего ответа для conditional GET.
+    ///
+    /// **Безопасность:** ответ ограничен `maxAvatarBytes` (512 KB) и обязан иметь
+    /// `Content-Type` из allowlist `{image/png, image/jpeg}`. Иначе бросает ошибку
+    /// до того, как байты попадут в `NSImage(data:)` — закрывает RCE-вектор через
+    /// malformed image (CVE-классов ImageIO).
     func getAvatar(friendCode: String, ifNoneMatch: String? = nil) async throws -> (data: Data, mime: String?, etag: String?)? {
         guard let secret = secretProvider() else { throw AiuseAPIError.missingSecret }
         // friend_code приходит из server-side data (FriendsPullSyncer), но всё равно валидируем —
@@ -159,10 +176,10 @@ final class AiuseAPIClient {
             req.setValue(ifNoneMatch, forHTTPHeaderField: "If-None-Match")
         }
 
-        let data: Data
+        let bytes: URLSession.AsyncBytes
         let response: URLResponse
         do {
-            (data, response) = try await session.data(for: req)
+            (bytes, response) = try await session.bytes(for: req)
         } catch {
             throw AiuseAPIError.transport(error.localizedDescription)
         }
@@ -177,9 +194,46 @@ final class AiuseAPIClient {
         guard (200..<300).contains(http.statusCode) else {
             throw AiuseAPIError.http(status: http.statusCode, body: "")
         }
-        let mime = http.value(forHTTPHeaderField: "Content-Type")
+
+        // MIME-allowlist: режим check-then-read. Чарсет-довески ("image/png; charset=..")
+        // отрезаем — нас интересует только сам тип.
+        let rawMime = http.value(forHTTPHeaderField: "Content-Type") ?? ""
+        let mime = rawMime.split(separator: ";").first.map {
+            String($0).trimmingCharacters(in: .whitespaces).lowercased()
+        } ?? ""
+        guard Self.allowedAvatarMimes.contains(mime) else {
+            throw AiuseAPIError.avatarBadMime(mime: rawMime)
+        }
+
+        // Content-Length precheck (можно отвалиться до чтения тела).
+        if let lenStr = http.value(forHTTPHeaderField: "Content-Length"),
+           let len = Int(lenStr), len > Self.maxAvatarBytes {
+            throw AiuseAPIError.avatarTooLarge(bytes: len)
+        }
+
+        let data = try await Self.readWithCap(bytes, cap: Self.maxAvatarBytes, onOverflow: { count in
+            AiuseAPIError.avatarTooLarge(bytes: count)
+        })
         let etag = http.value(forHTTPHeaderField: "ETag")
         return (data, mime, etag)
+    }
+
+    /// Streaming-чтение байтов с жёстким капом. При превышении бросает указанную ошибку,
+    /// не дочитывает остаток. Используется и `getAvatar`, и JSON-ом `request`.
+    private static func readWithCap(
+        _ bytes: URLSession.AsyncBytes,
+        cap: Int,
+        onOverflow: (Int) -> Error
+    ) async throws -> Data {
+        var data = Data()
+        data.reserveCapacity(min(cap, 64 * 1024))
+        for try await byte in bytes {
+            data.append(byte)
+            if data.count > cap {
+                throw onOverflow(data.count)
+            }
+        }
+        return data
     }
 
     // MARK: - snapshots
@@ -229,10 +283,10 @@ final class AiuseAPIClient {
             req.httpBody = try encoder.encode(AnyEncodable(body))
         }
 
-        let data: Data
+        let bytes: URLSession.AsyncBytes
         let response: URLResponse
         do {
-            (data, response) = try await session.data(for: req)
+            (bytes, response) = try await session.bytes(for: req)
         } catch {
             throw AiuseAPIError.transport(error.localizedDescription)
         }
@@ -240,6 +294,18 @@ final class AiuseAPIClient {
         guard let http = response as? HTTPURLResponse else {
             throw AiuseAPIError.unexpected
         }
+
+        // Content-Length precheck: можно отвалиться до чтения тела (на случай
+        // компрометированного aiuse, который захочет залить нам GB JSON-а).
+        if let lenStr = http.value(forHTTPHeaderField: "Content-Length"),
+           let len = Int(lenStr), len > Self.maxResponseBytes {
+            throw AiuseAPIError.responseTooLarge(bytes: len)
+        }
+
+        let data = try await Self.readWithCap(bytes, cap: Self.maxResponseBytes, onOverflow: { count in
+            AiuseAPIError.responseTooLarge(bytes: count)
+        })
+
         guard (200..<300).contains(http.statusCode) else {
             let bodyString = String(data: data, encoding: .utf8) ?? ""
             throw AiuseAPIError.http(status: http.statusCode, body: bodyString)
