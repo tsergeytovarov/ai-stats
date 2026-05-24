@@ -26,7 +26,8 @@ final class ConfigTests: XCTestCase {
         """.data(using: .utf8)!
         let cfg = try Config.decode(from: json)
         XCTAssertEqual(cfg.syncIntervalMinutes, 15)
-        XCTAssertEqual(cfg.ccusageCommand, ["npx", "-y", "ccusage@latest"])
+        XCTAssertEqual(cfg.ccusageCommand, ["npx", "-y", "ccusage@20"],
+                       "default запиннен на major 20 — не @latest, supply chain")
         XCTAssertEqual(cfg.enabledProviders, ["claude", "codex"])
     }
 
@@ -43,6 +44,13 @@ final class ConfigTests: XCTestCase {
         let cfg = try Config.decode(from: data)
         XCTAssertFalse(cfg.githubEnabled)
         XCTAssertEqual(cfg.enabledProviders, ["claude", "codex"])
+    }
+
+    func test_default_template_pins_ccusage_to_major_20() throws {
+        // Защита от supply-chain атаки: дефолт не должен скатиться обратно на @latest.
+        // Если перейдём на major 21+ — обнови и этот тест, и ccusage_command в defaultTemplate.
+        let cfg = try Config.decode(from: Config.defaultTemplate)
+        XCTAssertEqual(cfg.ccusageCommand, ["npx", "-y", "ccusage@20"])
     }
 
     // MARK: - ConfigLoader.clearGithubTokenField
