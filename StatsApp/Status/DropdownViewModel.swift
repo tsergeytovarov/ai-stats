@@ -41,7 +41,13 @@ final class DropdownViewModel: ObservableObject {
 
     @Published var period: Period = .day {
         didSet {
-            Task { await reload() }
+            // reload — синхронный (БД локальная, запросы — миллисекунды).
+            // Раньше был Task { await reload() } — при переключении period в
+            // popover'е async-Task не успевал обновить @Published так, чтобы
+            // NSPopover/SwiftUI отрисовал свежее значение в том же tick'е.
+            // Crumb (берёт period напрямую) обновлялся, а HeroNumber/topModels
+            // (берут aiTotals/topModels) — нет, пока popover не переоткроют.
+            reloadSync()
             Task { await loadLeaderboard() }
         }
     }
@@ -75,14 +81,28 @@ final class DropdownViewModel: ObservableObject {
         self.githubEnabled = githubEnabled
     }
 
+    /// Async-обёртка над reloadSync. Сохранена для существующих call site'ов
+    /// (initial app start, refresh button) — там awaiт удобно.
     func reload() async {
+        reloadSync()
+    }
+
+    /// Синхронный read из БД + обновление всех @Published. Делается в одном
+    /// MainActor tick'е чтобы SwiftUI гарантированно подхватил все изменения
+    /// в одном цикле re-render'а. БД локальная (GRDB DatabasePool), запросы
+    /// порядка миллисекунд — sync read не блокирует UI заметно.
+    func reloadSync() {
         let now = Date()
         let periodDays = DateUtils.daysRange(endingAt: now, lookback: period.lookbackDays)
         let prevPeriodDays = DateUtils.previousPeriodDays(endingAt: now, lookback: period.lookbackDays)
         let sparkDays = DateUtils.daysRange(endingAt: now, lookback: 29)
 
+        AppLogger.sync.info(
+            "reloadSync period=\(self.period.rawValue, privacy: .public) days=\(periodDays.count, privacy: .public)"
+        )
+
         do {
-            let snapshot = try await db.read { db -> (AITotals, AITotals, [SourceTotal], [ModelTotal], GitHubTotals, GitHubLOC, [RepoTotal], [Double], [Double]) in
+            let snapshot = try db.read { db -> (AITotals, AITotals, [SourceTotal], [ModelTotal], GitHubTotals, GitHubLOC, [RepoTotal], [Double], [Double]) in
                 let totals = try StatsQueries.aiTotals(in: db, days: periodDays)
                 let totalsPrev = try StatsQueries.aiTotals(in: db, days: prevPeriodDays)
                 let bySource = try StatsQueries.aiTotalsBySource(in: db, days: periodDays)
@@ -104,6 +124,9 @@ final class DropdownViewModel: ObservableObject {
             self.sparklineSeries = snapshot.7
             self.additionsSeries = snapshot.8
             self.lastSyncDescription = relativeDescription(for: syncCoordinator?.lastSyncAt.values.max())
+            AppLogger.sync.info(
+                "reload done period=\(self.period.rawValue, privacy: .public) totalCost=\(snapshot.0.totalCost, privacy: .public)"
+            )
         } catch {
             // GRDB errors могут содержать SQL — .private. Тип ошибки тоже не делаем .public,
             // чтобы не светить internals в Console.app.
