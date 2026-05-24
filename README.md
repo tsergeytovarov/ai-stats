@@ -50,7 +50,7 @@ open build/Build/Products/Release/StatsApp.app
   "github_token": "ghp_xxx",
   "github_login": "your-username",
   "sync_interval_minutes": 15,
-  "ccusage_command": ["npx", "-y", "ccusage@latest"],
+  "ccusage_command": ["npx", "-y", "ccusage@20"],
   "enabled_providers": ["claude", "codex"],
   "aiuse_api_base_url": "https://aiuse.popovs.tech/api"
 }
@@ -59,6 +59,8 @@ open build/Build/Products/Release/StatsApp.app
 **Где живёт PAT.** При старте app перенесёт `github_token` в Keychain (`tech.popovs.aistats.github`) и затрёт поле в JSON — plaintext-токен не остаётся на диске. Менять токен → впиши новое значение, перезапусти, повторится миграция. Удалить — Keychain Access → найди запись `tech.popovs.aistats.github`.
 
 **Безопасность `aiuse_api_base_url`.** Только `https://`. Любая другая схема — app откажется стартовать (Bearer-токен из Keychain не должен утечь plain-text'ом).
+
+**Версия `ccusage` запиннена** (`ccusage@20`, не `@latest`) — supply-chain protection. Менять руками когда выйдет major 21+ и захочешь обновиться. `npx -y` всё ещё резолвит patch'и внутри 20.x.x.
 
 Менять остальные поля можно — но имей в виду, что каждый sync запускает `npx ccusage` процесс на 10-30 секунд.
 
