@@ -5,6 +5,13 @@
 
 ## [Unreleased]
 
+### Security pass #1 — PAT в Keychain, https-only для aiuse, валидация friend_code
+
+- **GitHub PAT мигрирован из `~/.config/ai-stats/config.json` в Keychain** (service `tech.popovs.aistats.github`). При первом запуске после апдейта токен автоматически переезжает в Keychain, а поле `github_token` в JSON зануляется — plaintext-токен больше не лежит на диске с правами `0644`. Если нужно сменить токен — впиши в `github_token`, перезапусти, токен снова уедет в Keychain.
+- `~/.config/ai-stats/config.json` теперь создаётся с правами `0600` (owner read/write only). Defensive-фикс mode'а делается и на каждом чтении — старые файлы с `0644` приводятся к норме.
+- `aiuse_api_base_url` валидируется на старте: только `https://`. Любой `http://` (или ftp/file/...) даёт явную ошибку в alert `app.failed_to_start` — иначе Bearer-токен утёк бы plain-text'ом.
+- `friend_code` валидируется на клиенте перед интерполяцией в URL path: `^[A-Z0-9]{10}$` (с авто-нормализацией дефисов/регистра). Закрывает попытки просунуть `..`, `?`, `/` в `/friends/<code>` и `/avatars/<code>`. Применяется в `addFriend` / `removeFriend` / `unblock` / `getAvatar` (там defense-in-depth — серверу всё равно нельзя доверять).
+
 ### Аватарки в Large widget
 
 - `LeaderboardSlice.Entry` теперь содержит `friend_code` — без него виджет не мог сматчить запись с файлом. Decoder обратно-совместим: старые snapshot'ы → пустая строка → fallback на градиент.
