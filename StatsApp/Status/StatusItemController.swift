@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 final class StatusItemController: NSObject {
     private var statusItem: NSStatusItem?
+    private var capsuleHosting: NSHostingView<MenuBarCapsuleView>?
     private var popover: NSPopover?
     private let viewModel: DropdownViewModel
     private let onRefresh: () -> Void
@@ -21,9 +22,25 @@ final class StatusItemController: NSObject {
             button.title = ""
             button.target = self
             button.action = #selector(togglePopover(_:))
-            updateCapsule(in: button, priceText: "$0.00")
+
+            // Создаём NSHostingView один раз — переиспользуем между обновлениями.
+            // Раньше пересоздавали на каждый refresh — это терялок view state, плюс
+            // на первом install SwiftUI считал fittingSize до того как view получит
+            // window context → размер был мусором, capsule выглядел обрезанным.
+            // Чинится тремя выстрелами: persistent view + addSubview ДО измерения +
+            // layoutSubtreeIfNeeded перед чтением размера.
+            let hosting = NSHostingView(rootView: MenuBarCapsuleView(priceText: "$0.00"))
+            hosting.frame = NSRect(x: 0, y: 0, width: 60, height: NSStatusBar.system.thickness)
+            button.addSubview(hosting)
+            self.capsuleHosting = hosting
         }
         statusItem = item
+
+        // Первый layout: button уже в window, hosting в hierarchy → fittingSize вернёт
+        // правильный размер. На следующем runloop'е чтобы SwiftUI успел начальный pass.
+        DispatchQueue.main.async { [weak self] in
+            self?.layoutCapsule()
+        }
 
         // Обновляем заголовок при изменении aiTotals.
         Task { @MainActor [weak self] in
@@ -38,25 +55,27 @@ final class StatusItemController: NSObject {
     func refreshTitle() async {
         let cost = await viewModel.todayCost()
         let formatted = String(format: "$%.2f", cost)
-        guard let button = statusItem?.button else { return }
-        updateCapsule(in: button, priceText: formatted)
+        updateCapsule(priceText: formatted)
     }
 
-    private func updateCapsule(in button: NSStatusBarButton, priceText: String) {
-        let hosting = NSHostingView(rootView: MenuBarCapsuleView(priceText: priceText))
-        let fitting = hosting.fittingSize  // SwiftUI-aware размер, лучше чем intrinsicContentSize
+    private func updateCapsule(priceText: String) {
+        guard let hosting = capsuleHosting else { return }
+        // Обновляем rootView (SwiftUI diff'нет содержимое) — view state не теряется.
+        hosting.rootView = MenuBarCapsuleView(priceText: priceText)
+        layoutCapsule()
+    }
 
-        // Высота menu bar item фиксированная (≈22pt на macOS). Capsule должен туда вписаться.
+    /// Принудительный layout pass + чтение реального fittingSize + обновление length
+    /// statusItem'а и frame'а hosting view. Используется при install и при каждом обновлении.
+    private func layoutCapsule() {
+        guard let hosting = capsuleHosting else { return }
+        // Прогоняем layout subtree — SwiftUI пересчитает intrinsic размеры.
+        hosting.layoutSubtreeIfNeeded()
+        let fitting = hosting.fittingSize
         let menuBarHeight = NSStatusBar.system.thickness
-
-        button.subviews.forEach { $0.removeFromSuperview() }
         hosting.frame = NSRect(x: 0, y: 0, width: fitting.width, height: menuBarHeight)
-        hosting.autoresizingMask = [.width, .height]
-        button.addSubview(hosting)
-
-        // Явно задаём длину statusItem (а не frame button — у NSStatusItem есть length).
         statusItem?.length = fitting.width
-        button.title = ""
+        statusItem?.button?.title = ""
     }
 
     private func observeTotals() {
