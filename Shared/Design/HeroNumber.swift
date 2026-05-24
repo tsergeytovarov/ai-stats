@@ -21,6 +21,11 @@ struct HeroNumber: View {
         Text(text)
             .font(font)
             .foregroundStyle(gradient)
+            // Без этого большие суммы ($1 029, $12 345) обрезаются с "…":
+            // font захардкожен (30/38/44pt), контейнер виджета узкий, текст
+            // не лезет. SwiftUI auto-scale'нет до 50% размера если надо.
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
     }
 
     private var gradient: LinearGradient {

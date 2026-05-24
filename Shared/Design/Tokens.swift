@@ -53,6 +53,14 @@ enum BrandFont {
     static let displayL = Font.system(size: 38, weight: .bold, design: .default).monospacedDigit()
     static let displayM = Font.system(size: 30, weight: .bold, design: .default).monospacedDigit()
 
+    // Widget-specific hero шрифты — мельче чем popover-вариант, т.к. у виджетов
+    // контейнер узкий. Тысячи $$$ в Russian локали (с NBSP-разделителем) не
+    // помещались в displayL/M даже с minimumScaleFactor. Эти tokens используются
+    // только в StatsWidgetView'ах.
+    static let widgetHeroLarge = Font.system(size: 32, weight: .bold, design: .default).monospacedDigit()
+    static let widgetHeroMedium = Font.system(size: 26, weight: .bold, design: .default).monospacedDigit()
+    static let widgetHeroSmall = Font.system(size: 22, weight: .bold, design: .default).monospacedDigit()
+
     static let unitL = Font.system(size: 18, weight: .semibold)
     static let delta = Font.system(size: 12, weight: .semibold).monospacedDigit()
     static let body = Font.system(size: 13, weight: .regular)
