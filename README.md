@@ -43,7 +43,7 @@ open build/Build/Products/Release/StatsApp.app
 
 ## Конфиг
 
-При первом запуске app создаст `~/.config/ai-stats/config.json` — заполни `github_token` (PAT с scope `repo` + `read:user`), `github_login` и перезапусти. AI-часть работает без токена.
+При первом запуске app создаст `~/.config/ai-stats/config.json` (с правами `0600`). Заполни `github_token` (PAT с scope `repo` + `read:user`), `github_login` и перезапусти. AI-часть работает без токена.
 
 ```json
 {
@@ -51,11 +51,16 @@ open build/Build/Products/Release/StatsApp.app
   "github_login": "your-username",
   "sync_interval_minutes": 15,
   "ccusage_command": ["npx", "-y", "ccusage@latest"],
-  "enabled_providers": ["claude", "codex"]
+  "enabled_providers": ["claude", "codex"],
+  "aiuse_api_base_url": "https://aiuse.popovs.tech/api"
 }
 ```
 
-Менять можно — но имей в виду, что каждый sync запускает `npx ccusage` процесс на 10-30 секунд.
+**Где живёт PAT.** При старте app перенесёт `github_token` в Keychain (`tech.popovs.aistats.github`) и затрёт поле в JSON — plaintext-токен не остаётся на диске. Менять токен → впиши новое значение, перезапусти, повторится миграция. Удалить — Keychain Access → найди запись `tech.popovs.aistats.github`.
+
+**Безопасность `aiuse_api_base_url`.** Только `https://`. Любая другая схема — app откажется стартовать (Bearer-токен из Keychain не должен утечь plain-text'ом).
+
+Менять остальные поля можно — но имей в виду, что каждый sync запускает `npx ccusage` процесс на 10-30 секунд.
 
 ## Где живут файлы
 

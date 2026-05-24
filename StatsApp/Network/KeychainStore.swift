@@ -97,6 +97,13 @@ enum AiuseKeychain {
     static let account = "aiuse-api-secret"
 }
 
+/// Константы для GitHub PAT — мигрирован из config.json начиная с v0.2.1.
+/// Сам токен лежит в Keychain; в config.json остаётся пустая строка после миграции.
+enum GithubKeychain {
+    static let service = "tech.popovs.aistats.github"
+    static let account = "github-pat"
+}
+
 /// Memory-кэш api_secret. Заполняется один раз при старте AppContainer
 /// (из Keychain — это вызовет один macOS prompt), дальше живёт в памяти
 /// процесса. AccountTabViewModel обновляет value после create/delete.
@@ -105,4 +112,12 @@ enum AiuseKeychain {
 @MainActor
 final class SecretBox {
     var value: String?
+}
+
+/// Memory-кэш GitHub PAT. Та же причина что и у `SecretBox` — избежать
+/// постоянных Keychain-prompt'ов в unsigned-сборке. Заполняется один раз
+/// при старте AppContainer (после миграции из config.json если нужно).
+@MainActor
+final class GithubTokenBox {
+    var value: String = ""
 }
