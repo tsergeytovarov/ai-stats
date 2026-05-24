@@ -98,9 +98,42 @@ struct WidgetSnapshot: Codable, Equatable {
         struct Entry: Codable, Equatable {
             let rank: Int
             let previousRank: Int?
+            let friendCode: String
             let displayName: String
             let tokensTotal: Int64
             let isMe: Bool
+
+            init(
+                rank: Int,
+                previousRank: Int?,
+                friendCode: String,
+                displayName: String,
+                tokensTotal: Int64,
+                isMe: Bool
+            ) {
+                self.rank = rank
+                self.previousRank = previousRank
+                self.friendCode = friendCode
+                self.displayName = displayName
+                self.tokensTotal = tokensTotal
+                self.isMe = isMe
+            }
+
+            init(from decoder: Decoder) throws {
+                let c = try decoder.container(keyedBy: CodingKeys.self)
+                self.rank = try c.decode(Int.self, forKey: .rank)
+                self.previousRank = try c.decodeIfPresent(Int.self, forKey: .previousRank)
+                // Старые snapshot'ы (до widget-avatars) friend_code не писали —
+                // тогда строка просто без аватарки.
+                self.friendCode = try c.decodeIfPresent(String.self, forKey: .friendCode) ?? ""
+                self.displayName = try c.decode(String.self, forKey: .displayName)
+                self.tokensTotal = try c.decode(Int64.self, forKey: .tokensTotal)
+                self.isMe = try c.decode(Bool.self, forKey: .isMe)
+            }
+
+            private enum CodingKeys: String, CodingKey {
+                case rank, previousRank, friendCode, displayName, tokensTotal, isMe
+            }
         }
     }
 }
@@ -135,5 +168,48 @@ enum WidgetSnapshotIO {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return try? decoder.decode(WidgetSnapshot.self, from: data)
+    }
+
+    // MARK: - avatars
+
+    /// `<widget-sandbox>/Library/Application Support/ai-stats/avatars/`.
+    /// Раздельные write/read URL по той же причине что и для snapshot: app
+    /// (не sandboxed) пишет в widget sandbox по абсолютному пути, виджет
+    /// читает через свой applicationSupportDirectory.
+    static var avatarsWriteDir: URL {
+        writeURL.deletingLastPathComponent().appendingPathComponent("avatars", isDirectory: true)
+    }
+
+    static var avatarsReadDir: URL {
+        readURL.deletingLastPathComponent().appendingPathComponent("avatars", isDirectory: true)
+    }
+
+    /// Записывает blob в `avatars/<friend_code>.bin`. Атомарно. Создаёт директорию.
+    static func writeAvatar(friendCode: String, data: Data) throws {
+        let dir = avatarsWriteDir
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let url = dir.appendingPathComponent("\(friendCode).bin")
+        try data.write(to: url, options: .atomic)
+    }
+
+    /// Читает blob по friend_code из widget sandbox. nil — если файла нет.
+    static func readAvatar(friendCode: String) -> Data? {
+        guard !friendCode.isEmpty else { return nil }
+        let url = avatarsReadDir.appendingPathComponent("\(friendCode).bin")
+        return try? Data(contentsOf: url)
+    }
+
+    /// Удаляет аватарки, кодов которых нет в `keep`. Тихо игнорирует ошибки —
+    /// это housekeeping, не критично.
+    static func pruneAvatars(keep: Set<String>) {
+        let fm = FileManager.default
+        let dir = avatarsWriteDir
+        guard let names = try? fm.contentsOfDirectory(atPath: dir.path) else { return }
+        for name in names where name.hasSuffix(".bin") {
+            let code = String(name.dropLast(4))
+            if !keep.contains(code) {
+                try? fm.removeItem(at: dir.appendingPathComponent(name))
+            }
+        }
     }
 }

@@ -26,12 +26,12 @@ final class WidgetSnapshotTests: XCTestCase {
 
     func test_roundtrip_with_full_leaderboard_slice() throws {
         let me = WidgetSnapshot.LeaderboardSlice.Entry(
-            rank: 42, previousRank: 50, displayName: "Я", tokensTotal: 200, isMe: true
+            rank: 42, previousRank: 50, friendCode: "ME00000001", displayName: "Я", tokensTotal: 200, isMe: true
         )
         let lb = WidgetSnapshot.LeaderboardSlice(
             entries: [
-                .init(rank: 1, previousRank: 11, displayName: "Серёжа", tokensTotal: 12_400, isMe: false),
-                .init(rank: 2, previousRank: 5,  displayName: "Вася",    tokensTotal: 9_800,  isMe: false),
+                .init(rank: 1, previousRank: 11, friendCode: "FR00000001", displayName: "Серёжа", tokensTotal: 12_400, isMe: false),
+                .init(rank: 2, previousRank: 5,  friendCode: "FR00000002", displayName: "Вася",    tokensTotal: 9_800,  isMe: false),
             ],
             meBelow: me
         )
@@ -81,6 +81,33 @@ final class WidgetSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.day.aiCostPrev, 0)
         XCTAssertNil(snapshot.day.leaderboard)
         XCTAssertNil(snapshot.myFriendCode)
+    }
+
+    func test_decode_legacy_entry_without_friendCode_defaultsToEmpty() throws {
+        // Snapshot'ы до widget-avatars не писали friend_code в entries.
+        // Декодер должен дефолтить в пустую строку — widget просто не покажет
+        // аватарку (fallback на градиент), но не упадёт.
+        let json = """
+        {
+            "generatedAt": "2026-05-23T12:00:00Z",
+            "githubEnabled": true,
+            "day": {
+                "aiCost": 10.0, "aiTokens": 100, "commits": 0, "uniqueRepos": 0, "topModels": [],
+                "leaderboard": {
+                    "entries": [
+                        {"rank": 1, "displayName": "Серёжа", "tokensTotal": 12400, "isMe": false}
+                    ]
+                }
+            },
+            "week":  { "aiCost": 0, "aiTokens": 0, "commits": 0, "uniqueRepos": 0, "topModels": [] },
+            "month": { "aiCost": 0, "aiTokens": 0, "commits": 0, "uniqueRepos": 0, "topModels": [] }
+        }
+        """.data(using: .utf8)!
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let snapshot = try decoder.decode(WidgetSnapshot.self, from: json)
+        XCTAssertEqual(snapshot.day.leaderboard?.entries.first?.friendCode, "")
+        XCTAssertEqual(snapshot.day.leaderboard?.entries.first?.displayName, "Серёжа")
     }
 
     func test_decode_legacy_json_with_partial_period_slice() throws {
