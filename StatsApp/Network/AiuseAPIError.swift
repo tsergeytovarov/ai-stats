@@ -8,6 +8,8 @@ enum AiuseAPIError: LocalizedError, Equatable {
     case http(status: Int, body: String)
     case decoding(String)
     case unexpected
+    case avatarTooLarge(bytes: Int)          // ответ /avatars превысил кап
+    case avatarBadMime(mime: String)         // не из allowlist {image/png, image/jpeg}
 
     var errorDescription: String? {
         switch self {
@@ -26,6 +28,10 @@ enum AiuseAPIError: LocalizedError, Equatable {
             return "не удалось разобрать ответ: \(msg)"
         case .unexpected:
             return "неожиданный ответ сервера"
+        case .avatarTooLarge(let bytes):
+            return "аватарка слишком большая (\(bytes) байт). Максимум — 512 KB."
+        case .avatarBadMime(let mime):
+            return "неожиданный MIME-тип аватарки: \"\(mime)\". Ожидался image/png или image/jpeg."
         }
     }
 }
