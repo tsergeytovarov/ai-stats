@@ -44,4 +44,83 @@ final class ConfigTests: XCTestCase {
         XCTAssertFalse(cfg.githubEnabled)
         XCTAssertEqual(cfg.enabledProviders, ["claude", "codex"])
     }
+
+    // MARK: - ConfigLoader.clearGithubTokenField
+
+    func test_clearGithubTokenField_preserves_other_keys() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ai-stats-cfg-\(UUID().uuidString).json")
+        let payload: [String: Any] = [
+            "github_token": "ghp_secret_value",
+            "github_login": "popovs",
+            "sync_interval_minutes": 10,
+            "ccusage_command": ["npx", "-y", "ccusage@latest"],
+            "enabled_providers": ["claude", "codex"],
+            "custom_extra_field": "user-added-value"
+        ]
+        let data = try JSONSerialization.data(withJSONObject: payload)
+        try data.write(to: tmp)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        try ConfigLoader.clearGithubTokenField(at: tmp)
+
+        let cfg = try Config.decode(from: Data(contentsOf: tmp))
+        XCTAssertEqual(cfg.githubToken, "", "github_token должен быть очищен")
+        XCTAssertEqual(cfg.githubLogin, "popovs", "github_login должен остаться")
+        XCTAssertEqual(cfg.syncIntervalMinutes, 10)
+
+        let raw = try JSONSerialization.jsonObject(with: try Data(contentsOf: tmp)) as? [String: Any]
+        XCTAssertEqual(raw?["custom_extra_field"] as? String, "user-added-value",
+                       "неизвестные поля не должны теряться при перезаписи")
+    }
+
+    func test_clearGithubTokenField_is_noop_when_already_empty() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ai-stats-cfg-\(UUID().uuidString).json")
+        let payload: [String: Any] = [
+            "github_token": "",
+            "github_login": "popovs"
+        ]
+        let data = try JSONSerialization.data(withJSONObject: payload)
+        try data.write(to: tmp)
+        let originalMtime = try FileManager.default.attributesOfItem(atPath: tmp.path)[.modificationDate] as? Date
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        // Спим минимально, потом проверяем что mtime не изменился (файл не был переписан).
+        try ConfigLoader.clearGithubTokenField(at: tmp)
+        let newMtime = try FileManager.default.attributesOfItem(atPath: tmp.path)[.modificationDate] as? Date
+        XCTAssertEqual(originalMtime, newMtime, "пустое значение → диск не трогаем")
+    }
+
+    func test_loadOrCreate_sets_secure_permissions_on_create() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ai-stats-cfg-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let (_, wasCreated) = try ConfigLoader.loadOrCreate(at: tmp)
+        XCTAssertTrue(wasCreated)
+
+        let attrs = try FileManager.default.attributesOfItem(atPath: tmp.path)
+        let perms = (attrs[.posixPermissions] as? NSNumber)?.intValue ?? 0
+        XCTAssertEqual(perms, 0o600, "config.json должен быть owner-only read/write")
+    }
+
+    func test_loadOrCreate_fixes_permissions_on_existing_file() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ai-stats-cfg-\(UUID().uuidString).json")
+        let payload = Config.defaultTemplate
+        try payload.write(to: tmp)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: NSNumber(value: Int16(0o644))],
+            ofItemAtPath: tmp.path
+        )
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        _ = try ConfigLoader.loadOrCreate(at: tmp)
+
+        let attrs = try FileManager.default.attributesOfItem(atPath: tmp.path)
+        let perms = (attrs[.posixPermissions] as? NSNumber)?.intValue ?? 0
+        XCTAssertEqual(perms, 0o600, "loadOrCreate должен defensive-fix'ить mode")
+    }
+
 }
