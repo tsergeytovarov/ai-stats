@@ -8,14 +8,11 @@
 
 | Файл | Что снять |
 |---|---|
-| `menubar-capsule.png` | Capsule в menu bar — крупный план, видна цена и ember-иконка |
-| `popover-ai.png` | Popover открыт на секции «AI» (период «Д») |
-| `popover-github.png` | Popover на секции «GitHub», виден sparkline и top-репы |
+| `popover-ai.png` | Popover, секция «AI», период «Неделя» |
+| `popover-ai-month.png` | Popover, секция «AI», период «Месяц» |
+| `popover-github.png` | Popover, секция «GitHub», виден sparkline и top-репы |
 | `popover-leaderboard.png` | Popover на «Друзья» — со стрелками ▲/▼/NEW (см. `scripts/seed-demo-leaderboard.py`) |
-| `widget-small.png` | Small widget на десктопе |
-| `widget-medium.png` | Medium widget |
-| `widget-large.png` | Large widget с лидербордом |
-| `settings-general.png` | Settings → Общие — видна галочка «Запускать при входе в систему» |
+| `widgets-overview.png` | Все три виджета вместе на десктопе (Small + Medium + Large) |
 | `settings-account.png` | Settings → Аккаунт — со своим friend_code |
 
 ## Как снять popover-leaderboard с динамикой
