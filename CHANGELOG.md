@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+### Аватарка профиля — отображение и смена
+
+- Свой аватар хранится локально как BLOB в `my_profile` (поля `avatar_blob`, `avatar_mime`, `avatar_etag`, миграция v8) — по аналогии с `friend_profiles`. `avatar_path` остаётся как legacy-колонка, удалю позже.
+- В Settings/Аккаунт у созданного профиля теперь рисуется реальный аватар вместо хардкод-символа `person.crop.circle`. Появилась кнопка «Сменить аватарку» — PATCH `/profiles/me` + локальный апдейт через `StatsQueries.updateMyAvatar`.
+- При создании аккаунта BLOB сохраняется сразу после ответа сервера — до этого аватарка отправлялась на сервер, но локально не кэшировалась и не показывалась.
+- `FriendsPullSyncer` после цикла друзей догружает свой аватар тем же conditional GET с ETag — это backfill для аккаунтов, созданных до v8.
+- В превью при создании виден сам файл (через `AvatarView`), а не только размер в байтах.
+
 ### Rebrand → Burn
 
 - Продукт переименован: `ai-stats` → **Burn**. Затронуты только user-facing surfaces — display name в Dock/Spotlight/Cmd+Tab, заголовок окна Settings, About-строка, default-имя экспорта DB (`burn-YYYYMMDD.db`), имя виджета в Apple Widget Gallery, локализованный alert "failed to start" (en + ru).
