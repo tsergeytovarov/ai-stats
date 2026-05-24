@@ -50,6 +50,11 @@ final class FriendsPullSyncer {
             await fetchAvatarIfNeeded(friendCode: f.friendCode, existing: existing)
         }
 
+        // Свой аватар: получает ETag после первого create (avatar_etag в локальном
+        // кэше = nil) или обновляет при PATCH через web. Для уже существующих
+        // аккаунтов без локального blob — это единственная точка backfill'а.
+        await fetchMyAvatarIfNeeded()
+
         return friends.count
     }
 
@@ -64,6 +69,19 @@ final class FriendsPullSyncer {
             }
         } catch {
             NSLog("ai-stats avatar fetch error for \(friendCode): \(error)")
+        }
+    }
+
+    private func fetchMyAvatarIfNeeded() async {
+        guard let me = try? await db.read({ try StatsQueries.loadMyProfile($0) }) else { return }
+        do {
+            let result = try await api.getAvatar(friendCode: me.friendCode, ifNoneMatch: me.avatarEtag)
+            guard let (data, mime, etag) = result else { return }  // 304 / 404 — оставляем как есть
+            try await db.write { db in
+                try StatsQueries.updateMyAvatar(db, blob: data, mime: mime, etag: etag)
+            }
+        } catch {
+            NSLog("ai-stats my-avatar fetch error: \(error)")
         }
     }
 }
