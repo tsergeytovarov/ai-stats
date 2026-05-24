@@ -4,24 +4,61 @@ import SwiftUI
 @MainActor
 final class StatusItemController: NSObject {
     private var statusItem: NSStatusItem?
+    private var capsuleHosting: NSHostingView<MenuBarCapsuleView>?
     private var popover: NSPopover?
     private let viewModel: DropdownViewModel
     private let onRefresh: () -> Void
     private let onOpenSettings: () -> Void
+    private let onQuit: () -> Void
 
-    init(viewModel: DropdownViewModel, onRefresh: @escaping () -> Void, onOpenSettings: @escaping () -> Void) {
+    init(
+        viewModel: DropdownViewModel,
+        onRefresh: @escaping () -> Void,
+        onOpenSettings: @escaping () -> Void,
+        onQuit: @escaping () -> Void
+    ) {
         self.viewModel = viewModel
         self.onRefresh = onRefresh
         self.onOpenSettings = onOpenSettings
+        self.onQuit = onQuit
+    }
+
+    // Геометрия capsule — должна точно соответствовать MenuBarCapsuleView:
+    //   HStack(spacing: 4) { MiniEmberView(size: 12); Text(...) }
+    //     .padding(.horizontal, 8)
+    // Раньше пытались читать fittingSize у NSHostingView — но SwiftUI на status
+    // bar button даёт неверные размеры до полного first-layout. Capsule рос в
+    // 3 стадии при кликах. Сейчас считаем ширину сами — детерминированно,
+    // никакой зависимости от SwiftUI layout pass'а.
+    private static let emberSize: CGFloat = 12
+    private static let interItemSpacing: CGFloat = 4
+    private static let horizontalPadding: CGFloat = 8 * 2  // лево + право
+
+    /// Считает ширину capsule под priceText. Использует NSString.size(...)
+    /// с тем же шрифтом что MenuBarCapsuleView (11pt semibold monospaced digit).
+    /// nonisolated — pure-функция, не трогает actor state, тестируется без MainActor.
+    nonisolated static func capsuleWidth(for priceText: String) -> CGFloat {
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
+        let textWidth = (priceText as NSString)
+            .size(withAttributes: [.font: font])
+            .width
+        return ceil(emberSize + interItemSpacing + textWidth + horizontalPadding)
     }
 
     func install() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        // Стартуем сразу с правильной шириной — никаких 3-стадийных мерцаний.
+        let initialPrice = "$0.00"
+        let initialWidth = Self.capsuleWidth(for: initialPrice)
+        let item = NSStatusBar.system.statusItem(withLength: initialWidth)
         if let button = item.button {
             button.title = ""
             button.target = self
             button.action = #selector(togglePopover(_:))
-            updateCapsule(in: button, priceText: "$0.00")
+
+            let hosting = NSHostingView(rootView: MenuBarCapsuleView(priceText: initialPrice))
+            hosting.frame = NSRect(x: 0, y: 0, width: initialWidth, height: NSStatusBar.system.thickness)
+            button.addSubview(hosting)
+            self.capsuleHosting = hosting
         }
         statusItem = item
 
@@ -38,25 +75,18 @@ final class StatusItemController: NSObject {
     func refreshTitle() async {
         let cost = await viewModel.todayCost()
         let formatted = String(format: "$%.2f", cost)
-        guard let button = statusItem?.button else { return }
-        updateCapsule(in: button, priceText: formatted)
+        updateCapsule(priceText: formatted)
     }
 
-    private func updateCapsule(in button: NSStatusBarButton, priceText: String) {
-        let hosting = NSHostingView(rootView: MenuBarCapsuleView(priceText: priceText))
-        let fitting = hosting.fittingSize  // SwiftUI-aware размер, лучше чем intrinsicContentSize
-
-        // Высота menu bar item фиксированная (≈22pt на macOS). Capsule должен туда вписаться.
-        let menuBarHeight = NSStatusBar.system.thickness
-
-        button.subviews.forEach { $0.removeFromSuperview() }
-        hosting.frame = NSRect(x: 0, y: 0, width: fitting.width, height: menuBarHeight)
-        hosting.autoresizingMask = [.width, .height]
-        button.addSubview(hosting)
-
-        // Явно задаём длину statusItem (а не frame button — у NSStatusItem есть length).
-        statusItem?.length = fitting.width
-        button.title = ""
+    private func updateCapsule(priceText: String) {
+        guard let hosting = capsuleHosting else { return }
+        // Обновляем SwiftUI rootView (diff'ит содержимое, view state сохраняется)
+        // и пересчитываем ширину детерминированно из priceText.
+        hosting.rootView = MenuBarCapsuleView(priceText: priceText)
+        let width = Self.capsuleWidth(for: priceText)
+        hosting.frame = NSRect(x: 0, y: 0, width: width, height: NSStatusBar.system.thickness)
+        statusItem?.length = width
+        statusItem?.button?.title = ""
     }
 
     private func observeTotals() {
@@ -78,6 +108,10 @@ final class StatusItemController: NSObject {
                 onOpenSettings: { [weak self] in
                     self?.popover?.performClose(nil)
                     self?.onOpenSettings()
+                },
+                onQuit: { [weak self] in
+                    self?.popover?.performClose(nil)
+                    self?.onQuit()
                 }
             ))
             pop.contentViewController = hosting

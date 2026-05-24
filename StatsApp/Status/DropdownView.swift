@@ -4,6 +4,7 @@ struct DropdownView: View {
     @ObservedObject var viewModel: DropdownViewModel
     let onRefresh: () -> Void
     let onOpenSettings: () -> Void
+    let onQuit: () -> Void
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -24,6 +25,7 @@ struct DropdownView: View {
                     Spacer()
                     SyncIconButton(systemImage: "arrow.clockwise", action: onRefresh)
                     SyncIconButton(systemImage: "gearshape", action: onOpenSettings)
+                    SyncIconButton(systemImage: "power", action: onQuit)
                 }
                 .padding(.horizontal, 18)
                 .padding(.top, 10)
