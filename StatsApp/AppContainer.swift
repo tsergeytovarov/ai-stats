@@ -10,6 +10,7 @@ final class AppContainer {
     let syncCoordinator: SyncCoordinator
     let dropdownViewModel: DropdownViewModel
     let keychain: KeychainStore
+    let secretsStore: SecretsStore
     let secretBox: SecretBox
     let githubTokenBox: GithubTokenBox
     let aiuseAPI: AiuseAPIClient
@@ -27,17 +28,31 @@ final class AppContainer {
         let kc = MacOSKeychainStore()
         self.keychain = kc
 
-        // Один Keychain prompt при старте — дальше отдаём из memory cache.
-        // Без этого macOS триггерит prompt на каждый sync-запрос (unsigned-app).
+        // Все секреты — aiuse api_secret + GitHub PAT — в одном Keychain item'е.
+        // Раньше было 2 prompt'а на запуск (по одному на item), теперь 1.
+        // SecretsStore.loadAll() автоматически мигрирует с legacy AiuseKeychain /
+        // GithubKeychain items в combined при первом запуске — после этого
+        // combined существует и подтягивается одним hit'ом.
+        let store = SecretsStore(keychain: kc)
+        self.secretsStore = store
+        var secrets = store.loadAll()
+
+        // Миграция github_token из config.json. Делаем INPLACE в локальный snapshot
+        // и одним write'ом через saveAll — иначе бы здесь были лишние reads.
+        if let updated = Self.migrateGithubTokenFromConfig(
+            config: cfg, secretsStore: store, currentSecrets: secrets
+        ) {
+            secrets = updated
+        }
+
+        // Memory caches (SecretBox/GithubTokenBox) остаются — после loadAll()
+        // мы не дёргаем Keychain до конца сессии.
         let box = SecretBox()
-        box.value = kc.get(account: AiuseKeychain.account, service: AiuseKeychain.service)
+        box.value = secrets.aiuseSecret
         self.secretBox = box
 
-        // GitHub PAT: с v0.2.1 живёт в Keychain. Один раз мигрируем из config.json
-        // если пользователь только что вставил туда токен (или обновился со старой версии).
         let ghBox = GithubTokenBox()
-        Self.migrateGithubTokenIfNeeded(config: cfg, keychain: kc)
-        ghBox.value = kc.get(account: GithubKeychain.account, service: GithubKeychain.service) ?? ""
+        ghBox.value = secrets.githubPAT ?? ""
         self.githubTokenBox = ghBox
 
         // Жёстко требуем https для aiuse: иначе Bearer-токен из Keychain
@@ -79,30 +94,31 @@ final class AppContainer {
         )
     }
 
-    /// Однократная миграция github_token из config.json в Keychain.
-    /// Идемпотентна: если токен в конфиге пуст — ничего не делает; если Keychain уже заполнен
-    /// и в конфиге тоже что-то лежит — Keychain побеждает, поле в конфиге зануляется.
-    @discardableResult
-    nonisolated static func migrateGithubTokenIfNeeded(
+    /// Миграция github_token из config.json в combined Keychain item.
+    /// Возвращает обновлённый snapshot если миграция произошла, nil если конфиг пустой
+    /// (тогда caller продолжает использовать `currentSecrets` без изменений).
+    ///
+    /// Идемпотентна: если в combined уже есть githubPAT — Keychain wins, поле
+    /// в конфиге всё равно зануляется (plaintext-токен не должен оставаться на диске).
+    nonisolated static func migrateGithubTokenFromConfig(
         config: Config,
-        keychain: KeychainStore,
+        secretsStore: SecretsStore,
+        currentSecrets: SecretsStore.Secrets,
         configURL: URL = Paths.configURL
-    ) -> Bool {
+    ) -> SecretsStore.Secrets? {
         let configToken = config.githubToken.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !configToken.isEmpty else { return false }
+        guard !configToken.isEmpty else { return nil }
 
-        let existing = keychain.get(account: GithubKeychain.account, service: GithubKeychain.service)
-        if existing == nil || existing?.isEmpty == true {
-            // Keychain пустой — переливаем туда то что было в конфиге.
-            try? keychain.set(
-                configToken,
-                account: GithubKeychain.account,
-                service: GithubKeychain.service
-            )
+        var updated = currentSecrets
+        let existing = updated.githubPAT ?? ""
+        if existing.isEmpty {
+            updated.githubPAT = configToken
+            // saveAll НЕ читает Keychain до записи — мы передаём полный snapshot.
+            try? secretsStore.saveAll(updated)
         }
-        // В любом случае: зануляем поле в конфиге, чтобы plaintext-токен не оставался на диске.
+        // В любом случае: зануляем поле в конфиге.
         try? ConfigLoader.clearGithubTokenField(at: configURL)
-        return true
+        return updated
     }
 
     /// Валидация aiuse_api_base_url: только https. Любая другая схема — ошибка.
@@ -121,7 +137,7 @@ final class AppContainer {
 
     /// Создаёт fresh AccountTabViewModel — для каждого открытия окна настроек.
     func makeAccountTabViewModel() -> AccountTabViewModel {
-        AccountTabViewModel(api: aiuseAPI, keychain: keychain, secretBox: secretBox, db: dbPool)
+        AccountTabViewModel(api: aiuseAPI, secretsStore: secretsStore, secretBox: secretBox, db: dbPool)
     }
 
     /// Создаёт fresh FriendsTabViewModel — для каждого открытия окна настроек.
