@@ -5,6 +5,13 @@
 
 ## [Unreleased]
 
+### Аватарки в Large widget
+
+- `LeaderboardSlice.Entry` теперь содержит `friend_code` — без него виджет не мог сматчить запись с файлом. Decoder обратно-совместим: старые snapshot'ы → пустая строка → fallback на градиент.
+- `WidgetSnapshotIO` пишет blob'ы файлами в `<widget-sandbox>/Library/Application Support/ai-stats/avatars/<friend_code>.bin`. Тащить аватарки внутрь snapshot.json было бы дорого: 50 KB × 8 ≈ 400 KB JSON на каждый timeline reload.
+- `SyncCoordinator.syncAvatarsToWidgetContainer` после записи snapshot собирает уникальные `friend_code` из всех периодов leaderboard'а, грузит blob'ы за один read из `friend_profiles` + `my_profile` и пишет файлы. `pruneAvatars` чистит файлы кодов, которых уже нет.
+- `LargeView` для каждой строки читает blob через `readAvatar(friendCode:)` и передаёт в `FriendRow.avatarData`. Если файла нет — рисуется brand-градиент (как и раньше).
+
 ### Fix: ccusage из GUI снова работает (env PATH для child-процесса)
 
 - ccusage не запускался: `processFailed(exitCode: 127, stderr: "env: node: No such file or directory")`. GUI-приложение наследует PATH = `/usr/bin:/bin` без brew/nvm, `npx` через shebang `#!/usr/bin/env node` ищет node в этом голом PATH и валится.
