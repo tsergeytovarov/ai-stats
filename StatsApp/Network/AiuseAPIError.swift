@@ -3,6 +3,7 @@ import Foundation
 enum AiuseAPIError: LocalizedError, Equatable {
     case missingSecret           // нет в Keychain
     case invalidURL
+    case invalidFriendCode(String)   // friend_code не прошёл клиентскую валидацию
     case transport(String)       // network failure
     case http(status: Int, body: String)
     case decoding(String)
@@ -14,6 +15,8 @@ enum AiuseAPIError: LocalizedError, Equatable {
             return "api_secret отсутствует в Keychain (создай аккаунт в Settings → Аккаунт)"
         case .invalidURL:
             return "некорректный URL запроса"
+        case .invalidFriendCode(let raw):
+            return "friend_code должен быть 10 ASCII-символов из [A-Z0-9] (получено: \"\(raw)\")"
         case .transport(let msg):
             return "сетевая ошибка: \(msg)"
         case .http(let status, let body):

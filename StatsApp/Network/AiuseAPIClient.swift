@@ -75,10 +75,11 @@ final class AiuseAPIClient {
     // MARK: - friends
 
     func addFriend(friendCode: String) async throws -> FriendDTO {
+        let validated = try FriendCode.validated(friendCode)
         return try await request(
             path: "/friends",
             method: "POST",
-            body: AddFriendRequest(friendCode: friendCode),
+            body: AddFriendRequest(friendCode: validated),
             authed: true,
             decodeAs: FriendDTO.self
         )
@@ -95,8 +96,9 @@ final class AiuseAPIClient {
     }
 
     func removeFriend(friendCode: String, block: Bool = false) async throws {
+        let validated = try FriendCode.validated(friendCode)
         _ = try await request(
-            path: "/friends/\(friendCode)",
+            path: "/friends/\(validated)",
             method: "DELETE",
             body: RemoveFriendRequest(block: block),
             authed: true,
@@ -129,8 +131,9 @@ final class AiuseAPIClient {
     }
 
     func unblock(friendCode: String) async throws {
+        let validated = try FriendCode.validated(friendCode)
         _ = try await request(
-            path: "/blocks/\(friendCode)",
+            path: "/blocks/\(validated)",
             method: "DELETE",
             authed: true,
             decodeAs: EmptyResponse.self
@@ -143,9 +146,12 @@ final class AiuseAPIClient {
     /// ifNoneMatch — ETag из предыдущего ответа для conditional GET.
     func getAvatar(friendCode: String, ifNoneMatch: String? = nil) async throws -> (data: Data, mime: String?, etag: String?)? {
         guard let secret = secretProvider() else { throw AiuseAPIError.missingSecret }
+        // friend_code приходит из server-side data (FriendsPullSyncer), но всё равно валидируем —
+        // defense in depth, чтобы скомпрометированный сервер не смог подсунуть `..` в URL.
+        let validated = try FriendCode.validated(friendCode)
 
         var url = baseURL
-        url.append(path: "/avatars/\(friendCode)")
+        url.append(path: "/avatars/\(validated)")
         var req = URLRequest(url: url)
         req.httpMethod = "GET"
         req.setValue("Bearer \(secret)", forHTTPHeaderField: "Authorization")
