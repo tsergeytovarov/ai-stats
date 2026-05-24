@@ -123,4 +123,37 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(perms, 0o600, "loadOrCreate должен defensive-fix'ить mode")
     }
 
+    // MARK: - validateAiuseBaseURL
+
+    func test_validateAiuseBaseURL_accepts_https() throws {
+        let url = try AppContainer.validateAiuseBaseURL("https://aiuse.popovs.tech/api")
+        XCTAssertEqual(url.absoluteString, "https://aiuse.popovs.tech/api")
+    }
+
+    func test_validateAiuseBaseURL_rejects_http() {
+        XCTAssertThrowsError(try AppContainer.validateAiuseBaseURL("http://evil.example.com/api")) { err in
+            guard case ConfigError.insecureBaseURL(let scheme) = err else {
+                return XCTFail("ожидали insecureBaseURL, получили \(err)")
+            }
+            XCTAssertEqual(scheme, "http")
+        }
+    }
+
+    func test_validateAiuseBaseURL_rejects_other_schemes() {
+        XCTAssertThrowsError(try AppContainer.validateAiuseBaseURL("ftp://example.com/")) { err in
+            guard case ConfigError.insecureBaseURL = err else {
+                return XCTFail("ожидали insecureBaseURL, получили \(err)")
+            }
+        }
+        XCTAssertThrowsError(try AppContainer.validateAiuseBaseURL("file:///tmp/api")) { err in
+            guard case ConfigError.insecureBaseURL = err else {
+                return XCTFail("ожидали insecureBaseURL, получили \(err)")
+            }
+        }
+    }
+
+    func test_validateAiuseBaseURL_falls_back_to_default_on_empty() throws {
+        let url = try AppContainer.validateAiuseBaseURL("")
+        XCTAssertEqual(url.absoluteString, "https://aiuse.popovs.tech/api")
+    }
 }

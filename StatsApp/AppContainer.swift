@@ -40,7 +40,9 @@ final class AppContainer {
         ghBox.value = kc.get(account: GithubKeychain.account, service: GithubKeychain.service) ?? ""
         self.githubTokenBox = ghBox
 
-        let baseURL = URL(string: cfg.aiuseApiBaseURL) ?? URL(string: "https://aiuse.popovs.tech/api")!
+        // Жёстко требуем https для aiuse: иначе Bearer-токен из Keychain
+        // утечёт plain-text'ом на любой http-эндпоинт из конфига.
+        let baseURL = try Self.validateAiuseBaseURL(cfg.aiuseApiBaseURL)
         let api = AiuseAPIClient(
             baseURL: baseURL,
             secretProvider: { box.value }
@@ -101,6 +103,20 @@ final class AppContainer {
         // В любом случае: зануляем поле в конфиге, чтобы plaintext-токен не оставался на диске.
         try? ConfigLoader.clearGithubTokenField(at: configURL)
         return true
+    }
+
+    /// Валидация aiuse_api_base_url: только https. Любая другая схема — ошибка.
+    /// Сохранили fallback на дефолтный popovs.tech если конфиг вообще не разбирается как URL —
+    /// но если разобрался и схема не https, бросаем явную ошибку, чтобы юзер увидел её в alert.
+    nonisolated static func validateAiuseBaseURL(_ raw: String) throws -> URL {
+        let defaultURL = URL(string: "https://aiuse.popovs.tech/api")!
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return defaultURL }
+        guard let url = URL(string: trimmed) else { return defaultURL }
+        guard let scheme = url.scheme?.lowercased(), scheme == "https" else {
+            throw ConfigError.insecureBaseURL(scheme: url.scheme)
+        }
+        return url
     }
 
     /// Создаёт fresh AccountTabViewModel — для каждого открытия окна настроек.

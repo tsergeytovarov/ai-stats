@@ -62,9 +62,22 @@ struct Config: Equatable {
     """.data(using: .utf8)!
 }
 
-enum ConfigError: Error {
+enum ConfigError: Error, LocalizedError {
     case fileNotFound
     case invalidJSON(underlying: Error)
+    case insecureBaseURL(scheme: String?)
+
+    var errorDescription: String? {
+        switch self {
+        case .fileNotFound:
+            return "config файл не найден"
+        case .invalidJSON(let err):
+            return "невалидный JSON в config: \(err.localizedDescription)"
+        case .insecureBaseURL(let scheme):
+            let s = scheme ?? "<none>"
+            return "aiuse_api_base_url должен быть https:// (получено: \(s)://). Token утечёт на plain-text endpoint."
+        }
+    }
 }
 
 enum ConfigLoader {
