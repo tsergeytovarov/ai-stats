@@ -11,6 +11,11 @@ struct GeneralTabView: View {
     let onImport: () -> Void
     let onRefreshNow: () -> Void
 
+    /// Source-of-truth — SMAppService у системы. Toggle отражает её и обновляет
+    /// после каждого toggle. Init читает изначальное состояние из системы.
+    @State private var launchAtLogin: Bool = LaunchAtLoginService().isEnabled
+    @State private var launchAtLoginError: String?
+
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             section(NSLocalizedString("settings.config_file", comment: "")) {
@@ -31,11 +36,38 @@ struct GeneralTabView: View {
                 Button(NSLocalizedString("settings.refresh_now", comment: ""), action: onRefreshNow)
             }
 
+            section(NSLocalizedString("settings.startup", comment: "")) {
+                Toggle(NSLocalizedString("settings.launch_at_login", comment: ""), isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { _, newValue in
+                        toggleLaunchAtLogin(newValue)
+                    }
+                if let err = launchAtLoginError {
+                    Text(err).font(.caption).foregroundStyle(.red)
+                }
+            }
+
             Spacer()
             Text("Burn \(version)").font(.caption).foregroundStyle(.secondary)
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func toggleLaunchAtLogin(_ enabled: Bool) {
+        launchAtLoginError = nil
+        do {
+            try LaunchAtLoginService().setEnabled(enabled)
+            // Подтягиваем актуальное состояние — система могла отказать (например
+            // .requiresApproval) и реальное значение ≠ запрошенному.
+            let actual = LaunchAtLoginService().isEnabled
+            if actual != enabled {
+                launchAtLogin = actual
+                launchAtLoginError = NSLocalizedString("settings.launch_at_login.requires_approval", comment: "")
+            }
+        } catch {
+            launchAtLogin = LaunchAtLoginService().isEnabled
+            launchAtLoginError = error.localizedDescription
+        }
     }
 
     @ViewBuilder private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {

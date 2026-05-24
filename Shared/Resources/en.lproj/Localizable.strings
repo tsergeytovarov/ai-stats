@@ -27,6 +27,10 @@
 "settings.sync" = "Sync";
 "settings.refresh_now" = "Refresh now";
 
+"settings.startup" = "Startup";
+"settings.launch_at_login" = "Launch Burn at login";
+"settings.launch_at_login.requires_approval" = "System needs to approve this — open System Settings → General → Login Items and enable Burn there.";
+
 "alert.config_initialized.title" = "Config initialized";
 "alert.config_initialized.body %@" = "A default config was created at %@. Add your GitHub token (optional) and restart the app. AI usage tracking already works.";
 "alert.config_initialized.open" = "Open Config";
