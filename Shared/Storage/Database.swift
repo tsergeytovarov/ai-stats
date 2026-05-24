@@ -176,6 +176,14 @@ enum Database {
                 )
             """)
         }
+        migrator.registerMigration("v8_my_profile_avatar_blob") { db in
+            // Свой аватар хранится локально как BLOB по аналогии с friend_profiles —
+            // чтобы рендерить в UI без сетевого запроса и кэшировать через ETag.
+            // avatar_path оставляем как legacy-колонку (никогда не использовалась).
+            try db.execute(sql: "ALTER TABLE my_profile ADD COLUMN avatar_blob BLOB")
+            try db.execute(sql: "ALTER TABLE my_profile ADD COLUMN avatar_mime TEXT")
+            try db.execute(sql: "ALTER TABLE my_profile ADD COLUMN avatar_etag TEXT")
+        }
         try migrator.migrate(writer)
     }
 

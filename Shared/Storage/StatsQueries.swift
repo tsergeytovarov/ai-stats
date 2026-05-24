@@ -188,6 +188,18 @@ enum StatsQueries {
         _ = try MyProfileRow.deleteOne(db, key: 1)
     }
 
+    /// Точечный апдейт своего аватара. Если профиля нет — no-op.
+    /// blob=nil очищает локальный кэш (например, при удалении аватарки на сервере).
+    static func updateMyAvatar(
+        _ db: GRDB.Database, blob: Data?, mime: String?, etag: String?
+    ) throws {
+        guard var row = try MyProfileRow.fetchOne(db, key: 1) else { return }
+        row.avatarBlob = blob
+        row.avatarMime = mime
+        row.avatarEtag = etag
+        try row.update(db)
+    }
+
     // MARK: - aiuse: pending_snapshots
 
     /// Daily aggregates из ai_usage за период → upsert в pending_snapshots.

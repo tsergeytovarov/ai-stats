@@ -162,6 +162,9 @@ struct MyProfileRow: Codable, FetchableRecord, PersistableRecord, Equatable {
     var avatarPath: String?
     var sharingEnabled: Bool
     var serverUserId: Int64
+    var avatarBlob: Data? = nil
+    var avatarMime: String? = nil
+    var avatarEtag: String? = nil
 
     enum Columns {
         static let id = Column("id")
@@ -170,6 +173,9 @@ struct MyProfileRow: Codable, FetchableRecord, PersistableRecord, Equatable {
         static let avatarPath = Column("avatar_path")
         static let sharingEnabled = Column("sharing_enabled")
         static let serverUserId = Column("server_user_id")
+        static let avatarBlob = Column("avatar_blob")
+        static let avatarMime = Column("avatar_mime")
+        static let avatarEtag = Column("avatar_etag")
     }
 
     enum CodingKeys: String, CodingKey {
@@ -179,6 +185,9 @@ struct MyProfileRow: Codable, FetchableRecord, PersistableRecord, Equatable {
         case avatarPath = "avatar_path"
         case sharingEnabled = "sharing_enabled"
         case serverUserId = "server_user_id"
+        case avatarBlob = "avatar_blob"
+        case avatarMime = "avatar_mime"
+        case avatarEtag = "avatar_etag"
     }
 }
 

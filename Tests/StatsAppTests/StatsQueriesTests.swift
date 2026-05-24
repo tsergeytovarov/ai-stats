@@ -172,4 +172,60 @@ final class StatsQueriesTests: XCTestCase {
         XCTAssertEqual(current.totalCost, 5.0)   // 2.0 (claude) + 3.0 (codex)
         XCTAssertEqual(previous.totalCost, 1.5)  // 1.5 (claude)
     }
+
+    // MARK: - my_profile avatar
+
+    func test_saveMyProfile_roundtripsAvatarBlob() throws {
+        let blob = Data([0xFF, 0xD8, 0xFF, 0xE0])  // JPEG magic
+        let profile = MyProfileRow(
+            id: 1,
+            friendCode: "XK7P3M9Q2A",
+            displayName: "Я",
+            avatarPath: nil,
+            sharingEnabled: true,
+            serverUserId: 42,
+            avatarBlob: blob,
+            avatarMime: "image/jpeg",
+            avatarEtag: "\"abc123\""
+        )
+        try dbq.write { try StatsQueries.saveMyProfile($0, profile) }
+
+        let loaded = try dbq.read { try StatsQueries.loadMyProfile($0) }
+        XCTAssertEqual(loaded?.avatarBlob, blob)
+        XCTAssertEqual(loaded?.avatarMime, "image/jpeg")
+        XCTAssertEqual(loaded?.avatarEtag, "\"abc123\"")
+    }
+
+    func test_updateMyAvatar_overwritesExisting() throws {
+        let initial = MyProfileRow(
+            id: 1,
+            friendCode: "XK7P3M9Q2A",
+            displayName: "Я",
+            avatarPath: nil,
+            sharingEnabled: true,
+            serverUserId: 42
+        )
+        try dbq.write { try StatsQueries.saveMyProfile($0, initial) }
+
+        let blob = Data([0x89, 0x50, 0x4E, 0x47])  // PNG magic
+        try dbq.write {
+            try StatsQueries.updateMyAvatar($0, blob: blob, mime: "image/png", etag: "v2")
+        }
+
+        let loaded = try dbq.read { try StatsQueries.loadMyProfile($0) }
+        XCTAssertEqual(loaded?.avatarBlob, blob)
+        XCTAssertEqual(loaded?.avatarMime, "image/png")
+        XCTAssertEqual(loaded?.avatarEtag, "v2")
+        // Остальные поля не тронуты
+        XCTAssertEqual(loaded?.displayName, "Я")
+        XCTAssertEqual(loaded?.friendCode, "XK7P3M9Q2A")
+    }
+
+    func test_updateMyAvatar_noProfile_isNoOp() throws {
+        XCTAssertNoThrow(try dbq.write {
+            try StatsQueries.updateMyAvatar($0, blob: Data([0x00]), mime: "image/png", etag: nil)
+        })
+        let loaded = try dbq.read { try StatsQueries.loadMyProfile($0) }
+        XCTAssertNil(loaded)
+    }
 }
