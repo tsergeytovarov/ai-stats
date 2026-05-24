@@ -109,9 +109,13 @@ final class AiuseAPIClient {
 
     func removeFriend(friendCode: String, block: Bool = false) async throws {
         let validated = try FriendCode.validated(friendCode)
+        // `block` дублируется в query И в body. Body — для backward-compat с текущим
+        // сервером, query — для устойчивости к CDN/proxy которые DELETE body выкидывают.
+        // Когда сервер начнёт читать `block` из query, body можно будет убрать.
         _ = try await request(
             path: "/friends/\(validated)",
             method: "DELETE",
+            query: ["block": block ? "true" : "false"],
             body: RemoveFriendRequest(block: block),
             authed: true,
             decodeAs: EmptyResponse.self
