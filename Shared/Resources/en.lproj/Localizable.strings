@@ -42,7 +42,7 @@
 "alert.export_failed.title" = "Export failed";
 "alert.import_failed.title" = "Import failed";
 
-"app.failed_to_start.title" = "ai-stats failed to start";
+"app.failed_to_start.title" = "Burn failed to start";
 
 "unit.never" = "never";
 "unit.commits" = "commits";

@@ -40,7 +40,7 @@
 "alert.export_failed.title" = "Ошибка экспорта";
 "alert.import_failed.title" = "Ошибка импорта";
 
-"app.failed_to_start.title" = "ai-stats не запустилось";
+"app.failed_to_start.title" = "Burn не запустилось";
 
 "unit.never" = "никогда";
 "unit.commits" = "коммитов";

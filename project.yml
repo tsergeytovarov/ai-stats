@@ -36,7 +36,8 @@ targets:
       properties:
         LSUIElement: true
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
-        CFBundleDisplayName: ai-stats
+        CFBundleDisplayName: Burn
+        CFBundleName: Burn
         CFBundleShortVersionString: "0.2.0"
         CFBundleVersion: "2"
         NSHumanReadableCopyright: "Sergey Tovarov, MIT"
@@ -49,8 +50,11 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.sergeytovarov.aistats
+        PRODUCT_NAME: Burn
+        PRODUCT_MODULE_NAME: StatsApp
         GENERATE_INFOPLIST_FILE: NO
         CODE_SIGN_ENTITLEMENTS: StatsApp/StatsApp.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
 
   StatsWidget:
     type: app-extension
@@ -64,7 +68,7 @@ targets:
     info:
       path: StatsWidget/Info.plist
       properties:
-        CFBundleDisplayName: ai-stats Widget
+        CFBundleDisplayName: Burn Widget
         CFBundleShortVersionString: "0.2.0"
         CFBundleVersion: "2"
         NSExtension:
@@ -102,5 +106,5 @@ targets:
     settings:
       base:
         BUNDLE_LOADER: "$(TEST_HOST)"
-        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/StatsApp.app/Contents/MacOS/StatsApp"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Burn.app/Contents/MacOS/Burn"
         GENERATE_INFOPLIST_FILE: YES

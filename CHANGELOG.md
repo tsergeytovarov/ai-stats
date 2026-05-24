@@ -5,6 +5,13 @@
 
 ## [Unreleased]
 
+### Rebrand → Burn
+
+- Продукт переименован: `ai-stats` → **Burn**. Затронуты только user-facing surfaces — display name в Dock/Spotlight/Cmd+Tab, заголовок окна Settings, About-строка, default-имя экспорта DB (`burn-YYYYMMDD.db`), имя виджета в Apple Widget Gallery, локализованный alert "failed to start" (en + ru).
+- Новая иконка приложения: тёмное glass-squircle + горячий уголёк (pink core, double pink/cyan glow). Рендерится из Swift+CoreGraphics-скрипта `scripts/render-app-icon.swift` для 10 размеров AppIcon.appiconset через `scripts/generate-app-icon-set.sh`.
+- Mini-ember в menu bar capsule вместо SF-символа `chart.line.uptrend.xyaxis`. Pure SwiftUI (`MiniEmberView`), цвета из `BrandColor`-токенов.
+- Внутренние идентификаторы (bundle ID `com.sergeytovarov.aistats`, target names, пути в файловой системе `~/.config/ai-stats/`, `~/Library/Application Support/ai-stats/`, NSLog-теги, User-Agent, git repo) сохранены. Их renaming — отдельный шаг под v1.0 open-source cleanup.
+
 ### Полная переделка визуала — Liquid Glass + Neon Duo (B2)
 - Поповер: единый floating glass island внизу объединяет категорию (AI / GitHub / Друзья) и период (Д/Н/М). Два отдельных segmented picker удалены. Цвет crumb меняется по вкладке: pink / cyan / нейтрал.
 - Главное число — gradient text (white → pink/cyan), фон каждой поверхности — 3-слойный (Tahoe `.glassEffect()` + внутренний radial pink top-left + radial cyan bottom-right), идентичность держится на любых обоях.

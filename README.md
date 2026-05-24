@@ -1,8 +1,10 @@
-# ai-stats
+# Burn
 
 macOS menu bar app для статистики использования AI-агентов и активности на GitHub.
 
 Статус: **v0.1 — personal MVP**.
+
+> Бывший `ai-stats`. Внутренние идентификаторы (bundle ID `com.sergeytovarov.aistats`, пути `~/.config/ai-stats/`, `~/Library/Application Support/ai-stats/`, репозиторий и Xcode-проект) пока не переименованы — это запланировано под v1.0 cleanup. На пользователя смотрит уже **Burn**: иконка в Dock, имя в Spotlight/Cmd+Tab, capsule в menu bar.
 
 **Визуал:** редизайн под Apple Liquid Glass — pink+cyan палитра с внутренним brand-градиентом (не зависит от обоев), floating glass island для переключения категорий и периода, виджеты на едином visual language.
 

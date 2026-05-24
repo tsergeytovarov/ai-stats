@@ -29,7 +29,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         )
         let hosting = NSHostingController(rootView: view)
         let win = NSWindow(contentViewController: hosting)
-        win.title = "ai-stats Settings"
+        win.title = "Burn Settings"
         win.styleMask = [.titled, .closable]
         win.delegate = self
         win.center()

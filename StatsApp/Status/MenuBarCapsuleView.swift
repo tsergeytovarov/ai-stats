@@ -5,8 +5,7 @@ struct MenuBarCapsuleView: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Image(systemName: "chart.line.uptrend.xyaxis")
-                .font(.system(size: 10, weight: .semibold))
+            MiniEmberView(size: 12)
             Text(priceText)
                 .font(.system(size: 11, weight: .semibold))
                 .monospacedDigit()

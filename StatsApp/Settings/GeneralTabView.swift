@@ -32,7 +32,7 @@ struct GeneralTabView: View {
             }
 
             Spacer()
-            Text("ai-stats \(version)").font(.caption).foregroundStyle(.secondary)
+            Text("Burn \(version)").font(.caption).foregroundStyle(.secondary)
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

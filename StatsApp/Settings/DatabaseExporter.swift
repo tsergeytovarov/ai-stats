@@ -6,7 +6,7 @@ enum DatabaseExporter {
     static func runExport(pool: DatabasePool, parentWindow: NSWindow?) async {
         let panel = NSSavePanel()
         panel.allowedContentTypes = []
-        panel.nameFieldStringValue = "ai-stats-\(DateUtils.isoDayCompact(Date())).db"
+        panel.nameFieldStringValue = "burn-\(DateUtils.isoDayCompact(Date())).db"
 
         let response: NSApplication.ModalResponse
         if let window = parentWindow {

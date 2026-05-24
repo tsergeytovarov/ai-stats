@@ -20,7 +20,7 @@ struct StatsWidget: Widget {
             StatsWidgetView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
         }
-        .configurationDisplayName("ai-stats")
+        .configurationDisplayName("Burn")
         .description("AI usage и GitHub активность за выбранный период.")
         .supportedFamilies([.systemSmall, .systemMedium, .systemLarge])
     }
