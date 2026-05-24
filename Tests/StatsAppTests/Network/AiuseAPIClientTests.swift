@@ -283,4 +283,60 @@ final class AiuseAPIClientTests: XCTestCase {
         XCTAssertNil(result, "404 → nil")
     }
 
+    // MARK: - request: response size cap
+
+    func testRequest_rejectsHugeJSONViaContentLength() async {
+        // Сервер заявляет о 2 MB → отваливаемся ДО чтения тела.
+        MockURLProtocol.responder = { _ in
+            let resp = HTTPURLResponse(
+                url: URL(string: "https://test.local/api/friends")!,
+                statusCode: 200, httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json", "Content-Length": String(2 * 1024 * 1024)]
+            )!
+            return (resp, Data())
+        }
+        do {
+            _ = try await client.listFriends()
+            XCTFail("ожидали responseTooLarge")
+        } catch AiuseAPIError.responseTooLarge(let bytes) {
+            XCTAssertGreaterThan(bytes, 1024 * 1024)
+        } catch {
+            XCTFail("неожиданная ошибка: \(error)")
+        }
+    }
+
+    func testRequest_rejectsHugeJSONViaStreamCap() async {
+        // Без Content-Length, но реальный body > 1 MB.
+        let bigBody = Data(repeating: 0x7B, count: 1_200_000) // 1.2 MB
+        MockURLProtocol.responder = { _ in
+            let resp = HTTPURLResponse(
+                url: URL(string: "https://test.local/api/friends")!,
+                statusCode: 200, httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (resp, bigBody)
+        }
+        do {
+            _ = try await client.listFriends()
+            XCTFail("ожидали responseTooLarge")
+        } catch AiuseAPIError.responseTooLarge {
+            // OK
+        } catch {
+            XCTFail("неожиданная ошибка: \(error)")
+        }
+    }
+
+    func testRequest_passesSmallResponseThrough() async throws {
+        // Регрессионный — на маленьких ответах ничего не сломалось после refactor'а на bytes(for:).
+        MockURLProtocol.responder = { _ in
+            let resp = HTTPURLResponse(
+                url: URL(string: "https://test.local/api/friends")!,
+                statusCode: 200, httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (resp, Data(#"{"friends":[]}"#.utf8))
+        }
+        let friends = try await client.listFriends()
+        XCTAssertEqual(friends.count, 0)
+    }
 }
