@@ -177,6 +177,11 @@ struct CcusageFetcher: Fetcher {
         let process = Process()
         process.executableURL = try resolveExecutable(head)
         process.arguments = args
+        // GUI-приложение получает PATH = /usr/bin:/bin без brew/nvm. Child
+        // process (npx → node) запустится через shebang `#!/usr/bin/env node`,
+        // и `env` ищет node ровно в этом PATH → exit 127. Прокидываем child'у
+        // расширенный PATH по тем же дирам что и resolveExecutable.
+        process.environment = Self.enrichedEnvironment(base: ProcessInfo.processInfo.environment)
 
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
@@ -198,13 +203,35 @@ struct CcusageFetcher: Fetcher {
         return .aiUsage(payload)
     }
 
+    /// Стандартные пути, где у разработчика обычно установлены node/npx/bun
+    /// помимо системного PATH. Используется и для resolveExecutable, и для env
+    /// дочернего процесса (чтобы npx → node работал из GUI-приложения).
+    static func extraSearchPaths(home: String = NSHomeDirectory()) -> [String] {
+        ["/opt/homebrew/bin", "/usr/local/bin", "\(home)/.bun/bin"]
+    }
+
+    /// Возвращает env с PATH = extras + base.PATH, без дублирующихся директорий.
+    /// Pure-функция — тестируется без Process.
+    static func enrichedEnvironment(base: [String: String]) -> [String: String] {
+        let basePath = base["PATH"] ?? ""
+        let baseDirs = basePath.split(separator: ":").map(String.init)
+        var seen: Set<String> = []
+        var merged: [String] = []
+        for dir in extraSearchPaths() + baseDirs where !dir.isEmpty && seen.insert(dir).inserted {
+            merged.append(dir)
+        }
+        var env = base
+        env["PATH"] = merged.joined(separator: ":")
+        return env
+    }
+
     private func resolveExecutable(_ name: String) throws -> URL {
         if name.hasPrefix("/") { return URL(fileURLWithPath: name) }
 
         let candidatePaths = (ProcessInfo.processInfo.environment["PATH"] ?? "")
             .split(separator: ":")
             .map(String.init)
-            + ["/opt/homebrew/bin", "/usr/local/bin", "\(NSHomeDirectory())/.bun/bin"]
+            + Self.extraSearchPaths()
 
         for dir in candidatePaths {
             let candidate = URL(fileURLWithPath: dir).appendingPathComponent(name)

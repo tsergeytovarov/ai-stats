@@ -5,6 +5,13 @@
 
 ## [Unreleased]
 
+### Fix: ccusage из GUI снова работает (env PATH для child-процесса)
+
+- ccusage не запускался: `processFailed(exitCode: 127, stderr: "env: node: No such file or directory")`. GUI-приложение наследует PATH = `/usr/bin:/bin` без brew/nvm, `npx` через shebang `#!/usr/bin/env node` ищет node в этом голом PATH и валится.
+- `CcusageFetcher` теперь явно задаёт `process.environment` с расширенным PATH (`/opt/homebrew/bin`, `/usr/local/bin`, `~/.bun/bin` плюс существующий). Логика `extraSearchPaths` общая для `resolveExecutable` и env'а child-процесса.
+- Тесты на pure-функцию `enrichedEnvironment`: prepend brew к чистому PATH, no-dup при повторе, обработка пустого PATH, сохранение прочих ключей.
+- Симптом: виджеты по нулям, новые данные не накапливались. Это и было причиной сегодняшних "$0" в Small/Medium и "Пока никого" в Large.
+
 ### Аватарка профиля — отображение и смена
 
 - Свой аватар хранится локально как BLOB в `my_profile` (поля `avatar_blob`, `avatar_mime`, `avatar_etag`, миграция v8) — по аналогии с `friend_profiles`. `avatar_path` остаётся как legacy-колонка, удалю позже.
