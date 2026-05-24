@@ -43,10 +43,15 @@ struct AccountTabView: View {
         TextField("Имя", text: $newName)
             .textFieldStyle(.roundedBorder)
 
-        HStack {
-            Button("Выбрать аватарку") { pickAvatar() }
-            if let pickedAvatar {
-                Text("\(pickedAvatar.count) байт").font(.caption).foregroundStyle(.secondary)
+        HStack(spacing: 12) {
+            AvatarView(data: pickedAvatar, size: 48)
+            VStack(alignment: .leading, spacing: 4) {
+                Button(pickedAvatar == nil ? "Выбрать аватарку" : "Сменить аватарку") {
+                    pickAvatar()
+                }
+                if let pickedAvatar {
+                    Text("\(pickedAvatar.count) байт").font(.caption).foregroundStyle(.secondary)
+                }
             }
         }
 
@@ -66,9 +71,7 @@ struct AccountTabView: View {
     @ViewBuilder
     private func createdView(profile: MyProfileRow) -> some View {
         HStack(spacing: 12) {
-            Image(systemName: "person.crop.circle")
-                .resizable().frame(width: 48, height: 48)
-                .foregroundStyle(.secondary)
+            AvatarView(data: profile.avatarBlob, size: 48)
             VStack(alignment: .leading, spacing: 2) {
                 if isEditingName {
                     HStack {
@@ -90,6 +93,12 @@ struct AccountTabView: View {
                         .font(.caption)
                     }
                 }
+                Button(profile.avatarBlob == nil ? "Добавить аватарку" : "Сменить аватарку") {
+                    changeAvatar()
+                }
+                .buttonStyle(.borderless)
+                .font(.caption)
+                .disabled(viewModel.isWorking)
                 Text("server_user_id: \(profile.serverUserId)").font(.caption).foregroundStyle(.secondary)
             }
         }
@@ -167,22 +176,36 @@ struct AccountTabView: View {
     }
 
     private func pickAvatar() {
+        guard let picked = pickAvatarFile() else { return }
+        pickedAvatar = picked.data
+        pickedAvatarMime = picked.mime
+    }
+
+    /// Для существующего аккаунта: выбрать файл и сразу залить через VM.
+    private func changeAvatar() {
+        guard let picked = pickAvatarFile() else { return }
+        Task { await viewModel.updateAvatar(picked.data, mime: picked.mime) }
+    }
+
+    /// Открывает NSOpenPanel, читает JPEG/PNG, валидирует размер.
+    /// Ошибки кладёт в viewModel.errorMessage и возвращает nil.
+    private func pickAvatarFile() -> (data: Data, mime: String)? {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.jpeg, .png]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        if panel.runModal() == .OK, let url = panel.url {
-            do {
-                let data = try Data(contentsOf: url)
-                guard data.count <= 200 * 1024 else {
-                    viewModel.errorMessage = "Аватарка слишком большая (\(data.count) байт). Максимум 200 KB."
-                    return
-                }
-                pickedAvatar = data
-                pickedAvatarMime = url.pathExtension.lowercased() == "png" ? "image/png" : "image/jpeg"
-            } catch {
-                viewModel.errorMessage = "Не удалось прочитать файл: \(error.localizedDescription)"
+        guard panel.runModal() == .OK, let url = panel.url else { return nil }
+        do {
+            let data = try Data(contentsOf: url)
+            guard data.count <= 200 * 1024 else {
+                viewModel.errorMessage = "Аватарка слишком большая (\(data.count) байт). Максимум 200 KB."
+                return nil
             }
+            let mime = url.pathExtension.lowercased() == "png" ? "image/png" : "image/jpeg"
+            return (data, mime)
+        } catch {
+            viewModel.errorMessage = "Не удалось прочитать файл: \(error.localizedDescription)"
+            return nil
         }
     }
 }
