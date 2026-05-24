@@ -14,13 +14,13 @@ final class AccountTabViewModel: ObservableObject {
     @Published var isWorking: Bool = false
 
     private let api: AiuseAPIClient
-    private let keychain: KeychainStore
+    private let secretsStore: SecretsStore
     private let secretBox: SecretBox
     private let db: any DatabaseWriter
 
-    init(api: AiuseAPIClient, keychain: KeychainStore, secretBox: SecretBox, db: any DatabaseWriter) {
+    init(api: AiuseAPIClient, secretsStore: SecretsStore, secretBox: SecretBox, db: any DatabaseWriter) {
         self.api = api
-        self.keychain = keychain
+        self.secretsStore = secretsStore
         self.secretBox = secretBox
         self.db = db
     }
@@ -48,7 +48,7 @@ final class AccountTabViewModel: ObservableObject {
             let resp = try await api.createProfile(
                 displayName: displayName, avatar: avatar, avatarMime: avatarMime
             )
-            try keychain.set(resp.apiSecret, account: AiuseKeychain.account, service: AiuseKeychain.service)
+            try secretsStore.setAiuse(resp.apiSecret)
             secretBox.value = resp.apiSecret  // обновляем memory cache
 
             let row = MyProfileRow(
@@ -144,7 +144,7 @@ final class AccountTabViewModel: ObservableObject {
         defer { isWorking = false }
         do {
             try await api.deleteAccount()
-            try keychain.delete(account: AiuseKeychain.account, service: AiuseKeychain.service)
+            try secretsStore.setAiuse(String?.none)  // оставляет combined-item с github внутри
             secretBox.value = nil  // чистим memory cache
             try await db.write { try StatsQueries.deleteMyProfile($0) }
             state = .notCreated

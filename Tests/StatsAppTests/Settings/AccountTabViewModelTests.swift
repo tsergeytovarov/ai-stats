@@ -7,6 +7,7 @@ final class AccountTabViewModelTests: XCTestCase {
     var dbq: DatabaseQueue!
     var client: AiuseAPIClient!
     var keychain: MemoryKeychainStore!
+    var secretsStore: SecretsStore!
     var secretBox: SecretBox!
     var vm: AccountTabViewModel!
 
@@ -18,6 +19,7 @@ final class AccountTabViewModelTests: XCTestCase {
         config.protocolClasses = [MockURLProtocol.self]
         let session = URLSession(configuration: config)
         keychain = MemoryKeychainStore()
+        secretsStore = SecretsStore(keychain: keychain)
         secretBox = SecretBox()
         secretBox.value = "test-secret"
         client = AiuseAPIClient(
@@ -25,7 +27,7 @@ final class AccountTabViewModelTests: XCTestCase {
             secretProvider: { [secretBox] in secretBox?.value },
             session: session
         )
-        vm = AccountTabViewModel(api: client, keychain: keychain, secretBox: secretBox, db: dbq)
+        vm = AccountTabViewModel(api: client, secretsStore: secretsStore, secretBox: secretBox, db: dbq)
         MockURLProtocol.responder = nil
         MockURLProtocol.lastRequest = nil
         MockURLProtocol.lastBody = nil

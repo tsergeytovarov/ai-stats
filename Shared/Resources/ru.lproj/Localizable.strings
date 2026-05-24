@@ -25,6 +25,10 @@
 "settings.sync" = "Sync";
 "settings.refresh_now" = "Обновить сейчас";
 
+"settings.startup" = "Запуск";
+"settings.launch_at_login" = "Запускать Burn при входе в систему";
+"settings.launch_at_login.requires_approval" = "Системе нужно подтвердить запуск — открой Системные настройки → Основные → Объекты входа и включи Burn там.";
+
 "alert.config_initialized.title" = "Конфиг создан";
 "alert.config_initialized.body %@" = "По адресу %@ создан конфиг по умолчанию. Заполни GitHub токен (опционально) и перезапусти app. AI usage работает и без него.";
 "alert.config_initialized.open" = "Открыть конфиг";
