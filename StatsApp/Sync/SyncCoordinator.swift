@@ -126,6 +126,52 @@ final class SyncCoordinator {
     private func buildAndWriteWidgetSnapshot() throws {
         let snapshot = try buildSnapshot()
         try WidgetSnapshotIO.write(snapshot)
+        try? syncAvatarsToWidgetContainer(snapshot: snapshot)
+    }
+
+    /// Копирует blob'ы из my_profile/friend_profiles в widget sandbox для всех
+    /// friend_code, упомянутых в snapshot.leaderboard. Widget сам читает blob'ы
+    /// по имени файла. Тащить blob'ы внутрь snapshot.json нерационально —
+    /// 50KB×8 = ~400KB JSON на каждый timeline reload.
+    private func syncAvatarsToWidgetContainer(snapshot: WidgetSnapshot) throws {
+        // Собираем уникальные friend_code из всех периодов
+        var codes: Set<String> = []
+        for period in [snapshot.day, snapshot.week, snapshot.month] {
+            guard let lb = period.leaderboard else { continue }
+            for e in lb.entries where !e.friendCode.isEmpty { codes.insert(e.friendCode) }
+            if let me = lb.meBelow, !me.friendCode.isEmpty { codes.insert(me.friendCode) }
+        }
+        guard !codes.isEmpty else {
+            WidgetSnapshotIO.pruneAvatars(keep: [])
+            return
+        }
+
+        // Загружаем blob'ы за один read и пишем в widget container
+        struct AvatarBlob { let code: String; let data: Data }
+        let blobs: [AvatarBlob] = try db.read { db in
+            var result: [AvatarBlob] = []
+            // friend_profiles
+            let friends = try FriendProfileRow
+                .filter(codes.contains(FriendProfileRow.Columns.friendCode))
+                .fetchAll(db)
+            for row in friends {
+                if let blob = row.avatarBlob {
+                    result.append(AvatarBlob(code: row.friendCode, data: blob))
+                }
+            }
+            // my_profile отдельно — лежит в другой таблице
+            if let me = try StatsQueries.loadMyProfile(db),
+               codes.contains(me.friendCode),
+               let blob = me.avatarBlob {
+                result.append(AvatarBlob(code: me.friendCode, data: blob))
+            }
+            return result
+        }
+
+        for b in blobs {
+            try? WidgetSnapshotIO.writeAvatar(friendCode: b.code, data: b.data)
+        }
+        WidgetSnapshotIO.pruneAvatars(keep: codes)
     }
 
     private static func makeSlice(
@@ -179,6 +225,7 @@ final class SyncCoordinator {
             WidgetSnapshot.LeaderboardSlice.Entry(
                 rank: e.rank,
                 previousRank: e.previousRank,
+                friendCode: e.friendCode,
                 displayName: e.displayName,
                 tokensTotal: e.tokensTotal,
                 isMe: e.isMe

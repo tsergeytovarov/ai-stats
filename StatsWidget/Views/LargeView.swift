@@ -72,7 +72,8 @@ struct LargeView: View {
                     ForEach(Array(board.entries.prefix(4).enumerated()), id: \.offset) { idx, peer in
                         FriendRow(rank: idx + 1, name: peer.displayName,
                                   valueText: DropdownFormat.tokens(peer.tokensTotal),
-                                  isMe: peer.isMe)
+                                  isMe: peer.isMe,
+                                  avatarData: WidgetSnapshotIO.readAvatar(friendCode: peer.friendCode))
                     }
                 } else {
                     Text("widget.leaderboard.empty")
