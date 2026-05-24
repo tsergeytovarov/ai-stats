@@ -33,7 +33,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         await c.dropdownViewModel.reload()
                     }
                 },
-                onOpenSettings: { [weak self] in self?.openSettings() }
+                onOpenSettings: { [weak self] in self?.openSettings() },
+                onQuit: { NSApp.terminate(nil) }
             )
             statusController?.install()
 

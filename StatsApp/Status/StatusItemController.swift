@@ -9,11 +9,18 @@ final class StatusItemController: NSObject {
     private let viewModel: DropdownViewModel
     private let onRefresh: () -> Void
     private let onOpenSettings: () -> Void
+    private let onQuit: () -> Void
 
-    init(viewModel: DropdownViewModel, onRefresh: @escaping () -> Void, onOpenSettings: @escaping () -> Void) {
+    init(
+        viewModel: DropdownViewModel,
+        onRefresh: @escaping () -> Void,
+        onOpenSettings: @escaping () -> Void,
+        onQuit: @escaping () -> Void
+    ) {
         self.viewModel = viewModel
         self.onRefresh = onRefresh
         self.onOpenSettings = onOpenSettings
+        self.onQuit = onQuit
     }
 
     func install() {
@@ -97,6 +104,10 @@ final class StatusItemController: NSObject {
                 onOpenSettings: { [weak self] in
                     self?.popover?.performClose(nil)
                     self?.onOpenSettings()
+                },
+                onQuit: { [weak self] in
+                    self?.popover?.performClose(nil)
+                    self?.onQuit()
                 }
             ))
             pop.contentViewController = hosting
