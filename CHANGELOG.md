@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-05-24
+
+### Fix: menu bar capsule + кнопка Quit
+
+- **Capsule в menu bar сразу нормального размера.** Раньше при старте появлялся обрезанный, рос в 2-3 стадии после кликов. Корень — `NSHostingView.fittingSize` на status bar button возвращал мусор до полного first-layout pass'а SwiftUI. Заменил на детерминированный расчёт ширины через `NSString.size(withAttributes:)` с тем же шрифтом — никакой зависимости от SwiftUI layout, ширина считается мгновенно из priceText.
+- **Кнопка Quit** в footer popover'а (третья иконка `power` рядом с refresh + gear). Раньше из-за `LSUIElement=true` quit'ить app можно было только через Activity Monitor.
+- **Single-instance guard.** Запуск второй копии (через `open`, Spotlight, и т.п.) теперь активирует уже работающую и завершает себя. Раньше каждый запуск создавал новый `NSStatusItem` → 5 одинаковых иконок в menu bar. Отключается под XCTest.
+
 ## [0.4.0] — 2026-05-24
 
 ### Launch at login + меньше Keychain prompts
