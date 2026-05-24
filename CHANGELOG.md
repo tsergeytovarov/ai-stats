@@ -5,6 +5,13 @@
 
 ## [Unreleased]
 
+### Distribution: DMG-сборка + Homebrew Cask
+
+- **`scripts/build-dmg.sh`** — собирает Release-сборку через xcodebuild (ad-hoc подпись из `project.yml`), упаковывает в DMG через `create-dmg` с drag-to-Applications layout. На выходе печатает SHA256 для Cask formula. Без notarization (требует Apple Developer Program $99/год — пока пропускаем; для distribution через `brew install --cask` достаточно ad-hoc подписи + cask автоматически снимает quarantine).
+- **`homebrew/ai-stats.rb`** — шаблон Cask formula с placeholder для SHA256. README в `homebrew/` объясняет как опубликовать в отдельный tap-репозиторий (`tsergeytovarov/homebrew-tap`).
+- **README.md** — секция «Установка» с двумя путями: через Homebrew Cask (без Gatekeeper alert'а) и прямым DMG-скачиванием (с инструкцией про Right-click → Open для первого запуска ad-hoc подписанного app'а).
+- **Не делаем:** sandbox (#9) + App Group для widget (#12) — оба требовали бы либо подписи Developer ID cert'ом, либо overhead для нашего use-case с npx subprocess + dotfiles. Sandbox реально нужен только для App Store; для DMG-distribution Hardened Runtime обязателен только при notarization, которую мы пока не делаем.
+
 ### Security pass #4 — гигиена (backup rotation, DELETE dual-send)
 
 - **`DatabaseImporter` теперь чистит старые бэкапы** после успешного импорта — оставляет последние 3 (`stats.db.backup-<timestamp>`). Раньше копились вечно, каждый = размер текущей БД. Файлы не с нашим префиксом не трогаем. На failure-пути бэкапы не вычищаем — safety net остаётся.
