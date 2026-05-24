@@ -15,6 +15,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsController: SettingsWindowController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Single-instance guard. LSUIElement-app без Dock-иконки → юзер может
+        // случайно запустить несколько копий через `open` или Spotlight, каждая
+        // создаёт свой NSStatusItem → в menu bar появляется 5 одинаковых иконок.
+        // Если уже есть другой инстанс — активируем его и завершаемся.
+        //
+        // Отключаем под XCTest: test host = тоже Burn.app, и если в menu bar уже
+        // запущена prod-копия — guard убил бы test runner.
+        let isRunningTests = NSClassFromString("XCTest") != nil
+        if !isRunningTests, let bundleID = Bundle.main.bundleIdentifier {
+            let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+                .filter { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }
+            if let other = running.first {
+                other.activate(options: [.activateAllWindows])
+                NSApp.terminate(nil)
+                return
+            }
+        }
+
         do {
             let container = try AppContainer()
             self.container = container

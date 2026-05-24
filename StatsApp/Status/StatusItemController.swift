@@ -23,31 +23,44 @@ final class StatusItemController: NSObject {
         self.onQuit = onQuit
     }
 
+    // Геометрия capsule — должна точно соответствовать MenuBarCapsuleView:
+    //   HStack(spacing: 4) { MiniEmberView(size: 12); Text(...) }
+    //     .padding(.horizontal, 8)
+    // Раньше пытались читать fittingSize у NSHostingView — но SwiftUI на status
+    // bar button даёт неверные размеры до полного first-layout. Capsule рос в
+    // 3 стадии при кликах. Сейчас считаем ширину сами — детерминированно,
+    // никакой зависимости от SwiftUI layout pass'а.
+    private static let emberSize: CGFloat = 12
+    private static let interItemSpacing: CGFloat = 4
+    private static let horizontalPadding: CGFloat = 8 * 2  // лево + право
+
+    /// Считает ширину capsule под priceText. Использует NSString.size(...)
+    /// с тем же шрифтом что MenuBarCapsuleView (11pt semibold monospaced digit).
+    /// nonisolated — pure-функция, не трогает actor state, тестируется без MainActor.
+    nonisolated static func capsuleWidth(for priceText: String) -> CGFloat {
+        let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
+        let textWidth = (priceText as NSString)
+            .size(withAttributes: [.font: font])
+            .width
+        return ceil(emberSize + interItemSpacing + textWidth + horizontalPadding)
+    }
+
     func install() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        // Стартуем сразу с правильной шириной — никаких 3-стадийных мерцаний.
+        let initialPrice = "$0.00"
+        let initialWidth = Self.capsuleWidth(for: initialPrice)
+        let item = NSStatusBar.system.statusItem(withLength: initialWidth)
         if let button = item.button {
             button.title = ""
             button.target = self
             button.action = #selector(togglePopover(_:))
 
-            // Создаём NSHostingView один раз — переиспользуем между обновлениями.
-            // Раньше пересоздавали на каждый refresh — это терялок view state, плюс
-            // на первом install SwiftUI считал fittingSize до того как view получит
-            // window context → размер был мусором, capsule выглядел обрезанным.
-            // Чинится тремя выстрелами: persistent view + addSubview ДО измерения +
-            // layoutSubtreeIfNeeded перед чтением размера.
-            let hosting = NSHostingView(rootView: MenuBarCapsuleView(priceText: "$0.00"))
-            hosting.frame = NSRect(x: 0, y: 0, width: 60, height: NSStatusBar.system.thickness)
+            let hosting = NSHostingView(rootView: MenuBarCapsuleView(priceText: initialPrice))
+            hosting.frame = NSRect(x: 0, y: 0, width: initialWidth, height: NSStatusBar.system.thickness)
             button.addSubview(hosting)
             self.capsuleHosting = hosting
         }
         statusItem = item
-
-        // Первый layout: button уже в window, hosting в hierarchy → fittingSize вернёт
-        // правильный размер. На следующем runloop'е чтобы SwiftUI успел начальный pass.
-        DispatchQueue.main.async { [weak self] in
-            self?.layoutCapsule()
-        }
 
         // Обновляем заголовок при изменении aiTotals.
         Task { @MainActor [weak self] in
@@ -67,21 +80,12 @@ final class StatusItemController: NSObject {
 
     private func updateCapsule(priceText: String) {
         guard let hosting = capsuleHosting else { return }
-        // Обновляем rootView (SwiftUI diff'нет содержимое) — view state не теряется.
+        // Обновляем SwiftUI rootView (diff'ит содержимое, view state сохраняется)
+        // и пересчитываем ширину детерминированно из priceText.
         hosting.rootView = MenuBarCapsuleView(priceText: priceText)
-        layoutCapsule()
-    }
-
-    /// Принудительный layout pass + чтение реального fittingSize + обновление length
-    /// statusItem'а и frame'а hosting view. Используется при install и при каждом обновлении.
-    private func layoutCapsule() {
-        guard let hosting = capsuleHosting else { return }
-        // Прогоняем layout subtree — SwiftUI пересчитает intrinsic размеры.
-        hosting.layoutSubtreeIfNeeded()
-        let fitting = hosting.fittingSize
-        let menuBarHeight = NSStatusBar.system.thickness
-        hosting.frame = NSRect(x: 0, y: 0, width: fitting.width, height: menuBarHeight)
-        statusItem?.length = fitting.width
+        let width = Self.capsuleWidth(for: priceText)
+        hosting.frame = NSRect(x: 0, y: 0, width: width, height: NSStatusBar.system.thickness)
+        statusItem?.length = width
         statusItem?.button?.title = ""
     }
 
