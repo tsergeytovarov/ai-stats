@@ -5,6 +5,13 @@
 
 ## [Unreleased]
 
+### Security pass #2 — MIME/size cap на аватарки, JSON-cap, пин ccusage
+
+- **`getAvatar` теперь имеет жёсткий cap 512 KB и MIME-allowlist `{image/png, image/jpeg}`**. Закрывает RCE-вектор через ImageIO: malformed PNG/JPEG/SVG от скомпрометированного aiuse-сервера больше не доедет до `NSImage(data:)`. Чтение идёт через `URLSession.bytes(for:)` со streaming-cap'ом + Content-Length precheck. SVG специально отбит — формат позволяет JS/external refs, для нас не нужен.
+- **Все JSON-ответы от aiuse ограничены 1 MB.** Та же streaming-схема в `AiuseAPIClient.request`. Защита от OOM при скомпрометированном сервере, который захочет залить нам GB ответом на `/friends` или `/leaderboard`.
+- **`ccusage` запиннен на major 20** (`["npx", "-y", "ccusage@20"]` вместо `@latest`). `@latest` тянул supply-chain risk: malicious 21.0.0 в npm подхватился бы автоматически на следующий sync. Теперь только bug-fix внутри 20.x. Для апгрейда — менять руками.
+- Новые ошибки: `AiuseAPIError.avatarTooLarge`, `.avatarBadMime`, `.responseTooLarge` — с понятными сообщениями для UI.
+
 ### Security pass #1 — PAT в Keychain, https-only для aiuse, валидация friend_code
 
 - **GitHub PAT мигрирован из `~/.config/ai-stats/config.json` в Keychain** (service `tech.popovs.aistats.github`). При первом запуске после апдейта токен автоматически переезжает в Keychain, а поле `github_token` в JSON зануляется — plaintext-токен больше не лежит на диске с правами `0644`. Если нужно сменить токен — впиши в `github_token`, перезапусти, токен снова уедет в Keychain.
