@@ -209,7 +209,8 @@ struct DropdownLeaderboardSection: View {
                         rank: idx + 1,
                         name: entry.displayName,
                         valueText: DropdownFormat.tokens(entry.tokensTotal),
-                        isMe: entry.isMe
+                        isMe: entry.isMe,
+                        avatarData: viewModel.friendAvatars[entry.friendCode]
                     )
                 }
             }

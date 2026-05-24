@@ -166,7 +166,9 @@ final class DropdownViewModel: ObservableObject {
         await reloadAvatars()
     }
 
-    /// Подгружает avatar_blob из friend_profiles для всех entries в текущем лидерборде.
+    /// Подгружает avatar_blob из friend_profiles + my_profile для всех entries
+    /// в текущем лидерборде. Свой код живёт в my_profile, не в friend_profiles —
+    /// без отдельного fetch'а моя строка осталась бы без аватарки.
     func reloadAvatars() async {
         let codes = leaderboard.map { $0.friendCode }
         guard !codes.isEmpty else { friendAvatars = [:]; return }
@@ -176,6 +178,12 @@ final class DropdownViewModel: ObservableObject {
         var map: [String: Data] = [:]
         for row in rows {
             if let blob = row.avatarBlob { map[row.friendCode] = blob }
+        }
+        // Моя строка — отдельный источник правды.
+        if let me = try? await db.read({ try StatsQueries.loadMyProfile($0) }),
+           let blob = me.avatarBlob,
+           codes.contains(me.friendCode) {
+            map[me.friendCode] = blob
         }
         friendAvatars = map
     }
