@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import SwiftUI
 import GRDB
+import os.log
 
 // Period enum lives in Shared/Period.swift — accessible to both app and widget targets.
 
@@ -104,7 +105,9 @@ final class DropdownViewModel: ObservableObject {
             self.additionsSeries = snapshot.8
             self.lastSyncDescription = relativeDescription(for: syncCoordinator?.lastSyncAt.values.max())
         } catch {
-            NSLog("ai-stats reload error: \(error)")
+            // GRDB errors могут содержать SQL — .private. Тип ошибки тоже не делаем .public,
+            // чтобы не светить internals в Console.app.
+            AppLogger.sync.error("Reload failed: \(error.localizedDescription, privacy: .private)")
         }
     }
 

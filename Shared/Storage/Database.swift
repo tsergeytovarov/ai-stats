@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import os.log
 
 enum Database {
     static func openPool(at url: URL = Paths.databaseURL) throws -> DatabasePool {
@@ -31,9 +32,10 @@ enum Database {
                     try? fm.copyItem(at: legacy, to: target)
                 }
             }
-            NSLog("ai-stats: migrated DB from \(legacyURL.path) to \(targetURL.path)")
+            // Paths содержат NSUserName → .private (личная инфа, не нужна в системных логах).
+            AppLogger.db.info("Migrated DB from \(legacyURL.path, privacy: .private) to \(targetURL.path, privacy: .private)")
         } catch {
-            NSLog("ai-stats: legacy DB migration failed: \(error)")
+            AppLogger.db.error("Legacy DB migration failed: \(error.localizedDescription, privacy: .private)")
         }
     }
 

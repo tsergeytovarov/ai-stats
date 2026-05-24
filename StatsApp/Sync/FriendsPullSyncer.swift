@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import os.log
 
 /// Тянет список друзей с сервера и обновляет локальный кэш friend_profiles.
 /// Параллельно догружает аватарки через ETag (только новые/изменённые).
@@ -68,7 +69,11 @@ final class FriendsPullSyncer {
                 )
             }
         } catch {
-            NSLog("ai-stats avatar fetch error for \(friendCode): \(error)")
+            // friend_code = ID связан с конкретным юзером → .private.
+            // error может содержать response body (см. AiuseAPIError.http) → .private.
+            AppLogger.aiuse.error(
+                "Avatar fetch failed for \(friendCode, privacy: .private): \(error.localizedDescription, privacy: .private)"
+            )
         }
     }
 
@@ -81,7 +86,7 @@ final class FriendsPullSyncer {
                 try StatsQueries.updateMyAvatar(db, blob: data, mime: mime, etag: etag)
             }
         } catch {
-            NSLog("ai-stats my-avatar fetch error: \(error)")
+            AppLogger.aiuse.error("My-avatar fetch failed: \(error.localizedDescription, privacy: .private)")
         }
     }
 }

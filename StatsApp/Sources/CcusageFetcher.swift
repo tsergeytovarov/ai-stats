@@ -143,6 +143,8 @@ enum CcusageParser {
 enum CcusageError: Error, LocalizedError {
     case processFailed(exitCode: Int32, stderr: String)
     case binaryNotFound(commandHead: String)
+    case invalidCommandPrefix(String)
+    case emptyCommandPrefix
 
     var errorDescription: String? {
         switch self {
@@ -150,6 +152,11 @@ enum CcusageError: Error, LocalizedError {
             return "ccusage exited with code \(code): \(stderr)"
         case .binaryNotFound(let head):
             return "Cannot find executable '\(head)'. Install bun or node, or fix ccusage_command in config."
+        case .invalidCommandPrefix(let head):
+            return "ccusage_command[0] должен быть 'npx', 'bunx' или абсолютный путь (получено: \"\(head)\"). " +
+                   "Это защита от подмены команды через config."
+        case .emptyCommandPrefix:
+            return "ccusage_command не может быть пустым. Используй [\"npx\", \"-y\", \"ccusage@20\"]."
         }
     }
 }
@@ -172,7 +179,12 @@ struct CcusageFetcher: Fetcher {
             "--since", sinceArg,
             "--timezone", TimeZone.current.identifier,
         ]
-        let head = commandPrefix.first ?? "npx"
+        // Валидируем ПЕРВУЮ команду до запуска Process — это закрывает arbitrary
+        // command execution через подмену config.json (см. ниже validateCommandHead).
+        guard let head = commandPrefix.first else {
+            throw CcusageError.emptyCommandPrefix
+        }
+        try Self.validateCommandHead(head)
 
         let process = Process()
         process.executableURL = try resolveExecutable(head)
@@ -203,11 +215,33 @@ struct CcusageFetcher: Fetcher {
         return .aiUsage(payload)
     }
 
-    /// Стандартные пути, где у разработчика обычно установлены node/npx/bun
-    /// помимо системного PATH. Используется и для resolveExecutable, и для env
-    /// дочернего процесса (чтобы npx → node работал из GUI-приложения).
+    /// Системные дир'ы с node/npx/bun (brew). Раньше включали и `~/.bun/bin`,
+    /// но это home-writable — любой процесс с доступом к home может подложить
+    /// fake-binary. Bun-юзеры пусть добавляют его в shell PATH (env прокидывается
+    /// child'у через enrichedEnvironment, поэтому работать будет).
     static func extraSearchPaths(home: String = NSHomeDirectory()) -> [String] {
-        ["/opt/homebrew/bin", "/usr/local/bin", "\(home)/.bun/bin"]
+        _ = home  // оставили параметр для обратной совместимости тестов
+        return ["/opt/homebrew/bin", "/usr/local/bin"]
+    }
+
+    /// Разрешённые имена команд для commandPrefix[0]. Всё остальное должно быть
+    /// абсолютным путём — иначе reject. Это закрывает возможность подсунуть
+    /// `rm` / `curl <attacker>` / etc через config.json.
+    static let allowedRelativeCommands: Set<String> = ["npx", "bunx"]
+
+    /// Валидация commandPrefix[0]. См. allowedRelativeCommands.
+    static func validateCommandHead(_ head: String) throws {
+        if head.hasPrefix("/") {
+            // Абсолютный путь — приемлемо. Existence/executability проверит resolveExecutable.
+            // Запрещаем `..` в любом виде — никаких relative ascents даже в абсолютных путях.
+            guard !head.contains("..") else {
+                throw CcusageError.invalidCommandPrefix(head)
+            }
+            return
+        }
+        guard Self.allowedRelativeCommands.contains(head) else {
+            throw CcusageError.invalidCommandPrefix(head)
+        }
     }
 
     /// Возвращает env с PATH = extras + base.PATH, без дублирующихся директорий.

@@ -1,4 +1,5 @@
 import Foundation
+import os.log
 
 enum GitHubError: Error, LocalizedError {
     case graphqlErrors([String])
@@ -138,7 +139,11 @@ struct GitHubFetcher: Fetcher {
                         do {
                             return try await self.fetchLOCForRepo(repo, viewerId: viewerId, since: since)
                         } catch {
-                            NSLog("ai-stats LOC fetch error [\(repo)]: \(error)")
+                            // repo nameWithOwner может раскрыть private репы — .private.
+                            // error содержит response body (см. GitHubError.httpStatus) — .private.
+                            AppLogger.github.error(
+                                "LOC fetch failed [\(repo, privacy: .private)]: \(error.localizedDescription, privacy: .private)"
+                            )
                             return []
                         }
                     }
@@ -196,8 +201,12 @@ struct GitHubFetcher: Fetcher {
             catch { throw GitHubError.decoding(error) }
 
             if let errs = decoded.errors, !errs.isEmpty {
-                // 404 / deleted repo etc — skip silently
-                NSLog("ai-stats LOC [\(repo)] graphql errors: \(errs.map(\.message).joined(separator: "; "))")
+                // 404 / deleted repo etc — skip silently. error messages могут содержать
+                // имена приватных репов / другую meta → .private.
+                let joined = errs.map(\.message).joined(separator: "; ")
+                AppLogger.github.warning(
+                    "LOC graphql errors [\(repo, privacy: .private)]: \(joined, privacy: .private)"
+                )
                 return []
             }
             guard let history = decoded.data?.repository?.defaultBranchRef?.target?.history else {

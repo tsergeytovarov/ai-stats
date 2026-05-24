@@ -1,5 +1,6 @@
 import Foundation
 import GRDB
+import os.log
 
 /// Тянет /api/leaderboard для всех 4 периодов и кэширует JSON-ом локально.
 /// UI-компоненты могут читать кэш для оффлайн-фолбэка.
@@ -35,7 +36,10 @@ final class LeaderboardPullSyncer {
                 // sharing_enabled = false — нормальный кейс, не падаем.
                 return saved
             } catch {
-                NSLog("ai-stats leaderboard pull error [\(period)]: \(error)")
+                // period — публичный identifier ("day"/"week"/...). error может содержать server body.
+                AppLogger.aiuse.error(
+                    "Leaderboard pull failed [\(period, privacy: .public)]: \(error.localizedDescription, privacy: .private)"
+                )
             }
         }
         return saved
