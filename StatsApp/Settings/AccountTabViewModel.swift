@@ -57,12 +57,40 @@ final class AccountTabViewModel: ObservableObject {
                 displayName: displayName,
                 avatarPath: nil,
                 sharingEnabled: true,
-                serverUserId: resp.serverUserId
+                serverUserId: resp.serverUserId,
+                avatarBlob: avatar,
+                avatarMime: avatarMime,
+                // ETag получим при первом GET /avatars/{мой_код} — пока nil,
+                // локального blob достаточно для рендера.
+                avatarEtag: nil
             )
             try await db.write { try StatsQueries.saveMyProfile($0, row) }
             state = .created(row)
         } catch {
             errorMessage = "Не удалось создать профиль: \(error.localizedDescription)"
+        }
+    }
+
+    /// Меняет аватар существующего аккаунта: PATCH /profiles/me + локальный blob.
+    /// ETag сбрасывается — догрузится в следующий sync через GET /avatars.
+    func updateAvatar(_ avatar: Data, mime: String) async {
+        guard case let .created(profile) = state else { return }
+        isWorking = true
+        defer { isWorking = false }
+        errorMessage = nil
+
+        do {
+            _ = try await api.patchProfile(avatar: avatar, avatarMime: mime)
+            try await db.write {
+                try StatsQueries.updateMyAvatar($0, blob: avatar, mime: mime, etag: nil)
+            }
+            var updated = profile
+            updated.avatarBlob = avatar
+            updated.avatarMime = mime
+            updated.avatarEtag = nil
+            state = .created(updated)
+        } catch {
+            errorMessage = "Не удалось обновить аватарку: \(error.localizedDescription)"
         }
     }
 
