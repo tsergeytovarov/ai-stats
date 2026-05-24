@@ -339,4 +339,40 @@ final class AiuseAPIClientTests: XCTestCase {
         let friends = try await client.listFriends()
         XCTAssertEqual(friends.count, 0)
     }
+
+    // MARK: - removeFriend: dual-send block (#14)
+
+    func testRemoveFriend_sendsBlockInBothQueryAndBody() async throws {
+        MockURLProtocol.responder = { _ in
+            let resp = HTTPURLResponse(
+                url: URL(string: "https://test.local/api/friends/XK7P3M9Q2A?block=true")!,
+                statusCode: 204, httpVersion: "HTTP/1.1", headerFields: nil)!
+            return (resp, Data())
+        }
+        try await client.removeFriend(friendCode: "XK7P3M9Q2A", block: true)
+
+        let req = MockURLProtocol.lastRequest
+        XCTAssertEqual(req?.httpMethod, "DELETE")
+        // Query param должен быть в URL — устойчивость к CDN/proxy которые DELETE body strip'ают.
+        XCTAssertEqual(req?.url?.query, "block=true")
+        XCTAssertEqual(req?.url?.path, "/api/friends/XK7P3M9Q2A")
+
+        // Body тоже должен присутствовать — backward-compat с сервером, который
+        // ещё не научился читать query.
+        let body = try XCTUnwrap(MockURLProtocol.lastBody)
+        let decoded = try JSONDecoder().decode([String: Bool].self, from: body)
+        XCTAssertEqual(decoded["block"], true)
+    }
+
+    func testRemoveFriend_blockFalseAlsoSentInQuery() async throws {
+        MockURLProtocol.responder = { _ in
+            let resp = HTTPURLResponse(
+                url: URL(string: "https://test.local/api/friends/XK7P3M9Q2A?block=false")!,
+                statusCode: 204, httpVersion: "HTTP/1.1", headerFields: nil)!
+            return (resp, Data())
+        }
+        try await client.removeFriend(friendCode: "XK7P3M9Q2A", block: false)
+
+        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.query, "block=false")
+    }
 }

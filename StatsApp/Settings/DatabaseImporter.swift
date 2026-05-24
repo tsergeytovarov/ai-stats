@@ -70,6 +70,10 @@ enum DatabaseImporter {
                 }
                 throw error
             }
+
+            // 4. Ротация старых бэкапов — оставляем последние backupRetentionLimit штук.
+            // Делаем ТОЛЬКО после успешного импорта; на failure-пути бэкапы не трогаем.
+            Self.rotateBackups(in: Paths.appSupportDir, keep: Self.backupRetentionLimit)
             return true
         } catch {
             let alert = NSAlert()
@@ -86,7 +90,33 @@ enum DatabaseImporter {
         formatter.dateFormat = "yyyyMMdd-HHmmss"
         formatter.timeZone = TimeZone(identifier: "UTC")
         let suffix = formatter.string(from: Date())
-        return Paths.appSupportDir.appendingPathComponent("stats.db.backup-\(suffix)")
+        return Paths.appSupportDir.appendingPathComponent("\(backupPrefix)\(suffix)")
+    }
+
+    /// Префикс для бэкапов — единственная точка правды для имени.
+    /// Должен совпадать с тем что генерит backupURL() (используется и для rotate).
+    static let backupPrefix = "stats.db.backup-"
+
+    /// Сколько бэкапов оставляем. Каждый ≈ размер текущей БД, может пухнуть.
+    static let backupRetentionLimit = 3
+
+    /// Удаляет старые бэкапы из dir, оставляя последние `keep`. Pure-функция,
+    /// тестируется на временной директории. Имена сортируем лексикографически —
+    /// формат yyyyMMdd-HHmmss это позволяет, не нужно лезть в file metadata.
+    /// Файлы НЕ с нашим префиксом игнорируются (важно — bucket с чужим shit'ом).
+    static func rotateBackups(in dir: URL, keep: Int) {
+        guard keep >= 0 else { return }
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil) else {
+            return
+        }
+        let backups = entries
+            .filter { $0.lastPathComponent.hasPrefix(backupPrefix) }
+            .sorted { $0.lastPathComponent > $1.lastPathComponent }   // newest first
+        guard backups.count > keep else { return }
+        for old in backups.dropFirst(keep) {
+            try? fm.removeItem(at: old)
+        }
     }
 }
 
