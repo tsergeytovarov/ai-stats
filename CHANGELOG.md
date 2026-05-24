@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-05-24
+
 ### Launch at login + меньше Keychain prompts
 
 - **«Запускать Burn при входе в систему»** — toggle в Settings → Общие. Внутри `SMAppService.mainApp` (нативный macOS 13+ API). Управлять можно и из System Settings → General → Login Items.
