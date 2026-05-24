@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+## [0.4.2] — 2026-05-24
+
+### Fix: переключение period, обрезание чисел в виджетах, стрелки в лидерборде
+
+- **Popover теперь обновляет цифры при смене Д/Н/М** в моменте. Раньше менялся только Crumb (заголовок), а суммы/top-models — только при повторном открытии popover'а. Корень — `Task { await reload() }` в async-форме терял objectWillChange в NSPopover'е после первого re-render'а. Сделал `reloadSync` — БД локальная, sync read миллисекундный.
+- **Виджеты больше не обрезают суммы** с многотысячными числами ("$1 029" вместо "$1.."). Шрифты были захардкожены на 30/38/46pt — для popover'а это норма, для widget-контейнера 160-200pt узко. Завёл widget-specific tokens (22/26/32pt) + страховку `minimumScaleFactor(0.5)` + `lineLimit(1)`.
+- **Стрелки ▲N / ▼N / NEW появились в popover-лидерборде** «Друзья». `previous_rank` приходил с сервера, но `FriendRow` его не использовал — `RankDelta`-компонент существовал, но ни к чему не был подключён. Подключил.
+
 ### Dev tooling: seed-скрипт для скриншотов лидерборда
 
 - `scripts/seed-demo-leaderboard.py` — подмешивает `previous_rank` в `leaderboard_cache.payload_json` всех 4 periods так, чтобы у каждой строки была своя стрелка (▲N / ▼N / NEW / без изменений). Раньше cache хранил entries без previous_rank → стрелок в popover'е не было → screenshots выглядели плоско.
