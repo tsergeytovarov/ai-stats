@@ -1,7 +1,8 @@
 import Foundation
+import os.log
 
 /// Цены в USD за 1M токенов. Источник — публичные прайсы Anthropic / OpenAI на май 2026.
-/// Когда модель отсутствует в таблице, используем нулевые ставки и логируем NSLog.
+/// Когда модель отсутствует в таблице, используем нулевые ставки и логируем через AppLogger.pricing.
 struct ModelRate: Equatable {
     let inputPerM: Double
     let outputPerM: Double
@@ -29,10 +30,11 @@ enum PricingTable {
 
     private static let unknown = ModelRate(inputPerM: 0, outputPerM: 0, cacheReadPerM: 0, cacheCreatePerM: 0)
 
-    /// Возвращает ставку. Если модели нет — нулевая ставка плюс NSLog.
+    /// Возвращает ставку. Если модели нет — нулевая ставка плюс warning в лог.
     static func rate(for model: String) -> ModelRate {
         if let r = rates[model] { return r }
-        NSLog("ai-stats pricing: unknown model '\(model)', using zero rate")
+        // Model name = public identifier (publicly известный SKU из API ответа).
+        AppLogger.pricing.warning("Unknown model '\(model, privacy: .public)', using zero rate")
         return unknown
     }
 

@@ -1,6 +1,7 @@
 import Foundation
 import GRDB
 import WidgetKit
+import os.log
 
 /// Управляет периодической синхронизацией. Single-flight per source.
 @MainActor
@@ -54,7 +55,10 @@ final class SyncCoordinator {
                 try persist(result)
             } catch {
                 capturedError = error
-                NSLog("ai-stats sync error [\(source)]: \(error)")
+                // source = "ccusage"/"github" (public). error может содержать body/stderr (private).
+                AppLogger.sync.error(
+                    "Sync failed [\(source, privacy: .public)]: \(error.localizedDescription, privacy: .private)"
+                )
             }
         }
 
@@ -68,15 +72,21 @@ final class SyncCoordinator {
         if source == "ccusage" {
             if let syncer = snapshotSyncer {
                 do { _ = try await syncer.runOnce() }
-                catch { NSLog("ai-stats aiuse snapshot sync error: \(error)") }
+                catch {
+                    AppLogger.aiuse.error("Snapshot sync failed: \(error.localizedDescription, privacy: .private)")
+                }
             }
             if let pullSyncer = friendsPullSyncer {
                 do { _ = try await pullSyncer.runOnce() }
-                catch { NSLog("ai-stats aiuse friends pull error: \(error)") }
+                catch {
+                    AppLogger.aiuse.error("Friends pull failed: \(error.localizedDescription, privacy: .private)")
+                }
             }
             if let lbSyncer = leaderboardPullSyncer {
                 do { _ = try await lbSyncer.runOnce() }
-                catch { NSLog("ai-stats aiuse leaderboard pull error: \(error)") }
+                catch {
+                    AppLogger.aiuse.error("Leaderboard pull failed: \(error.localizedDescription, privacy: .private)")
+                }
             }
         }
     }
@@ -217,7 +227,9 @@ final class SyncCoordinator {
         do {
             resp = try decoder.decode(LeaderboardResponse.self, from: data)
         } catch {
-            NSLog("ai-stats widget leaderboard decode error [\(period)]: \(error)")
+            AppLogger.widget.error(
+                "Leaderboard decode failed [\(period, privacy: .public)]: \(error.localizedDescription, privacy: .private)"
+            )
             return nil
         }
 
