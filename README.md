@@ -95,7 +95,7 @@ open build/Build/Products/Release/Burn.app
 }
 ```
 
-**Где живёт PAT.** При старте app перенесёт `github_token` в Keychain (`tech.popovs.aistats.github`) и затрёт поле в JSON — plaintext-токен не остаётся на диске. Менять токен → впиши новое значение, перезапусти, повторится миграция. Удалить — Keychain Access → найди запись `tech.popovs.aistats.github`.
+**Где живёт PAT.** При старте app перенесёт `github_token` в Keychain (`tech.popovs.aistats.secrets`, account `combined-v1` — туда же кладётся aiuse api_secret, оба в одном JSON-blob'е) и затрёт поле в JSON — plaintext-токен не остаётся на диске. Менять токен → впиши новое значение, перезапусти, повторится миграция. Удалить — Keychain Access → найди запись `tech.popovs.aistats.secrets`.
 
 **Безопасность `aiuse_api_base_url`.** Только `https://`. Любая другая схема — app откажется стартовать (Bearer-токен из Keychain не должен утечь plain-text'ом).
 
@@ -103,10 +103,29 @@ open build/Build/Products/Release/Burn.app
 
 Менять остальные поля можно — но имей в виду, что каждый sync запускает `npx ccusage` процесс на 10-30 секунд.
 
+## Почему macOS просит пароль на старте
+
+При первом запуске после установки (и после каждого апдейта) macOS показывает диалог «`Burn` хочет получить доступ к `Local Items` keychain — введите пароль». Жми **Always Allow** один раз — больше не спросит до следующего апдейта.
+
+Причина: app подписан ad-hoc (без $99/год Apple Developer ID). macOS определяет «доверенность» app'а через подпись бинаря; для ad-hoc это означает, что **любая пересборка** = новая identity = invalidated trust → новый prompt. После того как ты разрешил один раз и не обновляешь app — prompt не приходит.
+
+Что я сделал чтобы prompts'ов было меньше:
+- Оба секрета (aiuse api_secret + GitHub PAT) лежат в одном Keychain item'е (`tech.popovs.aistats.secrets`). До v0.4.0 было два item'а → два prompt'а. Теперь один на запуск.
+- Все Keychain reads делаются разово на старте + кешируются в памяти процесса. Sync'и каждые 15 минут — не дёргают Keychain.
+
+Если хочешь полностью без prompt'ов — единственный путь это подписать app настоящим Developer ID cert'ом, что упирается в Apple Developer Program ($99/год + иностранная карта для оплаты из РФ).
+
+## Запуск при входе в систему
+
+Settings → Общие → «Запускать Burn при входе в систему». Toggle регистрирует app в macOS Login Items через `SMAppService.mainApp`. Управлять можно и из System Settings → General → Login Items.
+
+При первом включении macOS может попросить approval — тогда переключатель отобьёт обратно, и в системных настройках появится pending-запись (там надо разрешить руками).
+
 ## Где живут файлы
 
 - DB: `~/Library/Application Support/ai-stats/stats.db`
 - Config: `~/.config/ai-stats/config.json`
+- Keychain: `tech.popovs.aistats.secrets` / `combined-v1` (aiuse + github в одном JSON)
 
 ## Спек и план
 

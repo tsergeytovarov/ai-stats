@@ -5,6 +5,12 @@
 
 ## [Unreleased]
 
+### Launch at login + меньше Keychain prompts
+
+- **«Запускать Burn при входе в систему»** — toggle в Settings → Общие. Внутри `SMAppService.mainApp` (нативный macOS 13+ API). Управлять можно и из System Settings → General → Login Items.
+- **Все секреты схлопнуты в один Keychain item** (`tech.popovs.aistats.secrets`, account `combined-v1`, JSON-blob с `{aiuseSecret, githubPAT}`). Раньше было два отдельных item'а → два «введите пароль» prompt'а на запуск. Теперь — один. Миграция из legacy items автоматическая при первом запуске (`SecretsStore.loadAll()`).
+- **README обновлён** — секция «Почему macOS просит пароль на старте» с честным объяснением unsigned-app behavior'а: ad-hoc подпись → каждая пересборка инвалидирует trust cache → prompt возвращается; «Always Allow» работает до следующего апдейта app'а.
+
 ## [0.3.0] — 2026-05-24
 
 ### Distribution: DMG-сборка + Homebrew Cask
