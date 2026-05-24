@@ -38,6 +38,9 @@ final class DropdownViewModel: ObservableObject {
     private let api: AiuseAPIClient?
     private let hasAccount: () -> Bool
     let githubEnabled: Bool
+    /// Когда true — loadLeaderboard читает ТОЛЬКО из локального кэша, не дёргает aiuse-сервер.
+    /// Нужно для скриншотов с seed-данными (см. scripts/seed-demo-leaderboard.py).
+    let demoMode: Bool
 
     @Published var period: Period = .day {
         didSet {
@@ -73,12 +76,14 @@ final class DropdownViewModel: ObservableObject {
          syncCoordinator: SyncCoordinator,
          api: AiuseAPIClient? = nil,
          hasAccount: @escaping () -> Bool = { false },
-         githubEnabled: Bool = true) {
+         githubEnabled: Bool = true,
+         demoMode: Bool = false) {
         self.db = db
         self.syncCoordinator = syncCoordinator
         self.api = api
         self.hasAccount = hasAccount
         self.githubEnabled = githubEnabled
+        self.demoMode = demoMode
     }
 
     /// Async-обёртка над reloadSync. Сохранена для существующих call site'ов
@@ -170,6 +175,13 @@ final class DropdownViewModel: ObservableObject {
            let data = cached.payloadJson.data(using: .utf8),
            let decoded = try? JSONDecoder().decode(LeaderboardResponse.self, from: data) {
             leaderboard = decoded.entries
+        }
+
+        // В demo_mode НЕ дёргаем сервер — иначе seed-данные затрутся real-ответом.
+        // Cached-данные из leaderboard_cache уже загружены выше — этого достаточно.
+        if demoMode {
+            await reloadAvatars()
+            return
         }
 
         // Затем свежее с сервера. На ошибке оставляем cached (если был).
