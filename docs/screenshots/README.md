@@ -22,27 +22,23 @@
 **Workflow:**
 
 ```bash
-# 1. Включить demo_mode в config — иначе при старте Burn пойдёт за свежим
-#    лидербордом в aiuse-сервер и затрёт seed за пару секунд.
-#    Открой ~/.config/ai-stats/config.json и поставь:
-#        "demo_mode": true
-#    (поле необязательное, default false)
-
-# 2. Закрыть Burn полностью
+# 1. Закрыть Burn полностью
 killall Burn
 
-# 3. Бэкап текущей БД + seed previous_rank/tokens
+# 2. Бэкап БД + seed previous_rank/tokens + включить demo_mode в config
+#    (всё одной командой)
 ./scripts/seed-demo-leaderboard.py --backup --seed
 
-# 4. Запустить app — в demo_mode он НЕ ходит на aiuse-сервер, seed жив
+# 3. Запустить app — demo_mode скипает все aiuse-syncs, seed жив
 open /Applications/Burn.app
 
-# 5. Делать скриншоты сколько надо — никто cache не трогает
+# 4. Делать скриншоты сколько надо
 
-# 6. Когда закончил: restore + убрать demo_mode из config
+# 5. Откатить — восстановить БД + выключить demo_mode
 ./scripts/seed-demo-leaderboard.py --restore
-# и руками верни "demo_mode": false (или удали поле)
 ```
+
+Скрипт сам редактирует `~/.config/ai-stats/config.json` (ставит и снимает `demo_mode`) — руками ничего трогать не надо.
 
 Что должно быть видно после `--seed`:
 

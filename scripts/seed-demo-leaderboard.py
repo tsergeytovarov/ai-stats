@@ -33,8 +33,27 @@ from pathlib import Path
 
 DB_PATH = Path.home() / "Library/Group Containers/group.com.sergeytovarov.aistats/stats.db"
 BACKUP_PATH = DB_PATH.with_suffix(".db.demo-backup")
+CONFIG_PATH = Path.home() / ".config/ai-stats/config.json"
 
 PERIODS = ["day", "week", "month", "24h"]
+
+
+def _set_demo_mode(enabled: bool) -> None:
+    """Переключает demo_mode в config.json. Сохраняет остальные поля."""
+    if not CONFIG_PATH.exists():
+        print(f"⚠  config не найден: {CONFIG_PATH}, demo_mode не выставлен")
+        return
+    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        try:
+            cfg = json.load(f)
+        except json.JSONDecodeError as e:
+            print(f"⚠  невалидный config.json: {e}")
+            return
+    cfg["demo_mode"] = enabled
+    with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2, sort_keys=True)
+        f.write("\n")
+    print(f"✓ demo_mode = {enabled} в {CONFIG_PATH}")
 
 
 def _open_db() -> sqlite3.Connection:
@@ -53,11 +72,12 @@ def backup() -> None:
 
 
 def restore() -> None:
-    """Восстанавливает stats.db из бэкапа."""
+    """Восстанавливает stats.db из бэкапа + выключает demo_mode."""
     if not BACKUP_PATH.exists():
         sys.exit(f"бэкап не найден: {BACKUP_PATH}\nнечего восстанавливать")
     shutil.copy2(BACKUP_PATH, DB_PATH)
     print(f"✓ restore ← {BACKUP_PATH}")
+    _set_demo_mode(False)
 
 
 def _seed_previous_ranks(entries: list[dict]) -> list[dict]:
@@ -168,10 +188,15 @@ def seed() -> None:
     conn.commit()
     conn.close()
     print(f"\n✓ всего обновлено periods: {touched}")
+
+    # Включаем demo_mode чтобы Burn не затёр cache при initial sync.
+    _set_demo_mode(True)
+
     print("\nТеперь:")
-    print("  1. open /Applications/Burn.app")
-    print("  2. Делай screenshots — у тебя есть ~15 секунд до следующего sync'а")
-    print("  3. Когда закончил: ./scripts/seed-demo-leaderboard.py --restore")
+    print("  1. killall Burn  (если открыт)")
+    print("  2. open /Applications/Burn.app")
+    print("  3. Делай screenshots — cache не затрётся, demo_mode выключен sync")
+    print("  4. Когда закончил: ./scripts/seed-demo-leaderboard.py --restore")
 
 
 def main() -> None:
