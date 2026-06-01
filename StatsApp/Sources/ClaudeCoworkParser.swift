@@ -8,9 +8,16 @@ enum ClaudeCoworkParser {
         timezone: TimeZone,
         now: () -> Date
     ) throws -> CcusagePayload {
-        let isoFormatter = ISO8601DateFormatter()
-        isoFormatter.formatOptions = [.withInternetDateTime]
-        let nowString = isoFormatter.string(from: now())
+        // Реальные cowork timestamps приходят с дробными секундами ("...T10:00:00.794Z"),
+        // но не гарантированно — парсим оба варианта (см. parseTimestamp).
+        let isoFractional = ISO8601DateFormatter()
+        isoFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let isoPlain = ISO8601DateFormatter()
+        isoPlain.formatOptions = [.withInternetDateTime]
+        let parseTimestamp: (String) -> Date? = { s in
+            isoFractional.date(from: s) ?? isoPlain.date(from: s)
+        }
+        let nowString = isoPlain.string(from: now())
 
         let dayFormatter = DateFormatter()
         dayFormatter.dateFormat = "yyyy-MM-dd"
@@ -34,7 +41,7 @@ enum ClaudeCoworkParser {
                     let model = message["model"] as? String,
                     let usage = message["usage"] as? [String: Any],
                     let tsString = obj["timestamp"] as? String,
-                    let timestamp = isoFormatter.date(from: tsString)
+                    let timestamp = parseTimestamp(tsString)
                 else { continue }
 
                 guard !seen.contains(msgId) else { continue }

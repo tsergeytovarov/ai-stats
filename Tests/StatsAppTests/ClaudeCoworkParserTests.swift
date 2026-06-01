@@ -68,6 +68,25 @@ final class ClaudeCoworkParserTests: XCTestCase {
         XCTAssertEqual(mr.costUsd, 0.00945, accuracy: 1e-8)
     }
 
+    // MARK: - Timestamp formats
+
+    func test_timestamp_with_fractional_seconds_is_parsed() throws {
+        // Реальные cowork timestamps приходят с миллисекундами: "...T10:00:00.794Z".
+        // ISO8601DateFormatter с [.withInternetDateTime] их не парсит → запись терялась.
+        let line = assistantLine(
+            id: "msg_001", model: "claude-opus-4-7",
+            timestamp: "2026-01-15T10:00:00.794Z",
+            inputTokens: 100, cacheCreate: 0, cacheRead: 0, outputTokens: 50
+        )
+
+        let payload = try ClaudeCoworkParser.parse(
+            files: [line], since: sinceJan1, timezone: utc, now: nowJan15
+        )
+        XCTAssertEqual(payload.dayRows.count, 1)
+        XCTAssertEqual(payload.dayRows[0].day, "2026-01-15")
+        XCTAssertEqual(payload.dayRows[0].inputTokens, 100)
+    }
+
     // MARK: - Deduplication
 
     func test_duplicate_message_id_is_counted_once() throws {
