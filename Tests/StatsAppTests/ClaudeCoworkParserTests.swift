@@ -87,6 +87,46 @@ final class ClaudeCoworkParserTests: XCTestCase {
         XCTAssertEqual(payload.dayRows[0].inputTokens, 100)
     }
 
+    // MARK: - Synthetic model filtering
+
+    func test_synthetic_model_entries_are_ignored() throws {
+        // Claude Code пишет model="<synthetic>" для служебных сообщений
+        // (compaction и т.п.). Они не должны попадать в статистику.
+        let synthetic = assistantLine(
+            id: "msg_001", model: "<synthetic>",
+            timestamp: "2026-01-15T10:00:00Z",
+            inputTokens: 100, cacheCreate: 0, cacheRead: 0, outputTokens: 50
+        )
+
+        let payload = try ClaudeCoworkParser.parse(
+            files: [synthetic], since: sinceJan1, timezone: utc, now: nowJan15
+        )
+        XCTAssertTrue(payload.dayRows.isEmpty)
+        XCTAssertTrue(payload.modelRows.isEmpty)
+    }
+
+    func test_synthetic_filtered_but_real_model_kept_same_day() throws {
+        let synthetic = assistantLine(
+            id: "msg_001", model: "<synthetic>",
+            timestamp: "2026-01-15T08:00:00Z",
+            inputTokens: 999, cacheCreate: 0, cacheRead: 0, outputTokens: 999
+        )
+        let real = assistantLine(
+            id: "msg_002", model: "claude-opus-4-7",
+            timestamp: "2026-01-15T09:00:00Z",
+            inputTokens: 100, cacheCreate: 0, cacheRead: 0, outputTokens: 50
+        )
+
+        let payload = try ClaudeCoworkParser.parse(
+            files: [combined(synthetic, real)], since: sinceJan1, timezone: utc, now: nowJan15
+        )
+        XCTAssertEqual(payload.dayRows.count, 1)
+        XCTAssertEqual(payload.dayRows[0].inputTokens, 100)   // synthetic 999 не попал
+        XCTAssertEqual(payload.dayRows[0].modelsJson, "[\"claude-opus-4-7\"]")
+        XCTAssertEqual(payload.modelRows.count, 1)
+        XCTAssertEqual(payload.modelRows[0].model, "claude-opus-4-7")
+    }
+
     // MARK: - Deduplication
 
     func test_duplicate_message_id_is_counted_once() throws {

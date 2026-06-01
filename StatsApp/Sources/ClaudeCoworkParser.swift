@@ -39,6 +39,9 @@ enum ClaudeCoworkParser {
                     let message = obj["message"] as? [String: Any],
                     let msgId = message["id"] as? String,
                     let model = message["model"] as? String,
+                    // "<synthetic>" — служебные сообщения Claude Code (compaction и т.п.),
+                    // не реальные вызовы модели. В статистику не идут.
+                    model != "<synthetic>",
                     let usage = message["usage"] as? [String: Any],
                     let tsString = obj["timestamp"] as? String,
                     let timestamp = parseTimestamp(tsString)
