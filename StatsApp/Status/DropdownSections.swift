@@ -92,7 +92,8 @@ struct DropdownAISection: View {
             } else {
                 ForEach(viewModel.topModels.prefix(5), id: \.self) { m in
                     HStack {
-                        Text(m.model).font(BrandFont.body)
+                        Text(DropdownFormat.modelDisplayName(model: m.model, source: m.source))
+                            .font(BrandFont.body)
                         Spacer()
                         Text(MoneyFormatter.popover(m.costUsd))
                             .font(BrandFont.body)

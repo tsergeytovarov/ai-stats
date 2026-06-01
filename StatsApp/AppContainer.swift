@@ -182,6 +182,7 @@ final class AppContainer {
             CcusageFetcher(commandPrefix: config.ccusageCommand, provider: provider)
         }
         sources.append(("ccusage", ccFetchers))
+        sources.append(("claude-cowork", [ClaudeCoworkFetcher()]))
         // Токен берём из Keychain-бэкенного box'а, не из конфига.
         let token = githubTokenBox.value
         if !token.isEmpty && !config.githubLogin.isEmpty {

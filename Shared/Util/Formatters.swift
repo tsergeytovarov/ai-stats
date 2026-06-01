@@ -63,6 +63,29 @@ enum DropdownFormat {
         return CostDeltaContent(arrow: arrow, amount: amount, labelKey: labelKey, direction: direction)
     }
 
+    /// Человеческое имя модели с учётом источника.
+    /// Для cowork-сессий оборачивает короткое имя: "claude-opus-4-7" → "Cowork (Opus 4.7)".
+    /// Для остальных источников возвращает model как есть.
+    static func modelDisplayName(model: String, source: String) -> String {
+        guard source == "claude-cowork" else { return model }
+        return "Cowork (\(claudeShortName(model)))"
+    }
+
+    /// "claude-opus-4-7" → "Opus 4.7", "claude-haiku-4-5-20251001" → "Haiku 4.5".
+    /// Не-Anthropic модели возвращаются как есть.
+    private static func claudeShortName(_ model: String) -> String {
+        var parts = model.split(separator: "-").map(String.init)
+        guard parts.count >= 2, parts[0] == "claude" else { return model }
+        parts.removeFirst()                                 // убираем "claude"
+        let family = parts[0].capitalized
+        // Версионные части: 1–2 цифры (не дата типа "20251001")
+        let version = parts.dropFirst()
+            .filter { $0.count <= 2 && Int($0) != nil }
+            .prefix(2)
+        guard !version.isEmpty else { return family }
+        return "\(family) \(version.joined(separator: "."))"
+    }
+
     static func formatRankDelta(current: Int, previous: Int?) -> RankDeltaContent? {
         guard let previous else {
             return RankDeltaContent(kind: .new)
