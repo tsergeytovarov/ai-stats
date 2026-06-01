@@ -5,6 +5,11 @@
 
 ## [Unreleased]
 
+### Fix: cost для claude приходит из ccusage, а не считается локально
+
+- **`claude-opus-4-8` (и любая будущая модель) теперь считается.** Раньше парсер `CcusageParser` для claude брал per-model cost из локального `PricingTable`, а тот знал только модели по состоянию майско-2026 (opus-4-7, sonnet-4-6 и т.д.). Неизвестная модель → нулевая ставка → cost = 0 → модель проваливалась мимо top-моделей в popover/виджете. `ccusage` сам хранит up-to-date прайс Anthropic в каждом релизе — теперь day-level и per-model cost берутся прямо из его JSON-вывода (`daily[].totalCost`, `modelBreakdowns[].cost`). Для codex day-level тоже из ccusage (`daily[].costUSD`); per-model по-прежнему через `PricingTable` — ccusage codex per-model cost не отдаёт.
+- **Fallback на `PricingTable` сохранён** на случай старого ccusage без поля cost — чтобы при downgrade ничего не падало.
+
 ## [0.4.2] — 2026-05-24
 
 ### Fix: переключение period, обрезание чисел в виджетах, стрелки в лидерборде

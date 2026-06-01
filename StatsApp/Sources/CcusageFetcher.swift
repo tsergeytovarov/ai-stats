@@ -14,7 +14,9 @@ enum CcusageParser {
             var modelRows: [AIUsageModelRow] = []
             for day in report.daily {
                 let modelsJson = (try? String(data: encoder.encode(day.modelNames), encoding: .utf8)) ?? "[]"
-                let cost = computeCodexCost(day)
+                // Trust ccusage costUSD на day-уровне. Fallback (старый ccusage без
+                // поля) — сумма по PricingTable, чтобы не потерять данные.
+                let cost = day.costUSD ?? computeCodexCost(day)
                 let reasoningOut = day.models?.values.reduce(0) { $0 + ($1.reasoningOutputTokens ?? 0) } ?? 0
                 dayRows.append(AIUsageRow(
                     id: nil,
@@ -58,7 +60,11 @@ enum CcusageParser {
             var modelRows: [AIUsageModelRow] = []
             for day in report.daily {
                 let modelsJson = (try? String(data: encoder.encode(day.modelsUsed), encoding: .utf8)) ?? "[]"
-                let cost = computeClaudeCost(day)
+                // Trust ccusage cost — он держит up-to-date прайс Anthropic, в т.ч.
+                // для новых моделей (claude-opus-4-8 и далее), которые наш PricingTable
+                // может не знать. Fallback — PricingTable-сумма для старых ccusage без
+                // полей cost/totalCost.
+                let cost = day.totalCost ?? computeClaudePricingTableCost(day)
                 dayRows.append(AIUsageRow(
                     id: nil,
                     day: day.date,
@@ -72,7 +78,7 @@ enum CcusageParser {
                 ))
                 if let breakdowns = day.modelBreakdowns {
                     for b in breakdowns {
-                        let modelCost = PricingTable.cost(
+                        let modelCost = b.cost ?? PricingTable.cost(
                             model: b.modelName,
                             inputTokens: b.inputTokens,
                             outputTokens: b.outputTokens,
@@ -97,8 +103,10 @@ enum CcusageParser {
         }
     }
 
-    private static func computeClaudeCost(_ day: CcusageClaudeDay) -> Double {
-        // Если breakdown есть — суммируем точно по модели.
+    /// Fallback day-level cost для случая, когда ccusage не отдал totalCost (старая
+    /// версия). Используется ТОЛЬКО как defensive fallback — модель может быть
+    /// неизвестна PricingTable (тогда вернёт 0).
+    private static func computeClaudePricingTableCost(_ day: CcusageClaudeDay) -> Double {
         if let breakdowns = day.modelBreakdowns, !breakdowns.isEmpty {
             return breakdowns.reduce(0) { acc, b in
                 acc + PricingTable.cost(
@@ -110,7 +118,6 @@ enum CcusageParser {
                 )
             }
         }
-        // Fallback — берём первую модель из списка modelsUsed и применяем её ставку к агрегату.
         let model = day.modelsUsed.first ?? ""
         return PricingTable.cost(
             model: model,

@@ -17,6 +17,9 @@ struct CcusageClaudeDay: Decodable {
     let cacheCreationTokens: Int64
     let cacheReadTokens: Int64
     let modelBreakdowns: [ClaudeModelBreakdown]?
+    /// Day-level стоимость от ccusage. Опционально — старые версии ccusage могли
+    /// не отдавать. Если nil, парсер фолбэчит на сумму per-model cost.
+    let totalCost: Double?
 }
 
 struct ClaudeModelBreakdown: Decodable {
@@ -25,6 +28,8 @@ struct ClaudeModelBreakdown: Decodable {
     let outputTokens: Int64
     let cacheCreationTokens: Int64
     let cacheReadTokens: Int64
+    /// Per-model стоимость от ccusage. Опционально — fallback см. CcusageParser.
+    let cost: Double?
 }
 
 // MARK: - Codex
@@ -39,6 +44,9 @@ struct CcusageCodexDay: Decodable {
     let outputTokens: Int64
     let cachedInputTokens: Int64
     let models: [String: CodexModelStats]?
+    /// Day-level стоимость от ccusage (поле "costUSD"). Опционально — fallback на
+    /// PricingTable-сумму по моделям, см. CcusageParser.
+    let costUSD: Double?
 
     var modelNames: [String] { models?.keys.sorted() ?? [] }
 }

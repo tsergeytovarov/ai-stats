@@ -14,10 +14,8 @@ final class CcusageParserTests: XCTestCase {
         XCTAssertEqual(day0.source, "claude")
         XCTAssertEqual(day0.inputTokens, 17800) // 12000 + 800 + 5000
         XCTAssertEqual(day0.outputTokens, 3400)
-        // opus: 10000*15 + 3000*75 + 4000*1.5 + 500*18.75 (all /1e6) = 0.390375
-        // sonnet: 2000*3 + 400*15 + 1000*0.3 + 300*3.75 (all /1e6)  = 0.013425
-        // total: 0.4038
-        XCTAssertEqual(day0.costUsd, 0.4038, accuracy: 0.0001)
+        // costUsd берётся прямо из ccusage daily[].totalCost — не считается локально.
+        XCTAssertEqual(day0.costUsd, 0.5, accuracy: 0.0001)
         XCTAssertEqual(day0.modelsJson, "[\"claude-opus-4-7\",\"claude-sonnet-4-6\"]")
         XCTAssertEqual(day0.updatedAt, "2024-05-22T10:00:00Z")
     }
@@ -42,10 +40,8 @@ final class CcusageParserTests: XCTestCase {
         // codex inputTokens = inputTokens + cachedInputTokens = 12000 + 5000
         XCTAssertEqual(day.inputTokens, 17000)
         XCTAssertEqual(day.outputTokens, 3400)
-        // gpt-5.5: 7000*10 + 2000*30 + 3000*1.25 (all /1e6) = 0.13375
-        // codex-auto-review: 5000*5 + 1400*15 + 2000*0.63 (all /1e6) = 0.04726
-        // total: ~0.18101
-        XCTAssertEqual(day.costUsd, 0.181, accuracy: 0.0001)
+        // costUsd берётся прямо из ccusage daily[].costUSD — не считается локально.
+        XCTAssertEqual(day.costUsd, 1.42, accuracy: 0.0001)
         // models из объекта-словаря, отсортированные по имени
         XCTAssertEqual(day.modelsJson, "[\"codex-auto-review\",\"gpt-5.5\"]")
     }
@@ -65,12 +61,11 @@ final class CcusageParserTests: XCTestCase {
         // inputTokens = 10000 + 500(cacheCreate) + 4000(cacheRead)
         XCTAssertEqual(opus.inputTokens, 14500)
         XCTAssertEqual(opus.outputTokens, 3000)
-        // opus cost: 10000*15 + 3000*75 + 4000*1.5 + 500*18.75 (all /1e6) = 0.390375
-        XCTAssertEqual(opus.costUsd, 0.390375, accuracy: 0.000001)
+        // costUsd берётся из ccusage modelBreakdowns[].cost напрямую.
+        XCTAssertEqual(opus.costUsd, 0.45, accuracy: 0.000001)
 
         let sonnet = payload.modelRows.first { $0.model == "claude-sonnet-4-6" && $0.day == "2024-05-20" }!
-        // sonnet cost: 2000*3 + 400*15 + 1000*0.3 + 300*3.75 (all /1e6) = 0.013425
-        XCTAssertEqual(sonnet.costUsd, 0.013425, accuracy: 0.000001)
+        XCTAssertEqual(sonnet.costUsd, 0.05, accuracy: 0.000001)
     }
 
     func test_codex_models_dict_produces_per_model_rows() throws {

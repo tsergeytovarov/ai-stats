@@ -8,20 +8,23 @@
       "cacheCreationTokens": 800,
       "cacheReadTokens": 5000,
       "totalTokens": 21200,
+      "totalCost": 0.5,
       "modelBreakdowns": [
         {
           "modelName": "claude-opus-4-7",
           "inputTokens": 10000,
           "outputTokens": 3000,
           "cacheCreationTokens": 500,
-          "cacheReadTokens": 4000
+          "cacheReadTokens": 4000,
+          "cost": 0.45
         },
         {
           "modelName": "claude-sonnet-4-6",
           "inputTokens": 2000,
           "outputTokens": 400,
           "cacheCreationTokens": 300,
-          "cacheReadTokens": 1000
+          "cacheReadTokens": 1000,
+          "cost": 0.05
         }
       ]
     },
@@ -33,13 +36,15 @@
       "cacheCreationTokens": 0,
       "cacheReadTokens": 2000,
       "totalTokens": 11500,
+      "totalCost": 0.27,
       "modelBreakdowns": [
         {
           "modelName": "claude-opus-4-7",
           "inputTokens": 8000,
           "outputTokens": 1500,
           "cacheCreationTokens": 0,
-          "cacheReadTokens": 2000
+          "cacheReadTokens": 2000,
+          "cost": 0.27
         }
       ]
     }
