@@ -1,10 +1,10 @@
 cask "ai-stats" do
-  version "0.4.3"
+  version "0.5.0"
 
   # SHA256 высчитывается на каждый релиз. Подставляется build-dmg.sh-скриптом
   # после создания DMG. Для разработки можно временно использовать :no_check,
   # но НЕ публиковать с ним — потеряешь integrity-проверку.
-  sha256 "2decb7f1a51f0f579da6d426f4ce86dfa02364e5e85c6787705335e6646f0a0a"
+  sha256 "34237082477c856f56ec8d23cfdf910fab7a384f524f25a5141b05194741679b"
 
   url "https://github.com/tsergeytovarov/ai-stats/releases/download/v#{version}/burn-#{version}.dmg"
   name "Burn"
