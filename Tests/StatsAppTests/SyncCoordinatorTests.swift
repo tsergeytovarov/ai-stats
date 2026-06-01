@@ -85,4 +85,68 @@ final class SyncCoordinatorTests: XCTestCase {
             XCTAssertNil(state.lastError)
         }
     }
+
+    /// После долгого sleep'а Mac'а dispatch-таймер мог пропустить интервалы.
+    /// При wake-нотификации coordinator обязан немедленно прогнать sync, чтобы
+    /// виджеты не оставались с устаревшими данными.
+    func test_wake_notification_triggers_sync_for_all_sources() async throws {
+        let dbq = try DatabaseQueue()
+        try Database.migrate(dbq)
+        let ccFetcher = MockFetcher(result: .aiUsage(CcusagePayload(dayRows: [], modelRows: [])))
+
+        let testCenter = NotificationCenter()
+        let testWakeName = Notification.Name("test.didWake")
+        let coordinator = await SyncCoordinator(
+            db: dbq,
+            testWakeCenter: testCenter,
+            testWakeName: testWakeName,
+            now: Date.init
+        )
+
+        await coordinator.startTimer(
+            interval: 99999,  // огромный интервал, чтобы тик от таймера в тест не приехал
+            sources: [("ccusage", [ccFetcher])]
+        )
+
+        // Шлём synthetic wake. Coordinator подписался на testCenter с testWakeName.
+        testCenter.post(name: testWakeName, object: nil)
+
+        // Дать observer'у отработать на main queue → Task @MainActor → runOnce.
+        // Polling, не sleep — чтобы не зависеть от арбитрарной задержки.
+        for _ in 0..<50 {
+            let count = await ccFetcher.callCount
+            if count >= 1 { break }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+
+        let count = await ccFetcher.callCount
+        XCTAssertEqual(count, 1, "wake notification must force sync for all sources")
+        await coordinator.stopTimer()
+    }
+
+    /// stopTimer() снимает подписку на wake — после остановки synthetic wake
+    /// не должен дёргать sync.
+    func test_stopTimer_removes_wake_observer() async throws {
+        let dbq = try DatabaseQueue()
+        try Database.migrate(dbq)
+        let ccFetcher = MockFetcher(result: .aiUsage(CcusagePayload(dayRows: [], modelRows: [])))
+
+        let testCenter = NotificationCenter()
+        let testWakeName = Notification.Name("test.didWake.stop")
+        let coordinator = await SyncCoordinator(
+            db: dbq,
+            testWakeCenter: testCenter,
+            testWakeName: testWakeName,
+            now: Date.init
+        )
+
+        await coordinator.startTimer(interval: 99999, sources: [("ccusage", [ccFetcher])])
+        await coordinator.stopTimer()
+        testCenter.post(name: testWakeName, object: nil)
+
+        // Подождём — если observer всё ещё активен, sync пройдёт. Должен НЕ пройти.
+        try await Task.sleep(nanoseconds: 200_000_000)
+        let count = await ccFetcher.callCount
+        XCTAssertEqual(count, 0, "stopTimer must unsubscribe from wake notifications")
+    }
 }

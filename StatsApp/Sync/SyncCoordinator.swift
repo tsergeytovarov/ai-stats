@@ -1,6 +1,9 @@
 import Foundation
 import GRDB
 import WidgetKit
+#if canImport(AppKit)
+import AppKit
+#endif
 import os.log
 
 /// Управляет периодической синхронизацией. Single-flight per source.
@@ -11,35 +14,112 @@ final class SyncCoordinator {
     private let snapshotSyncer: SnapshotSyncer?
     private let friendsPullSyncer: FriendsPullSyncer?
     private let leaderboardPullSyncer: LeaderboardPullSyncer?
+    /// Тесты прокидывают свой NotificationCenter + имя, чтобы шлать synthetic wake.
+    /// В проде nil — берётся NSWorkspace.shared.notificationCenter в installWakeObserverIfNeeded().
+    private let testWakeCenter: NotificationCenter?
+    private let testWakeName: Notification.Name?
     private var inFlight: Set<String> = []
-    private var timer: Timer?
+    private var dispatchTimer: DispatchSourceTimer?
+    private var wakeObserver: NSObjectProtocol?
+    private var wakeObserverCenter: NotificationCenter?
+    private var configuredSources: [(name: String, fetchers: [any Fetcher])] = []
+    private var configuredInterval: TimeInterval = 0
     private(set) var lastSyncAt: [String: Date] = [:]
 
     init(db: any DatabaseWriter,
          snapshotSyncer: SnapshotSyncer? = nil,
          friendsPullSyncer: FriendsPullSyncer? = nil,
          leaderboardPullSyncer: LeaderboardPullSyncer? = nil,
+         testWakeCenter: NotificationCenter? = nil,
+         testWakeName: Notification.Name? = nil,
          now: @escaping () -> Date = Date.init) {
         self.db = db
         self.snapshotSyncer = snapshotSyncer
         self.friendsPullSyncer = friendsPullSyncer
         self.leaderboardPullSyncer = leaderboardPullSyncer
+        self.testWakeCenter = testWakeCenter
+        self.testWakeName = testWakeName
         self.now = now
     }
 
+    deinit {
+        if let wakeObserver, let wakeObserverCenter {
+            wakeObserverCenter.removeObserver(wakeObserver)
+        }
+        dispatchTimer?.cancel()
+    }
+
     func startTimer(interval: TimeInterval, sources: [(name: String, fetchers: [any Fetcher])]) {
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+        dispatchTimer?.cancel()
+        configuredSources = sources
+        configuredInterval = interval
+
+        // DispatchSourceTimer на main queue вместо Timer.scheduledTimer:
+        // 1. Не зависит от RunLoop modes — пока main queue жива, timer стреляет.
+        // 2. Лучше переживает sleep/wake циклы macOS, чем Timer на main RunLoop
+        //    (который после long sleep мог замолкать на старых билдах).
+        let t = DispatchSource.makeTimerSource(queue: .main)
+        t.schedule(deadline: .now() + interval, repeating: interval)
+        t.setEventHandler { [weak self] in
             guard let self else { return }
-            Task { @MainActor in
-                for (name, fetchers) in sources {
-                    try? await self.runOnce(source: name, fetchers: fetchers)
-                }
-            }
+            Task { @MainActor in await self.runAllSources() }
+        }
+        t.resume()
+        dispatchTimer = t
+
+        // Подписка на wake. После долгого sleep'а Mac'а штатный таймер мог
+        // пропустить интервалы — нотификация триггерит немедленный sync,
+        // чтобы виджет/popover не сидели на устаревших данных полчаса.
+        installWakeObserverIfNeeded()
+    }
+
+    func stopTimer() {
+        dispatchTimer?.cancel()
+        dispatchTimer = nil
+        if let wakeObserver, let wakeObserverCenter {
+            wakeObserverCenter.removeObserver(wakeObserver)
+            self.wakeObserver = nil
+            self.wakeObserverCenter = nil
         }
     }
 
-    func stopTimer() { timer?.invalidate(); timer = nil }
+    /// Вызывает `runOnce` для всех configured-источников. Используется и тиком
+    /// таймера, и обработчиком wake-нотификации.
+    func runAllSources() async {
+        for (name, fetchers) in configuredSources {
+            try? await runOnce(source: name, fetchers: fetchers)
+        }
+    }
+
+    private func installWakeObserverIfNeeded() {
+        guard wakeObserver == nil else { return }
+        let center: NotificationCenter
+        let name: Notification.Name
+        if let testWakeCenter, let testWakeName {
+            center = testWakeCenter
+            name = testWakeName
+        } else {
+            #if canImport(AppKit)
+            center = NSWorkspace.shared.notificationCenter
+            name = NSWorkspace.didWakeNotification
+            #else
+            return
+            #endif
+        }
+        wakeObserverCenter = center
+        wakeObserver = center.addObserver(
+            forName: name,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            // Запускаем sync через MainActor — наш state @MainActor-isolated.
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                AppLogger.sync.info("Wake notification — forcing sync for all sources")
+                await self.runAllSources()
+            }
+        }
+    }
 
     func runOnce(source: String, fetchers: [any Fetcher]) async throws {
         guard !inFlight.contains(source) else { return }

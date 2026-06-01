@@ -5,6 +5,14 @@
 
 ## [Unreleased]
 
+### Fix: sync переживает sleep/wake Mac'а
+
+- **Виджеты больше не «застывают»** после долгого uptime приложения. Раньше `SyncCoordinator` крутил sync через `Timer.scheduledTimer` на main RunLoop — на macOS такой таймер плохо переживает циклы sleep/wake: после нескольких sleep'ов мог замолкнуть и больше не отстреливать. Симптом — приложение запущено неделю, БД и snapshot не обновляются, единственный sync с момента старта.
+- **Что изменилось:**
+  - `Timer.scheduledTimer` → `DispatchSourceTimer` на main queue. Не зависит от RunLoop modes, в т.ч. modal-режима popover'а, и устойчивее к App Nap.
+  - Подписка на `NSWorkspace.didWakeNotification` — после wake'а сразу форсим sync для всех источников, не ждём очередного тика.
+- Тесты на wake-наблюдатель + unsubscribe в `stopTimer` (всего 215 тестов в сюите).
+
 ### Fix: cost для claude приходит из ccusage, а не считается локально
 
 - **`claude-opus-4-8` (и любая будущая модель) теперь считается.** Раньше парсер `CcusageParser` для claude брал per-model cost из локального `PricingTable`, а тот знал только модели по состоянию майско-2026 (opus-4-7, sonnet-4-6 и т.д.). Неизвестная модель → нулевая ставка → cost = 0 → модель проваливалась мимо top-моделей в popover/виджете. `ccusage` сам хранит up-to-date прайс Anthropic в каждом релизе — теперь day-level и per-model cost берутся прямо из его JSON-вывода (`daily[].totalCost`, `modelBreakdowns[].cost`). Для codex day-level тоже из ccusage (`daily[].costUSD`); per-model по-прежнему через `PricingTable` — ccusage codex per-model cost не отдаёт.
