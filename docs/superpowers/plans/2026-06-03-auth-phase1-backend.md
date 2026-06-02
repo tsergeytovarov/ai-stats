@@ -1094,6 +1094,8 @@ Expected: FAIL — 404 (нет `/auth/cb`).
 В `src/aiuse/routers/auth.py` добавить импорты и эндпоинт:
 
 ```python
+from sqlalchemy.exc import IntegrityError
+
 from aiuse.codes import generate_auth_code, generate_friend_code, hash_token
 from aiuse.models import AuthIdentity, AuthSession, Profile
 ```
@@ -1144,13 +1146,26 @@ async def auth_callback(
         )
         profile_id = auth_session.link_profile_id
     else:
-        # новый профиль
-        profile = Profile(
-            friend_code=generate_friend_code(),
-            display_name=identity.handle or "anon",
-        )
-        session.add(profile)
-        await session.flush()
+        # новый профиль с retry на коллизию friend_code через SAVEPOINT:
+        # begin_nested откатывает только вставку профиля, не всю транзакцию
+        # (auth_session мы ещё не трогали — её мутируем ниже).
+        profile = None
+        for _ in range(3):
+            candidate = Profile(
+                friend_code=generate_friend_code(),
+                display_name=identity.handle or "anon",
+            )
+            try:
+                async with session.begin_nested():
+                    session.add(candidate)
+                    await session.flush()
+                profile = candidate
+                break
+            except IntegrityError:
+                continue
+        if profile is None:
+            raise HTTPException(status_code=500, detail="friend_code collision")
+
         session.add(
             AuthIdentity(
                 profile_id=profile.id,
@@ -1173,7 +1188,7 @@ async def auth_callback(
     )
 ```
 
-> `friend_code` генерируется без retry на коллизию — на 500 юзерах из 30^10 пространства это пренебрежимо. Если коллизия всё же случится, `UniqueConstraint` кинет IntegrityError → 500, юзер повторит вход. Достаточно для MVP.
+> `friend_code` генерируется с retry до 3 раз через SAVEPOINT (`begin_nested`) — как в существующем `create_profile`. Коллизия на 500 юзерах из 30^10 пренебрежима, но retry даёт согласованность с остальным кодом и не валит весь вход 500-кой.
 
 - [ ] **Step 4: Запустить — проходит**
 
@@ -1466,23 +1481,42 @@ depends_on = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+
     # 1. добавить nullable device_id
     op.add_column("snapshots", sa.Column("device_id", sa.BigInteger(), nullable=True))
 
-    # 2. backfill: device_id = legacy device_token профиля (device_label='legacy')
+    # 2. backfill: device_id = самый ранний device_token профиля (по MIN(id)).
+    #    Не завязываемся на device_label='legacy' — берём любой существующий токен
+    #    профиля. На этой точке миграций у каждого профиля ровно один (из 006).
     op.execute(
         """
         UPDATE snapshots s
         SET device_id = dt.id
-        FROM device_tokens dt
-        WHERE dt.profile_id = s.user_id AND dt.device_label = 'legacy'
+        FROM (
+            SELECT profile_id, MIN(id) AS id
+            FROM device_tokens
+            GROUP BY profile_id
+        ) dt
+        WHERE dt.profile_id = s.user_id
         """
     )
 
-    # 3. сделать NOT NULL
+    # 3. guard: если остались снапшоты-сироты без device_token профиля —
+    #    падаем громко ДО смены NOT NULL, чтобы не ловить невнятную ошибку PK.
+    orphans = bind.execute(
+        sa.text("SELECT count(*) FROM snapshots WHERE device_id IS NULL")
+    ).scalar_one()
+    if orphans:
+        raise RuntimeError(
+            f"{orphans} snapshots без device_id: есть профили со снапшотами, "
+            "но без device_token. Разберись вручную перед NOT NULL."
+        )
+
+    # 4. сделать NOT NULL
     op.alter_column("snapshots", "device_id", existing_type=sa.BigInteger(), nullable=False)
 
-    # 4. FK + сменить PK
+    # 5. FK + сменить PK
     op.create_foreign_key(
         "fk_snapshots_device", "snapshots", "device_tokens", ["device_id"], ["id"],
         ondelete="CASCADE",
@@ -1838,7 +1872,7 @@ git commit -m "docs: env-переменные OAuth и эндпоинты фаз
 
 **Не входит в этот план (по дизайну — клиент/другие фазы):** §6.3 выбор scope (сервер уже умеет через `include_private`, но UI — клиентский план 1b), §8 стрики/бейджи (фаза 2+), Google/Yandex провайдеры (фаза 3 — `oauth.py` к этому готов через реестр).
 
-**2. Placeholder scan:** плейсхолдеров нет — весь код приведён целиком, команды с ожидаемым результатом. Генерация `friend_code` без retry в callback — осознанное упрощение (отмечено в Task 7), не плейсхолдер.
+**2. Placeholder scan:** плейсхолдеров нет — весь код приведён целиком, команды с ожидаемым результатом. `friend_code` в callback генерируется с SAVEPOINT-retry (Task 7), как в `create_profile`.
 
 **3. Type consistency:** `hash_token`/`hash_api_secret` (алиас, Task 5) · `generate_device_token` (Task 5, исп. Tasks 8, 9 тесты) · `sha256_hex` (Task 5, исп. Task 8) · `bearer_device` возвращает `DeviceToken` (Task 2, исп. Tasks 9) · `bearer_required` возвращает `Profile` (Task 2, исп. существующими роутерами) · `ProviderIdentity(sub, handle)` (Task 5, исп. Tasks 7) · PK снапшотов `(user_id, device_id, hour_bucket)` согласован между моделью (Task 9 Step 3), миграцией (Step 4) и upsert (Step 5).
 
