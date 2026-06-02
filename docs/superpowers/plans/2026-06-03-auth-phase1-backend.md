@@ -864,6 +864,7 @@ class AuthExchangeRequest(BaseModel):
 class AuthExchangeResponse(BaseModel):
     device_token: str
     github_token: str | None = None
+    github_login: str | None = None   # handle из github-identity профиля (для GitHub-фетчера клиента)
     friend_code: str
     server_user_id: int
 ```
@@ -1240,6 +1241,7 @@ async def test_exchange_returns_device_and_github_token(client, fake_github):
     body = resp.json()
     assert body["device_token"]
     assert body["github_token"] == "gh-access-token"
+    assert body["github_login"] == "octocat"
     assert body["friend_code"]
 
     # выданный device_token реально аутентифицирует
@@ -1342,6 +1344,15 @@ async def auth_exchange(
 
     github_token = auth_session.provider_token if auth_session.provider == "github" else None
 
+    # github_login: handle из github-identity профиля (нужен клиенту для GitHub-фетчера)
+    github_login = (
+        await session.execute(
+            select(AuthIdentity.handle).where(
+                AuthIdentity.profile_id == profile.id, AuthIdentity.provider == "github"
+            )
+        )
+    ).scalar_one_or_none()
+
     # сессия одноразовая — удаляем (и data-токен вместе с ней)
     await session.delete(auth_session)
     await session.commit()
@@ -1349,6 +1360,7 @@ async def auth_exchange(
     return AuthExchangeResponse(
         device_token=device_token,
         github_token=github_token,
+        github_login=github_login,
         friend_code=profile.friend_code,
         server_user_id=profile.id,
     )
