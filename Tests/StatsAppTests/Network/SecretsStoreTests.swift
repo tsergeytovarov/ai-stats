@@ -131,11 +131,32 @@ final class SecretsStoreTests: XCTestCase {
     func test_saveAll_writesWithoutReadingFirst() throws {
         // saveAll должен писать переданный snapshot, не делая loadAll().
         // Тест опосредованный: записываем напрямую и читаем — должно совпасть.
-        try store.saveAll(SecretsStore.Secrets(aiuseSecret: "x", githubPAT: "y"))
+        try store.saveAll(SecretsStore.Secrets(aiuseSecret: "x", githubPAT: "y", githubLogin: nil))
 
         let reloaded = store.loadAll()
         XCTAssertEqual(reloaded.aiuseSecret, "x")
         XCTAssertEqual(reloaded.githubPAT, "y")
+    }
+
+    // MARK: - github auth (token + login)
+
+    func test_setGithubAuth_persistsTokenAndLogin() throws {
+        let kc = MemoryKeychainStore()
+        let store = SecretsStore(keychain: kc)
+
+        try store.setGithubAuth(token: "ght", login: "octocat")
+
+        let loaded = store.loadAll()
+        XCTAssertEqual(loaded.githubPAT, "ght")
+        XCTAssertEqual(loaded.githubLogin, "octocat")
+    }
+
+    func test_legacySecrets_haveNilGithubLogin() throws {
+        let kc = MemoryKeychainStore()
+        let store = SecretsStore(keychain: kc)
+        try store.setAiuse("dt")
+
+        XCTAssertNil(store.loadAll().githubLogin)
     }
 
     // MARK: - idempotency
