@@ -11,6 +11,8 @@ struct AccountTabView: View {
     @State private var showDeleteConfirm = false
     @State private var editingName: String = ""
     @State private var isEditingName: Bool = false
+    @State private var includePrivateRepos = false
+    @State private var globalOptInLocal = false
 
     var body: some View {
         ScrollView {
@@ -39,6 +41,22 @@ struct AccountTabView: View {
         Text("Создать аккаунт").font(.title2).bold()
         Text("Без аккаунта недоступен лидерборд и виджет с лидербордом. Локальная статистика работает как и раньше.")
             .foregroundStyle(.secondary).font(.callout)
+
+        Button {
+            Task { await viewModel.signInWithGitHub(includePrivate: includePrivateRepos) }
+        } label: {
+            Label("Войти через GitHub", systemImage: "person.badge.key")
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(viewModel.isWorking)
+
+        Toggle("Включая приватные репозитории", isOn: $includePrivateRepos)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+        Divider()
+
+        Text("Или создать аккаунт вручную").font(.callout).foregroundStyle(.secondary)
 
         TextField("Имя", text: $newName)
             .textFieldStyle(.roundedBorder)
@@ -124,6 +142,15 @@ struct AccountTabView: View {
         ))
         Text("Если выключено: ты не отправляешь свои данные и не видишь чужие.")
             .font(.caption).foregroundStyle(.secondary)
+
+        Toggle("Показывать в публичном лидерборде", isOn: Binding(
+            get: { globalOptInLocal },
+            set: { newValue in
+                globalOptInLocal = newValue
+                Task { await viewModel.toggleGlobalOptIn(newValue) }
+            }
+        ))
+        .help("Твой handle, аватар и цифры станут видны публично на сайте")
 
         Divider()
 
