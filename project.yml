@@ -43,6 +43,9 @@ targets:
         NSHumanReadableCopyright: "Sergey Tovarov, MIT"
         CFBundleDevelopmentRegion: en
         CFBundleLocalizations: [en, ru]
+        CFBundleURLTypes:
+          - CFBundleURLName: tech.popovs.burn.auth
+            CFBundleURLSchemes: [burn]
     entitlements:
       path: StatsApp/StatsApp.entitlements
       properties:
