@@ -75,7 +75,7 @@ final class AccountTabViewModelTests: XCTestCase {
             let resp = HTTPURLResponse(
                 url: URL(string: "https://test.local/api/profiles/me")!,
                 statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
-            let json = #"{"friend_code":"XK7P3M9Q2A","display_name":"Я","sharing_enabled":true,"created_at":"2026-05-24T10:00:00Z"}"#
+            let json = #"{"friend_code":"XK7P3M9Q2A","display_name":"Я","sharing_enabled":true,"global_opt_in":false,"created_at":"2026-05-24T10:00:00Z"}"#
             return (resp, json.data(using: .utf8)!)
         }
         let blob = Data([0x89, 0x50, 0x4E, 0x47])  // PNG
