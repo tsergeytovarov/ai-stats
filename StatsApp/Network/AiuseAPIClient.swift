@@ -50,13 +50,14 @@ final class AiuseAPIClient {
     func patchProfile(displayName: String? = nil,
                       avatar: Data? = nil,
                       avatarMime: String? = nil,
-                      sharingEnabled: Bool? = nil) async throws -> ProfileResponse {
+                      sharingEnabled: Bool? = nil,
+                      globalOptIn: Bool? = nil) async throws -> ProfileResponse {
         let body = ProfileUpdateRequest(
             displayName: displayName,
             avatarB64: avatar?.base64EncodedString(),
             avatarMime: avatarMime,
             sharingEnabled: sharingEnabled,
-            globalOptIn: nil
+            globalOptIn: globalOptIn
         )
         return try await request(
             path: "/profiles/me",
@@ -82,6 +83,19 @@ final class AiuseAPIClient {
             method: "DELETE",
             authed: true,
             decodeAs: EmptyResponse.self
+        )
+    }
+
+    // MARK: - auth
+
+    func exchange(code: String, verifier: String) async throws -> AuthExchangeResponse {
+        let body = AuthExchangeRequest(code: code, verifier: verifier)
+        return try await request(
+            path: "/auth/exchange",
+            method: "POST",
+            body: body,
+            authed: false,
+            decodeAs: AuthExchangeResponse.self
         )
     }
 

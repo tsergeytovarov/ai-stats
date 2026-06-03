@@ -375,4 +375,36 @@ final class AiuseAPIClientTests: XCTestCase {
 
         XCTAssertEqual(MockURLProtocol.lastRequest?.url?.query, "block=false")
     }
+
+    // MARK: - auth: exchange
+
+    func test_exchange_postsCodeAndVerifier_returnsTokens() async throws {
+        MockURLProtocol.responder = { req in
+            let url = req.url!.absoluteString
+            XCTAssertTrue(url.hasSuffix("/auth/exchange"))
+            let body = """
+            {"device_token":"dt","github_token":"ght","github_login":"octocat",
+             "friend_code":"AAAA-BBBB-CC","server_user_id":7}
+            """.data(using: .utf8)!
+            return (HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, body)
+        }
+        let cfg = URLSessionConfiguration.ephemeral
+        cfg.protocolClasses = [MockURLProtocol.self]
+        let api = AiuseAPIClient(
+            baseURL: URL(string: "https://example.test/api")!,
+            secretProvider: { nil },
+            session: URLSession(configuration: cfg)
+        )
+
+        let resp = try await api.exchange(code: "AUTHCODE", verifier: "v123")
+
+        XCTAssertEqual(resp.deviceToken, "dt")
+        XCTAssertEqual(resp.githubToken, "ght")
+        XCTAssertEqual(resp.githubLogin, "octocat")
+        XCTAssertEqual(resp.serverUserId, 7)
+
+        let sent = MockURLProtocol.lastBody.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        XCTAssertEqual(sent?["code"] as? String, "AUTHCODE")
+        XCTAssertEqual(sent?["verifier"] as? String, "v123")
+    }
 }
