@@ -55,7 +55,8 @@ final class AiuseAPIClient {
             displayName: displayName,
             avatarB64: avatar?.base64EncodedString(),
             avatarMime: avatarMime,
-            sharingEnabled: sharingEnabled
+            sharingEnabled: sharingEnabled,
+            globalOptIn: nil
         )
         return try await request(
             path: "/profiles/me",
