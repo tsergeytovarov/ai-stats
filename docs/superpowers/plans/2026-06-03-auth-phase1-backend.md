@@ -376,26 +376,36 @@ async def bearer_required(
 
 - [ ] **Step 6: `create_profile` пишет device_token**
 
-В `src/aiuse/routers/profiles.py`: импортировать модель и после успешного `commit` профиля создать device-токен. Заменить тело цикла создания так, чтобы legacy-`api_secret` дублировался в `device_tokens`:
+В `src/aiuse/routers/profiles.py`: импортировать модель:
 
 ```python
 from aiuse.models import DeviceToken, Friendship, Profile
 ```
 
-В `create_profile`, после `await session.refresh(profile)` (профиль уже создан) и перед формированием ответа:
+**Device_token добавляется в сессию ВНУТРИ retry-цикла, до `commit` — в той же транзакции, что и профиль.** Иначе при падении отдельного второго commit профиль останется без токена (в него нельзя залогиниться). `relationship` проставит FK на commit:
 
 ```python
-    session.add(
-        DeviceToken(
-            profile_id=profile.id,
-            token_hash=hash_api_secret(secret),
-            device_label="legacy",
+        session.add(candidate)
+        # device_token в той же транзакции — иначе профиль-сирота без токена
+        session.add(
+            DeviceToken(
+                profile=candidate,
+                token_hash=hash_api_secret(secret),
+                device_label="legacy",
+            )
         )
-    )
-    await session.commit()
+        try:
+            await session.commit()
+            profile = candidate
+            break
+        except Exception:
+            await session.rollback()
+            continue
 ```
 
-Добавить импорт `hash_api_secret` в этот файл (он уже импортируется из `aiuse.codes`).
+Отдельного второго `commit` после цикла НЕ делаем. `await session.refresh(profile)` после цикла остаётся. `hash_api_secret` уже импортирован из `aiuse.codes`.
+
+> **Заметка про downgrade 006:** `downgrade()` возвращает `api_secret_hash` в `NOT NULL`. В фазе 1 безопасно (legacy `create_profile` всегда его заполняет). Но как только появятся OAuth-профили с `NULL` хэшем, этот downgrade упадёт — в будущей фазе добавить guard или дропать колонку вместо возврата NOT NULL.
 
 - [ ] **Step 7: Запустить тесты**
 
