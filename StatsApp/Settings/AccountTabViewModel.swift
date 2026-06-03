@@ -13,15 +13,30 @@ final class AccountTabViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var isWorking: Bool = false
 
+    /// Колбэк после успешного GitHub-входа (AppContainer вешает live-пересборку источников). nil в тестах → no-op.
+    var onSignedIn: (() async -> Void)?
+
     private let api: AiuseAPIClient
+    private let auth: GitHubSignInService
     private let secretsStore: SecretsStore
     private let secretBox: SecretBox
+    private let githubTokenBox: GithubTokenBox
+    private let githubLoginBox: GithubLoginBox
     private let db: any DatabaseWriter
 
-    init(api: AiuseAPIClient, secretsStore: SecretsStore, secretBox: SecretBox, db: any DatabaseWriter) {
+    init(api: AiuseAPIClient,
+         auth: GitHubSignInService,
+         secretsStore: SecretsStore,
+         secretBox: SecretBox,
+         githubTokenBox: GithubTokenBox,
+         githubLoginBox: GithubLoginBox,
+         db: any DatabaseWriter) {
         self.api = api
+        self.auth = auth
         self.secretsStore = secretsStore
         self.secretBox = secretBox
+        self.githubTokenBox = githubTokenBox
+        self.githubLoginBox = githubLoginBox
         self.db = db
     }
 
@@ -68,6 +83,57 @@ final class AccountTabViewModel: ObservableObject {
             state = .created(row)
         } catch {
             errorMessage = "Не удалось создать профиль: \(error.localizedDescription)"
+        }
+    }
+
+    /// Вход через GitHub OAuth: брокер-флоу → exchange → сохранить секреты и профиль.
+    /// Создаёт фрешевый профиль; старый api_secret-аккаунт не мигрируется (device_token перезаписывается).
+    func signInWithGitHub(includePrivate: Bool) async {
+        isWorking = true
+        defer { isWorking = false }
+        errorMessage = nil
+        do {
+            let resp = try await auth.signIn(provider: "github", includePrivate: includePrivate)
+
+            try secretsStore.setAiuse(resp.deviceToken)
+            secretBox.value = resp.deviceToken
+
+            if let token = resp.githubToken {
+                try secretsStore.setGithubAuth(token: token, login: resp.githubLogin)
+                githubTokenBox.value = token
+                githubLoginBox.value = resp.githubLogin ?? ""
+            }
+
+            let row = MyProfileRow(
+                id: 1,
+                friendCode: resp.friendCode,
+                displayName: resp.githubLogin ?? "anon",
+                avatarPath: nil,
+                sharingEnabled: false,
+                serverUserId: resp.serverUserId,
+                avatarBlob: nil,
+                avatarMime: nil,
+                avatarEtag: nil
+            )
+            try await db.write { try StatsQueries.saveMyProfile($0, row) }
+            state = .created(row)
+            await onSignedIn?()
+        } catch AuthError.cancelled {
+            // молча — юзер сам закрыл окно входа
+        } catch {
+            errorMessage = "Не удалось войти: \(error.localizedDescription)"
+        }
+    }
+
+    /// Тогл публичного глобального лидерборда (push-only в фазе 1).
+    func toggleGlobalOptIn(_ enabled: Bool) async {
+        guard case .created = state else { return }
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            _ = try await api.patchProfile(globalOptIn: enabled)
+        } catch {
+            errorMessage = "Не удалось переключить публичный лидерборд: \(error.localizedDescription)"
         }
     }
 

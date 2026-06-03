@@ -20,10 +20,12 @@ final class SecretsStore {
     struct Secrets: Codable, Equatable {
         var aiuseSecret: String?
         var githubPAT: String?
+        var githubLogin: String?
 
-        static let empty = Secrets(aiuseSecret: nil, githubPAT: nil)
+        static let empty = Secrets(aiuseSecret: nil, githubPAT: nil, githubLogin: nil)
 
         /// true если есть хоть один непустой секрет (для решения нужна ли запись в combined).
+        /// githubLogin сюда не входит — это не секрет, а лишь метаданные токена.
         var hasAny: Bool {
             (aiuseSecret?.isEmpty == false) || (githubPAT?.isEmpty == false)
         }
@@ -48,7 +50,7 @@ final class SecretsStore {
         // 2. Legacy migration. Читаем старые items, собираем в combined.
         let aiuse = keychain.get(account: AiuseKeychain.account, service: AiuseKeychain.service)
         let github = keychain.get(account: GithubKeychain.account, service: GithubKeychain.service)
-        let migrated = Secrets(aiuseSecret: aiuse, githubPAT: github)
+        let migrated = Secrets(aiuseSecret: aiuse, githubPAT: github, githubLogin: nil)
 
         if migrated.hasAny {
             do {
@@ -75,6 +77,14 @@ final class SecretsStore {
     func setGithub(_ value: String?) throws {
         var current = loadAll()
         current.githubPAT = value
+        try save(current)
+    }
+
+    /// Пишет github-токен и логин одним апдейтом combined-item, сохраняя aiuseSecret.
+    func setGithubAuth(token: String?, login: String?) throws {
+        var current = loadAll()
+        current.githubPAT = token
+        current.githubLogin = login
         try save(current)
     }
 

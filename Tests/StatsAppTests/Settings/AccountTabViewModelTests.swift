@@ -2,6 +2,12 @@ import XCTest
 import GRDB
 @testable import StatsApp
 
+private final class FakeSignIn: GitHubSignInService {
+    var response: AuthExchangeResponse
+    init(_ r: AuthExchangeResponse) { response = r }
+    func signIn(provider: String, includePrivate: Bool) async throws -> AuthExchangeResponse { response }
+}
+
 @MainActor
 final class AccountTabViewModelTests: XCTestCase {
     var dbq: DatabaseQueue!
@@ -9,6 +15,9 @@ final class AccountTabViewModelTests: XCTestCase {
     var keychain: MemoryKeychainStore!
     var secretsStore: SecretsStore!
     var secretBox: SecretBox!
+    var githubTokenBox: GithubTokenBox!
+    var githubLoginBox: GithubLoginBox!
+    private var signIn: FakeSignIn!
     var vm: AccountTabViewModel!
 
     override func setUpWithError() throws {
@@ -22,15 +31,51 @@ final class AccountTabViewModelTests: XCTestCase {
         secretsStore = SecretsStore(keychain: keychain)
         secretBox = SecretBox()
         secretBox.value = "test-secret"
+        githubTokenBox = GithubTokenBox()
+        githubLoginBox = GithubLoginBox()
+        signIn = FakeSignIn(AuthExchangeResponse(
+            deviceToken: "dt", githubToken: nil, githubLogin: nil,
+            friendCode: "AAAA-BBBB-CC", serverUserId: 1
+        ))
         client = AiuseAPIClient(
             baseURL: URL(string: "https://test.local/api")!,
             secretProvider: { [secretBox] in secretBox?.value },
             session: session
         )
-        vm = AccountTabViewModel(api: client, secretsStore: secretsStore, secretBox: secretBox, db: dbq)
+        vm = AccountTabViewModel(
+            api: client, auth: signIn, secretsStore: secretsStore, secretBox: secretBox,
+            githubTokenBox: githubTokenBox, githubLoginBox: githubLoginBox, db: dbq
+        )
         MockURLProtocol.responder = nil
         MockURLProtocol.lastRequest = nil
         MockURLProtocol.lastBody = nil
+    }
+
+    func test_signInWithGitHub_persistsTokensAndProfile() async throws {
+        let fake = FakeSignIn(AuthExchangeResponse(
+            deviceToken: "dt", githubToken: "ght", githubLogin: "octocat",
+            friendCode: "AAAA-BBBB-CC", serverUserId: 7
+        ))
+        let ghTok = GithubTokenBox()
+        let ghLogin = GithubLoginBox()
+        let vm2 = AccountTabViewModel(
+            api: client, auth: fake, secretsStore: secretsStore, secretBox: secretBox,
+            githubTokenBox: ghTok, githubLoginBox: ghLogin, db: dbq
+        )
+
+        await vm2.signInWithGitHub(includePrivate: false)
+
+        XCTAssertEqual(secretBox.value, "dt")
+        XCTAssertEqual(ghTok.value, "ght")
+        XCTAssertEqual(ghLogin.value, "octocat")
+        XCTAssertEqual(secretsStore.loadAll().githubPAT, "ght")
+        if case let .created(profile) = vm2.state {
+            XCTAssertEqual(profile.friendCode, "AAAA-BBBB-CC")
+            XCTAssertEqual(profile.serverUserId, 7)
+            XCTAssertFalse(profile.sharingEnabled)
+        } else {
+            XCTFail("expected .created")
+        }
     }
 
     func test_createAccount_withAvatar_persistsBlobLocally() async throws {
@@ -75,7 +120,7 @@ final class AccountTabViewModelTests: XCTestCase {
             let resp = HTTPURLResponse(
                 url: URL(string: "https://test.local/api/profiles/me")!,
                 statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
-            let json = #"{"friend_code":"XK7P3M9Q2A","display_name":"Я","sharing_enabled":true,"created_at":"2026-05-24T10:00:00Z"}"#
+            let json = #"{"friend_code":"XK7P3M9Q2A","display_name":"Я","sharing_enabled":true,"global_opt_in":false,"created_at":"2026-05-24T10:00:00Z"}"#
             return (resp, json.data(using: .utf8)!)
         }
         let blob = Data([0x89, 0x50, 0x4E, 0x47])  // PNG

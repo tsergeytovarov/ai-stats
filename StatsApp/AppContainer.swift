@@ -13,6 +13,8 @@ final class AppContainer {
     let secretsStore: SecretsStore
     let secretBox: SecretBox
     let githubTokenBox: GithubTokenBox
+    let githubLoginBox: GithubLoginBox
+    let authService: AuthService
     let aiuseAPI: AiuseAPIClient
     let snapshotSyncer: SnapshotSyncer
     let friendsPullSyncer: FriendsPullSyncer
@@ -55,6 +57,11 @@ final class AppContainer {
         ghBox.value = secrets.githubPAT ?? ""
         self.githubTokenBox = ghBox
 
+        let ghLoginBox = GithubLoginBox()
+        // OAuth-логин (из combined-secrets) приоритетнее legacy config.github_login.
+        ghLoginBox.value = secrets.githubLogin ?? cfg.githubLogin
+        self.githubLoginBox = ghLoginBox
+
         // Жёстко требуем https для aiuse: иначе Bearer-токен из Keychain
         // утечёт plain-text'ом на любой http-эндпоинт из конфига.
         let baseURL = try Self.validateAiuseBaseURL(cfg.aiuseApiBaseURL)
@@ -63,6 +70,11 @@ final class AppContainer {
             secretProvider: { box.value }
         )
         self.aiuseAPI = api
+        self.authService = AuthService(
+            authBaseURL: baseURL,
+            api: api,
+            webAuth: ASWebAuthenticator()
+        )
         let syncer = SnapshotSyncer(db: dbPool, api: api)
         self.snapshotSyncer = syncer
 
@@ -100,7 +112,7 @@ final class AppContainer {
         self.syncCoordinator = coordinator
         let dbPoolRef = dbPool
         // githubEnabled теперь определяется runtime-токеном (из Keychain), а не полем конфига.
-        let githubEnabledNow = !ghBox.value.isEmpty && !cfg.githubLogin.isEmpty
+        let githubEnabledNow = !ghBox.value.isEmpty && !ghLoginBox.value.isEmpty
         self.dropdownViewModel = DropdownViewModel(
             db: dbPool,
             syncCoordinator: coordinator,
@@ -154,7 +166,28 @@ final class AppContainer {
 
     /// Создаёт fresh AccountTabViewModel — для каждого открытия окна настроек.
     func makeAccountTabViewModel() -> AccountTabViewModel {
-        AccountTabViewModel(api: aiuseAPI, secretsStore: secretsStore, secretBox: secretBox, db: dbPool)
+        let vm = AccountTabViewModel(
+            api: aiuseAPI,
+            auth: authService,
+            secretsStore: secretsStore,
+            secretBox: secretBox,
+            githubTokenBox: githubTokenBox,
+            githubLoginBox: githubLoginBox,
+            db: dbPool
+        )
+        vm.onSignedIn = { [weak self] in await self?.refreshSourcesAfterSignIn() }
+        return vm
+    }
+
+    /// Пересобирает fetcher-источники из актуальных box'ов (токен/логин обновлены
+    /// после OAuth) и перезапускает периодический sync. GitHub-источник дёргаем сразу.
+    func refreshSourcesAfterSignIn() async {
+        let sources = buildFetchers()
+        for (name, fetchers) in sources where name == "github" {
+            try? await syncCoordinator.runOnce(source: name, fetchers: fetchers)
+        }
+        let interval = TimeInterval(config.syncIntervalMinutes * 60)
+        syncCoordinator.startTimer(interval: interval, sources: sources)
     }
 
     /// Создаёт fresh FriendsTabViewModel — для каждого открытия окна настроек.
@@ -183,10 +216,11 @@ final class AppContainer {
         }
         sources.append(("ccusage", ccFetchers))
         sources.append(("claude-cowork", [ClaudeCoworkFetcher()]))
-        // Токен берём из Keychain-бэкенного box'а, не из конфига.
+        // Токен и логин берём из Keychain-бэкенных box'ов, не из конфига.
         let token = githubTokenBox.value
-        if !token.isEmpty && !config.githubLogin.isEmpty {
-            sources.append(("github", [GitHubFetcher(token: token, login: config.githubLogin)]))
+        let login = githubLoginBox.value
+        if !token.isEmpty && !login.isEmpty {
+            sources.append(("github", [GitHubFetcher(token: token, login: login)]))
         }
         return sources
     }

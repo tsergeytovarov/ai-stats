@@ -121,3 +121,9 @@ final class SecretBox {
 final class GithubTokenBox {
     var value: String = ""
 }
+
+/// Memory-кэш GitHub-логина. Едет вместе с токеном (из OAuth или legacy config).
+@MainActor
+final class GithubLoginBox {
+    var value: String = ""
+}
