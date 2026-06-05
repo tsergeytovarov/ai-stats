@@ -14,19 +14,24 @@ private final class FakeWebAuth: WebAuthenticating {
 }
 
 final class AuthServiceTests: XCTestCase {
-    private func makeAPI() -> AiuseAPIClient {
+    private func makeAPI(secret: String? = nil) -> AiuseAPIClient {
         MockURLProtocol.responder = { req in
-            let body = """
-            {"device_token":"dt","github_token":"ght","github_login":"octocat",
-             "friend_code":"AAAA-BBBB-CC","server_user_id":7}
-            """.data(using: .utf8)!
+            let body: Data
+            if req.url!.path.hasSuffix("/auth/link-intent") {
+                body = #"{"link_ticket":"TICKET"}"#.data(using: .utf8)!
+            } else {
+                body = """
+                {"device_token":"dt","github_token":"ght","github_login":"octocat",
+                 "friend_code":"AAAA-BBBB-CC","server_user_id":7}
+                """.data(using: .utf8)!
+            }
             return (HTTPURLResponse(url: req.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, body)
         }
         let cfg = URLSessionConfiguration.ephemeral
         cfg.protocolClasses = [MockURLProtocol.self]
         return AiuseAPIClient(
             baseURL: URL(string: "https://example.test/api")!,
-            secretProvider: { nil },
+            secretProvider: { secret },
             session: URLSession(configuration: cfg)
         )
     }
@@ -39,7 +44,7 @@ final class AuthServiceTests: XCTestCase {
             webAuth: fake
         )
 
-        let resp = try await service.signIn(provider: "github", includePrivate: false)
+        let resp = try await service.signIn(provider: "github", includePrivate: false, linkExisting: false)
 
         XCTAssertEqual(resp.deviceToken, "dt")
         XCTAssertEqual(resp.githubLogin, "octocat")
@@ -49,6 +54,24 @@ final class AuthServiceTests: XCTestCase {
         XCTAssertTrue(start.contains("provider=github"))
         XCTAssertTrue(start.contains("challenge="))
         XCTAssertTrue(start.contains("include_private=false"))
+        XCTAssertFalse(start.contains("link_ticket"))
+    }
+
+    func test_signIn_linkExisting_addsLinkTicket() async throws {
+        let fake = FakeWebAuth(callback: URL(string: "burn://auth/callback?code=AUTHCODE&state=st")!)
+        let service = AuthService(
+            authBaseURL: URL(string: "https://example.test/api")!,
+            api: makeAPI(secret: "device-token"),
+            webAuth: fake
+        )
+
+        let resp = try await service.signIn(provider: "github", includePrivate: false, linkExisting: true)
+
+        XCTAssertEqual(resp.deviceToken, "dt")
+
+        let start = fake.capturedURL!.absoluteString
+        XCTAssertTrue(start.hasPrefix("https://example.test/api/auth/start"))
+        XCTAssertTrue(start.contains("link_ticket=TICKET"))
     }
 
     func test_signIn_noCodeInCallback_throws() async {
@@ -59,7 +82,7 @@ final class AuthServiceTests: XCTestCase {
             webAuth: fake
         )
         do {
-            _ = try await service.signIn(provider: "github", includePrivate: false)
+            _ = try await service.signIn(provider: "github", includePrivate: false, linkExisting: false)
             XCTFail("expected throw")
         } catch {
             XCTAssertEqual(error as? AuthError, .noCodeInCallback)

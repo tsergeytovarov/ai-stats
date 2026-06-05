@@ -93,7 +93,9 @@ final class AccountTabViewModel: ObservableObject {
         defer { isWorking = false }
         errorMessage = nil
         do {
-            let resp = try await auth.signIn(provider: "github", includePrivate: includePrivate)
+            let linkExisting: Bool
+            if case .created = state { linkExisting = true } else { linkExisting = false }
+            let resp = try await auth.signIn(provider: "github", includePrivate: includePrivate, linkExisting: linkExisting)
 
             try secretsStore.setAiuse(resp.deviceToken)
             secretBox.value = resp.deviceToken
@@ -117,6 +119,24 @@ final class AccountTabViewModel: ObservableObject {
             )
             try await db.write { try StatsQueries.saveMyProfile($0, row) }
             state = .created(row)
+
+            // аватарка с GitHub (best-effort, не критично если не вышло)
+            if let login = resp.githubLogin,
+               let (avatarData, mime) = await GithubAvatar.fetch(login: login) {
+                do {
+                    _ = try await api.patchProfile(avatar: avatarData, avatarMime: mime)
+                    try await db.write { try StatsQueries.updateMyAvatar($0, blob: avatarData, mime: mime, etag: nil) }
+                    if case let .created(p) = state {
+                        var updated = p
+                        updated.avatarBlob = avatarData
+                        updated.avatarMime = mime
+                        updated.avatarEtag = nil
+                        state = .created(updated)
+                    }
+                } catch {
+                    // аватар не критичен — лог в errorMessage не пишем, чтобы не пугать
+                }
+            }
             await onSignedIn?()
         } catch AuthError.cancelled {
             // молча — юзер сам закрыл окно входа

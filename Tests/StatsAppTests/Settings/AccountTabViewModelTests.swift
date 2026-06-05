@@ -5,7 +5,7 @@ import GRDB
 private final class FakeSignIn: GitHubSignInService {
     var response: AuthExchangeResponse
     init(_ r: AuthExchangeResponse) { response = r }
-    func signIn(provider: String, includePrivate: Bool) async throws -> AuthExchangeResponse { response }
+    func signIn(provider: String, includePrivate: Bool, linkExisting: Bool) async throws -> AuthExchangeResponse { response }
 }
 
 @MainActor
