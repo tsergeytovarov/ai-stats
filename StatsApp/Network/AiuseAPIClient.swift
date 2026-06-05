@@ -99,6 +99,15 @@ final class AiuseAPIClient {
         )
     }
 
+    func linkIntent() async throws -> LinkIntentResponse {
+        return try await request(
+            path: "/auth/link-intent",
+            method: "POST",
+            authed: true,
+            decodeAs: LinkIntentResponse.self
+        )
+    }
+
     // MARK: - friends
 
     func addFriend(friendCode: String) async throws -> FriendDTO {

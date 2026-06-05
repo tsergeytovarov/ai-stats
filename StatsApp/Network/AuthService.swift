@@ -2,7 +2,7 @@ import Foundation
 
 /// Узкий протокол для ViewModel — чтобы тестировать VM с fake-входом.
 protocol GitHubSignInService {
-    func signIn(provider: String, includePrivate: Bool) async throws -> AuthExchangeResponse
+    func signIn(provider: String, includePrivate: Bool, linkExisting: Bool) async throws -> AuthExchangeResponse
 }
 
 /// Оркестрирует OAuth-флоу: start URL → ASWebAuthenticationSession → exchange.
@@ -19,7 +19,7 @@ final class AuthService: GitHubSignInService {
         self.webAuth = webAuth
     }
 
-    func signIn(provider: String, includePrivate: Bool) async throws -> AuthExchangeResponse {
+    func signIn(provider: String, includePrivate: Bool, linkExisting: Bool) async throws -> AuthExchangeResponse {
         let verifier = Crypto.randomVerifier()
         let challenge = Crypto.sha256Hex(verifier)
 
@@ -28,11 +28,16 @@ final class AuthService: GitHubSignInService {
         guard var components = URLComponents(url: startURL, resolvingAgainstBaseURL: false) else {
             throw AuthError.badCallbackURL(startURL.absoluteString)
         }
-        components.queryItems = [
+        var items: [URLQueryItem] = [
             URLQueryItem(name: "provider", value: provider),
             URLQueryItem(name: "challenge", value: challenge),
             URLQueryItem(name: "include_private", value: includePrivate ? "true" : "false"),
         ]
+        if linkExisting {
+            let ticket = try await api.linkIntent().linkTicket
+            items.append(URLQueryItem(name: "link_ticket", value: ticket))
+        }
+        components.queryItems = items
         guard let finalStart = components.url else {
             throw AuthError.badCallbackURL(startURL.absoluteString)
         }
