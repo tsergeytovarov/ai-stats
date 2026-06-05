@@ -123,6 +123,22 @@ struct AccountTabView: View {
 
         Divider()
 
+        Text("Вход через GitHub").font(.headline)
+        Button {
+            Task { await viewModel.signInWithGitHub(includePrivate: includePrivateRepos) }
+        } label: {
+            Label("Войти через GitHub", systemImage: "person.badge.key")
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(viewModel.isWorking)
+        Toggle("Включая приватные репозитории", isOn: $includePrivateRepos)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        Text("Заменит текущий локальный аккаунт на GitHub-аккаунт.")
+            .font(.caption).foregroundStyle(.secondary)
+
+        Divider()
+
         Text("Твой код для друзей").font(.headline)
         HStack {
             Text(formatFriendCode(profile.friendCode))
