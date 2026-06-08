@@ -56,6 +56,7 @@ enum ClaudeCoworkParser {
                     model: model,
                     inputTokens: Int64(usage["input_tokens"] as? Int ?? 0),
                     cacheCreateTokens: Int64(usage["cache_creation_input_tokens"] as? Int ?? 0),
+                    cacheCreate1hTokens: Int64((usage["cache_creation"] as? [String: Any])?["ephemeral_1h_input_tokens"] as? Int ?? 0),
                     cacheReadTokens: Int64(usage["cache_read_input_tokens"] as? Int ?? 0),
                     outputTokens: Int64(usage["output_tokens"] as? Int ?? 0)
                 ))
@@ -72,6 +73,7 @@ enum ClaudeCoworkParser {
             agg.inputTokens       += e.inputTokens + e.cacheCreateTokens + e.cacheReadTokens
             agg.inputTokensNoCache += e.inputTokens
             agg.cacheCreateTokens += e.cacheCreateTokens
+            agg.cacheCreate1hTokens += e.cacheCreate1hTokens
             agg.cacheReadTokens   += e.cacheReadTokens
             agg.outputTokens      += e.outputTokens
             byDayModel[key] = agg
@@ -92,7 +94,8 @@ enum ClaudeCoworkParser {
                     inputTokens: agg.inputTokensNoCache,
                     outputTokens: agg.outputTokens,
                     cacheReadTokens: agg.cacheReadTokens,
-                    cacheCreateTokens: agg.cacheCreateTokens
+                    cacheCreateTokens: agg.cacheCreateTokens,
+                    cacheCreate1hTokens: agg.cacheCreate1hTokens
                 ),
                 updatedAt: nowString
             ))
@@ -139,6 +142,7 @@ enum ClaudeCoworkParser {
         let model: String
         let inputTokens: Int64
         let cacheCreateTokens: Int64
+        let cacheCreate1hTokens: Int64
         let cacheReadTokens: Int64
         let outputTokens: Int64
     }
@@ -152,6 +156,7 @@ enum ClaudeCoworkParser {
         var inputTokens: Int64 = 0
         var inputTokensNoCache: Int64 = 0
         var cacheCreateTokens: Int64 = 0
+        var cacheCreate1hTokens: Int64 = 0
         var cacheReadTokens: Int64 = 0
         var outputTokens: Int64 = 0
     }
