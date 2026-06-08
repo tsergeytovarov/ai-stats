@@ -81,8 +81,8 @@ final class CcusageParserTests: XCTestCase {
         // inputTokens = 7000 + 3000(cached) = 10000
         XCTAssertEqual(gpt.inputTokens, 10000)
         XCTAssertEqual(gpt.outputTokens, 2000)
-        // gpt-5.5: 7000*10 + 2000*30 + 3000*1.25 (all /1e6) = 0.13375
-        XCTAssertEqual(gpt.costUsd, 0.13375, accuracy: 0.000001)
+        // gpt-5.5: 7000*5 + 2000*30 + 3000*0.50 (all /1e6) = 0.0965
+        XCTAssertEqual(gpt.costUsd, 0.0965, accuracy: 0.000001)
 
         let codexModel = payload.modelRows.first { $0.model == "codex-auto-review" }!
         // codex-auto-review: 5000*5 + 1400*15 + 2000*0.63 (all /1e6) = 0.04726
