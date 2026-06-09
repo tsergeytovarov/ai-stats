@@ -38,6 +38,7 @@ README.md           <- инструкция установки для юзеро
 
 ```bash
 brew tap tsergeytovarov/tap
+brew trust --cask tsergeytovarov/tap/ai-stats
 brew install --cask ai-stats
 ```
 
