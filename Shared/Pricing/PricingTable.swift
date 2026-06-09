@@ -21,6 +21,10 @@ enum PricingTable {
     static let opusRate   = ModelRate(inputPerM: 5.00, outputPerM: 25.00, cacheReadPerM: 0.50, cacheCreatePerM: 6.25, cacheCreate1hPerM: 10.00)
     static let sonnetRate = ModelRate(inputPerM: 3.00, outputPerM: 15.00, cacheReadPerM: 0.30, cacheCreatePerM: 3.75, cacheCreate1hPerM: 6.00)
     static let haikuRate  = ModelRate(inputPerM: 1.00, outputPerM: 5.00,  cacheReadPerM: 0.10, cacheCreatePerM: 1.25, cacheCreate1hPerM: 2.00)
+    // Fable 5 / Mythos 5 — $10/$50, 1M контекст (docs Anthropic, overview). Cache — по
+    // универсальным множителям Anthropic (read 0.1×, 5m write 1.25×, 1h write 2×).
+    static let fableRate  = ModelRate(inputPerM: 10.00, outputPerM: 50.00, cacheReadPerM: 1.00, cacheCreatePerM: 12.50, cacheCreate1hPerM: 20.00)
+    static let mythosRate = ModelRate(inputPerM: 10.00, outputPerM: 50.00, cacheReadPerM: 1.00, cacheCreatePerM: 12.50, cacheCreate1hPerM: 20.00)
 
     /// Точное совпадение по имени модели → ставка.
     static let rates: [String: ModelRate] = [
@@ -32,6 +36,10 @@ enum PricingTable {
         "claude-sonnet-4-5":         sonnetRate,
         "claude-haiku-4-5-20251001": haikuRate,
         "claude-haiku-4-5":          haikuRate,
+
+        // Anthropic — Fable 5 / Mythos 5 (Mythos 5 — invitation-only, Project Glasswing)
+        "claude-fable-5":            fableRate,
+        "claude-mythos-5":           mythosRate,
 
         // OpenAI — gpt-5.x family (cache-write у OpenAI не тарифицируется отдельно → 0)
         "gpt-5.5":                   ModelRate(inputPerM: 5.00, outputPerM: 30.00, cacheReadPerM: 0.50,  cacheCreatePerM: 0.00, cacheCreate1hPerM: 0.00),
@@ -63,6 +71,8 @@ enum PricingTable {
         if model.hasPrefix("claude-opus-")   { return ("opus", opusRate) }
         if model.hasPrefix("claude-sonnet-") { return ("sonnet", sonnetRate) }
         if model.hasPrefix("claude-haiku-")  { return ("haiku", haikuRate) }
+        if model.hasPrefix("claude-fable-")  { return ("fable", fableRate) }
+        if model.hasPrefix("claude-mythos-") { return ("mythos", mythosRate) }
         return nil
     }
 

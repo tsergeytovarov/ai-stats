@@ -85,6 +85,47 @@ final class PricingTableTests: XCTestCase {
         XCTAssertEqual(c, 1.0, accuracy: 0.0001)
     }
 
+    // MARK: - Fable 5 / Mythos 5 ($10 in / $50 out / $1 cache-read / $12.50 5m / $20 1h)
+
+    func test_fable5_input_10_per_M() {
+        let c = PricingTable.cost(model: "claude-fable-5", inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheCreateTokens: 0)
+        XCTAssertEqual(c, 10.0, accuracy: 0.0001)
+    }
+
+    func test_fable5_output_50_per_M() {
+        let c = PricingTable.cost(model: "claude-fable-5", inputTokens: 0, outputTokens: 1_000_000, cacheReadTokens: 0, cacheCreateTokens: 0)
+        XCTAssertEqual(c, 50.0, accuracy: 0.0001)
+    }
+
+    func test_fable5_cache_read_1_per_M() {
+        let c = PricingTable.cost(model: "claude-fable-5", inputTokens: 0, outputTokens: 0, cacheReadTokens: 1_000_000, cacheCreateTokens: 0)
+        XCTAssertEqual(c, 1.0, accuracy: 0.0001)
+    }
+
+    func test_fable5_cache_create_1h_20_per_M() {
+        let c = PricingTable.cost(model: "claude-fable-5", inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreateTokens: 1_000_000, cacheCreate1hTokens: 1_000_000)
+        XCTAssertEqual(c, 20.0, accuracy: 0.0001)
+    }
+
+    func test_mythos5_input_10_output_50() {
+        let inp = PricingTable.cost(model: "claude-mythos-5", inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheCreateTokens: 0)
+        let out = PricingTable.cost(model: "claude-mythos-5", inputTokens: 0, outputTokens: 1_000_000, cacheReadTokens: 0, cacheCreateTokens: 0)
+        XCTAssertEqual(inp, 10.0, accuracy: 0.0001)
+        XCTAssertEqual(out, 50.0, accuracy: 0.0001)
+    }
+
+    func test_unknown_fable_variant_uses_fable_rate() {
+        // будущий claude-fable-6 / claude-fable-5[1m] → ставка Fable, не ноль
+        let c = PricingTable.cost(model: "claude-fable-5[1m]", inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheCreateTokens: 0)
+        XCTAssertEqual(c, 10.0, accuracy: 0.0001)
+    }
+
+    func test_unknown_mythos_variant_uses_mythos_rate() {
+        // claude-mythos-preview и т.п. → ставка Mythos
+        let c = PricingTable.cost(model: "claude-mythos-preview", inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheCreateTokens: 0)
+        XCTAssertEqual(c, 10.0, accuracy: 0.0001)
+    }
+
     // MARK: - OpenAI gpt-5.x (сверено с developers.openai.com/api/docs/pricing)
 
     func test_gpt55_input_5_output_30() {
