@@ -23,7 +23,7 @@ enum CcusageParser {
                     day: day.date,
                     source: source,
                     modelsJson: modelsJson,
-                    inputTokens: day.inputTokens + day.cachedInputTokens,
+                    inputTokens: day.inputTokens + (day.cacheReadTokens ?? 0) + (day.cacheCreationTokens ?? 0),
                     inputTokensNoCache: day.inputTokens,
                     outputTokens: day.outputTokens + reasoningOut,
                     costUsd: cost,
@@ -36,15 +36,15 @@ enum CcusageParser {
                             model: name,
                             inputTokens: stats.inputTokens,
                             outputTokens: stats.outputTokens + reasoningOutModel,
-                            cacheReadTokens: stats.cachedInputTokens ?? 0,
-                            cacheCreateTokens: 0
+                            cacheReadTokens: stats.cacheReadTokens ?? 0,
+                            cacheCreateTokens: stats.cacheCreationTokens ?? 0
                         )
                         modelRows.append(AIUsageModelRow(
                             id: nil,
                             day: day.date,
                             source: source,
                             model: name,
-                            inputTokens: stats.inputTokens + (stats.cachedInputTokens ?? 0),
+                            inputTokens: stats.inputTokens + (stats.cacheReadTokens ?? 0) + (stats.cacheCreationTokens ?? 0),
                             inputTokensNoCache: stats.inputTokens,
                             outputTokens: stats.outputTokens + reasoningOutModel,
                             costUsd: modelCost,
@@ -140,8 +140,8 @@ enum CcusageParser {
                 model: name,
                 inputTokens: stats.inputTokens,
                 outputTokens: stats.outputTokens + reasoningOut,
-                cacheReadTokens: stats.cachedInputTokens ?? 0,
-                cacheCreateTokens: 0
+                cacheReadTokens: stats.cacheReadTokens ?? 0,
+                cacheCreateTokens: stats.cacheCreationTokens ?? 0
             )
         }
     }
