@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+## [0.6.2] — 2026-06-08
+
 ### Feature: поддержка Claude Fable 5 и Mythos 5
 
 - **Fable 5 и Mythos 5 считаются по своим ставкам.** Anthropic выпустил `claude-fable-5` ($10/$50 за MTok) — самую мощную общедоступную модель, и `claude-mythos-5` (Project Glasswing, invitation-only). Обе добавлены в `PricingTable` — раньше новая модель шла по нулевой ставке и показывалась за $0. Family-fallback расширен префиксами `claude-fable-`/`claude-mythos-`, чтобы будущие версии и `[1m]`-варианты не занулялись.
