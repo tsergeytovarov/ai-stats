@@ -5,6 +5,8 @@
 
 ## [Unreleased]
 
+## [0.6.3] — 2026-06-09
+
 ### Fix: вернулась статистика Codex/ChatGPT (ccusage сменил схему)
 
 - **Codex снова считается.** ccusage переименовал поля в выводе `codex daily`: `cachedInputTokens` → `cacheReadTokens` + `cacheCreationTokens` (как у claude). DTO держал `cachedInputTokens` обязательным — декод падал с «данные отсутствуют», весь источник Codex замерзал (claude/github при этом продолжали работать). Поля приведены к актуальной схеме и сделаны опциональными, чтобы будущее переименование снова не роняло синк.
