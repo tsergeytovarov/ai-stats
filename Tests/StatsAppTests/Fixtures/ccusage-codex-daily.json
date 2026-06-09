@@ -4,7 +4,8 @@
       "date": "2024-05-20",
       "inputTokens": 12000,
       "outputTokens": 3400,
-      "cachedInputTokens": 5000,
+      "cacheReadTokens": 5000,
+      "cacheCreationTokens": 0,
       "costUSD": 1.42,
       "reasoningOutputTokens": 200,
       "totalTokens": 21200,
@@ -12,14 +13,16 @@
         "gpt-5.5": {
           "inputTokens": 7000,
           "outputTokens": 2000,
-          "cachedInputTokens": 3000,
+          "cacheReadTokens": 3000,
+          "cacheCreationTokens": 0,
           "isFallback": false,
           "totalTokens": 12000
         },
         "codex-auto-review": {
           "inputTokens": 5000,
           "outputTokens": 1400,
-          "cachedInputTokens": 2000,
+          "cacheReadTokens": 2000,
+          "cacheCreationTokens": 0,
           "isFallback": false,
           "totalTokens": 9200
         }

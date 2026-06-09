@@ -5,6 +5,10 @@
 
 ## [Unreleased]
 
+### Fix: вернулась статистика Codex/ChatGPT (ccusage сменил схему)
+
+- **Codex снова считается.** ccusage переименовал поля в выводе `codex daily`: `cachedInputTokens` → `cacheReadTokens` + `cacheCreationTokens` (как у claude). DTO держал `cachedInputTokens` обязательным — декод падал с «данные отсутствуют», весь источник Codex замерзал (claude/github при этом продолжали работать). Поля приведены к актуальной схеме и сделаны опциональными, чтобы будущее переименование снова не роняло синк.
+
 ## [0.6.2] — 2026-06-08
 
 ### Feature: поддержка Claude Fable 5 и Mythos 5
