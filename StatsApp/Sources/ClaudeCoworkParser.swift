@@ -2,8 +2,10 @@ import Foundation
 
 enum ClaudeCoworkParser {
 
+    // `some Sequence<Data>` вместо [Data]: caller может отдать ленивую
+    // последовательность, чтобы не материализовывать все файлы в памяти разом.
     static func parse(
-        files: [Data],
+        files: some Sequence<Data>,
         since: Date,
         timezone: TimeZone,
         now: () -> Date

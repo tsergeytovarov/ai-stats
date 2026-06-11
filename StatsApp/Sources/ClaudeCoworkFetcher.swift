@@ -22,8 +22,10 @@ struct ClaudeCoworkFetcher: Fetcher {
     }
 
     func fetch(since: Date) async throws -> FetchResult {
-        let files = collectJsonlFiles()
-        let datas = files.compactMap { try? Data(contentsOf: $0) }
+        let files = collectJsonlFiles(modifiedSince: since)
+        // Ленивое чтение: в памяти живёт один файл за раз, а не вся история
+        // Cowork-сессий разом (раньше — peak footprint в сотни MB на каждый тик).
+        let datas = files.lazy.compactMap { try? Data(contentsOf: $0) }
         let payload = try ClaudeCoworkParser.parse(
             files: datas, since: since, timezone: timezone, now: now
         )
@@ -32,11 +34,17 @@ struct ClaudeCoworkFetcher: Fetcher {
 
     // Enumerates all *.jsonl that are inside a `.claude/projects/` subtree
     // under sessionsBaseURL. Hidden dirs are included intentionally — .claude is one.
-    private func collectJsonlFiles() -> [URL] {
+    //
+    // mtime-фильтр: jsonl-транскрипты append-only, поэтому mtime файла >=
+    // timestamp последней записи. Файл, не менявшийся с `since`, не содержит
+    // записей новее `since` — парсер всё равно отфильтровал бы его целиком.
+    // Скипаем ДО чтения: без этого каждый sync-тик перечитывал и перепарсивал
+    // всю историю сессий (сотни MB JSON), выжигая CPU и память.
+    private func collectJsonlFiles(modifiedSince since: Date) -> [URL] {
         guard FileManager.default.fileExists(atPath: sessionsBaseURL.path) else { return [] }
         guard let enumerator = FileManager.default.enumerator(
             at: sessionsBaseURL,
-            includingPropertiesForKeys: nil,
+            includingPropertiesForKeys: [.contentModificationDateKey],
             options: []
         ) else { return [] }
 
@@ -49,6 +57,12 @@ struct ClaudeCoworkFetcher: Fetcher {
                   dotClaudeIdx + 1 < components.count,
                   components[dotClaudeIdx + 1] == "projects"
             else { continue }
+            // Нет mtime (exotic FS, гонка с удалением) — читаем файл, данные
+            // важнее микрооптимизации.
+            if let mtime = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate,
+               mtime < since {
+                continue
+            }
             results.append(url)
         }
         return results

@@ -44,6 +44,45 @@ final class ClaudeCoworkFetcherTests: XCTestCase {
         XCTAssertEqual(payload.dayRows[0].inputTokens, 100)
     }
 
+    func test_fetcher_skips_files_not_modified_since() async throws {
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let projectsDir = tempDir
+            .appendingPathComponent("cowork-session")
+            .appendingPathComponent("workspace")
+            .appendingPathComponent("local_agent")
+            .appendingPathComponent(".claude")
+            .appendingPathComponent("projects")
+            .appendingPathComponent("project-path")
+        try FileManager.default.createDirectory(at: projectsDir, withIntermediateDirectories: true)
+
+        // Запись внутри датирована ПОСЛЕ since, но mtime файла — ДО since.
+        // Реальный append-only jsonl так выглядеть не может (mtime >= timestamp
+        // последней записи), поэтому фетчер обязан отсеять файл по mtime,
+        // не читая содержимое с диска.
+        let jsonlContent = """
+        {"type":"assistant","timestamp":"2026-01-15T10:00:00Z","requestId":"req_001","message":{"id":"msg_001","model":"claude-opus-4-7","role":"assistant","usage":{"input_tokens":100,"cache_creation_input_tokens":0,"cache_read_input_tokens":0,"output_tokens":50}}}
+        """
+        let fileURL = projectsDir.appendingPathComponent("stale.jsonl")
+        try jsonlContent.write(to: fileURL, atomically: true, encoding: .utf8)
+        let staleDate = ISO8601DateFormatter().date(from: "2025-12-01T00:00:00Z")!
+        try FileManager.default.setAttributes(
+            [.modificationDate: staleDate], ofItemAtPath: fileURL.path
+        )
+
+        let fetcher = ClaudeCoworkFetcher(
+            sessionsBaseURL: tempDir, timezone: utc, now: nowJan15
+        )
+        let result = try await fetcher.fetch(since: sinceJan1)
+
+        guard case .aiUsage(let payload) = result else {
+            return XCTFail("Expected .aiUsage result")
+        }
+        XCTAssertTrue(payload.dayRows.isEmpty, "file with mtime older than since must be skipped unread")
+    }
+
     func test_fetcher_returns_empty_when_sessions_directory_does_not_exist() async throws {
         let nonExistent = URL(fileURLWithPath: "/nonexistent/\(UUID().uuidString)")
         let fetcher = ClaudeCoworkFetcher(
