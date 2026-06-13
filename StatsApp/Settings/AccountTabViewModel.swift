@@ -107,6 +107,12 @@ final class AccountTabViewModel: ObservableObject {
             try secretsStore.setAiuse(resp.deviceToken)
             secretBox.value = resp.deviceToken
 
+            // Полная синхронизация: берём реальное состояние шаринга с сервера, а не
+            // угадываем. Фолбэк на эвристику (новый профиль приватен, линк сохраняет
+            // прежний выбор), только если GET не прошёл — например офлайн.
+            let serverSharing = (try? await api.getMyProfile())?.sharingEnabled
+            let resolvedSharing = serverSharing ?? (linkExisting ? priorSharing : false)
+
             if let token = resp.githubToken {
                 try secretsStore.setGithubAuth(token: token, login: resp.githubLogin)
                 githubTokenBox.value = token
@@ -118,9 +124,7 @@ final class AccountTabViewModel: ObservableObject {
                 friendCode: resp.friendCode,
                 displayName: resp.githubLogin ?? "anon",
                 avatarPath: nil,
-                // Привязка к существующему аккаунту не сбрасывает его выбор шаринга;
-                // новый аккаунт через провайдера приватен по умолчанию (совпадает с сервером).
-                sharingEnabled: linkExisting ? priorSharing : false,
+                sharingEnabled: resolvedSharing,
                 serverUserId: resp.serverUserId,
                 avatarBlob: nil,
                 avatarMime: nil,
