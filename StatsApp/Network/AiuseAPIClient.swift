@@ -68,6 +68,17 @@ final class AiuseAPIClient {
         )
     }
 
+    /// Текущий профиль с сервера (включая sharing_enabled) — источник правды
+    /// для синхронизации локального флага шаринга.
+    func getMyProfile() async throws -> ProfileResponse {
+        return try await request(
+            path: "/profiles/me",
+            method: "GET",
+            authed: true,
+            decodeAs: ProfileResponse.self
+        )
+    }
+
     func regenerateFriendCode() async throws -> RegenerateFriendCodeResponse {
         return try await request(
             path: "/profiles/me/regenerate-friend-code",

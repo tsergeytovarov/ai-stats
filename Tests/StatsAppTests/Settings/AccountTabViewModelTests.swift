@@ -213,4 +213,27 @@ final class AccountTabViewModelTests: XCTestCase {
         let stored = try await dbq.read { try StatsQueries.loadMyProfile($0) }
         XCTAssertEqual(stored?.sharingEnabled, true)
     }
+
+    func test_signInWithGitHub_readsSharingFromServer() async throws {
+        // сервер сообщает, что шаринг ВКЛЮЧЁН — клиент берёт правду с сервера
+        // (GET /profiles/me), а не дефолт «новый профиль → false».
+        MockURLProtocol.responder = { _ in
+            let resp = HTTPURLResponse(
+                url: URL(string: "https://test.local/api/profiles/me")!,
+                statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
+            let json = #"{"friend_code":"AAAA-BBBB-CC","display_name":"octocat","sharing_enabled":true,"global_opt_in":false,"created_at":"2026-06-13T10:00:00Z"}"#
+            return (resp, Data(json.utf8))
+        }
+        defer { MockURLProtocol.responder = nil }
+
+        await vm.signInWithGitHub(includePrivate: false)
+
+        if case let .created(p) = vm.state {
+            XCTAssertTrue(p.sharingEnabled, "клиент должен взять sharing с сервера, а не угадывать")
+        } else {
+            XCTFail("expected created")
+        }
+        let stored = try await dbq.read { try StatsQueries.loadMyProfile($0) }
+        XCTAssertEqual(stored?.sharingEnabled, true)
+    }
 }
