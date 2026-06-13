@@ -108,4 +108,36 @@ final class DropdownViewModelAvatarsTests: XCTestCase {
 
         XCTAssertTrue(vm.friendAvatars.isEmpty)
     }
+
+    func test_loadLeaderboard_serverForbidden_showsSharingOff_notError() async throws {
+        try await dbq.write { db in
+            try StatsQueries.saveMyProfile(db, MyProfileRow(
+                id: 1, friendCode: "ME00000001", displayName: "Я",
+                avatarPath: nil, sharingEnabled: false, serverUserId: 1
+            ))
+        }
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        MockURLProtocol.responder = { _ in
+            let resp = HTTPURLResponse(
+                url: URL(string: "https://test.local/api/leaderboard")!,
+                statusCode: 403, httpVersion: "HTTP/1.1", headerFields: nil)!
+            return (resp, Data(#"{"detail":"hidden"}"#.utf8))
+        }
+        defer { MockURLProtocol.responder = nil }
+        let api = AiuseAPIClient(
+            baseURL: URL(string: "https://test.local/api")!,
+            secretProvider: { "tok" },
+            session: URLSession(configuration: config)
+        )
+        let coord = await SyncCoordinator(db: dbq, now: Date.init)
+        let vm = DropdownViewModel(db: dbq, syncCoordinator: coord, api: api, hasAccount: { true })
+        vm.leaderboard = [entry("STALE0001", isMe: false, rank: 1)]  // устаревший кэш
+
+        await vm.loadLeaderboard()
+
+        XCTAssertTrue(vm.leaderboardSharingOff)
+        XCTAssertNil(vm.leaderboardError)
+        XCTAssertTrue(vm.leaderboard.isEmpty, "403 должен прятать чужой кэш")
+    }
 }

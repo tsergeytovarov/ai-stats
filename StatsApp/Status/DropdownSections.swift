@@ -198,7 +198,11 @@ struct DropdownLeaderboardSection: View {
                 .padding(.top, 10)
                 .padding(.bottom, 6)
 
-            if let error = viewModel.leaderboardError {
+            if viewModel.leaderboardSharingOff {
+                Text("widget.leaderboard.no_account")
+                    .font(BrandFont.caption)
+                    .foregroundStyle(TextColor.muted)
+            } else if let error = viewModel.leaderboardError {
                 Text(error).font(BrandFont.caption).foregroundStyle(BrandColor.danger)
             } else if viewModel.leaderboard.isEmpty {
                 Text("widget.leaderboard.empty")

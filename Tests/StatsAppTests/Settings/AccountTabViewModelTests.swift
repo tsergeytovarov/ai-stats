@@ -186,4 +186,31 @@ final class AccountTabViewModelTests: XCTestCase {
         XCTAssertEqual(stored?.avatarBlob, initialBlob)
         XCTAssertEqual(stored?.avatarEtag, "v1")
     }
+
+    func test_signInWithGitHub_linkExisting_preservesSharing() async throws {
+        // существующий аккаунт с ВКЛЮЧЁННЫМ шарингом
+        try await dbq.write { db in
+            try StatsQueries.saveMyProfile(db, MyProfileRow(
+                id: 1, friendCode: "OLD0000001", displayName: "Old",
+                avatarPath: nil, sharingEnabled: true, serverUserId: 7
+            ))
+        }
+        await vm.reload()
+        guard case .created = vm.state else {
+            XCTFail("expected created")
+            return
+        }
+
+        // вход через GitHub в существующий аккаунт (linkExisting=true)
+        await vm.signInWithGitHub(includePrivate: false)
+
+        // шаринг НЕ сброшен в false
+        if case let .created(p) = vm.state {
+            XCTAssertTrue(p.sharingEnabled, "линк существующего аккаунта не должен сбрасывать шаринг")
+        } else {
+            XCTFail("expected created")
+        }
+        let stored = try await dbq.read { try StatsQueries.loadMyProfile($0) }
+        XCTAssertEqual(stored?.sharingEnabled, true)
+    }
 }
