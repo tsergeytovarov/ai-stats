@@ -38,8 +38,8 @@ targets:
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
         CFBundleDisplayName: Burn
         CFBundleName: Burn
-        CFBundleShortVersionString: "0.6.4"
-        CFBundleVersion: "13"
+        CFBundleShortVersionString: "0.6.5"
+        CFBundleVersion: "14"
         NSHumanReadableCopyright: "Sergey Tovarov, MIT"
         CFBundleDevelopmentRegion: en
         CFBundleLocalizations: [en, ru]
@@ -72,8 +72,8 @@ targets:
       path: StatsWidget/Info.plist
       properties:
         CFBundleDisplayName: Burn Widget
-        CFBundleShortVersionString: "0.6.4"
-        CFBundleVersion: "13"
+        CFBundleShortVersionString: "0.6.5"
+        CFBundleVersion: "14"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     entitlements:
