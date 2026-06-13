@@ -69,6 +69,9 @@ final class DropdownViewModel: ObservableObject {
     // Leaderboard (v0.3.0)
     @Published var leaderboard: [LeaderboardEntry] = []
     @Published var leaderboardError: String?
+    /// true — сервер скрыл борду из-за выключенного шаринга (403). Не ошибка:
+    /// UI показывает подсказку «включи шаринг», а не красный error.
+    @Published var leaderboardSharingOff: Bool = false
     @Published var leaderboardLoading: Bool = false
     @Published var friendAvatars: [String: Data] = [:]   // friend_code → avatar bytes
 
@@ -157,11 +160,13 @@ final class DropdownViewModel: ObservableObject {
         guard let api, hasAccount() else {
             leaderboard = []
             leaderboardError = nil
+            leaderboardSharingOff = false
             return
         }
         leaderboardLoading = true
         defer { leaderboardLoading = false }
         leaderboardError = nil
+        leaderboardSharingOff = false
 
         let apiPeriod: String
         switch period {
@@ -194,6 +199,13 @@ final class DropdownViewModel: ObservableObject {
                let writer = db as? any DatabaseWriter {
                 try? await writer.write { try StatsQueries.saveLeaderboardCache($0, period: apiPeriod, payloadJson: json) }
             }
+        } catch AiuseAPIError.http(403, _) {
+            // sharing_enabled=false на сервере — борда намеренно скрыта (free-rider
+            // protection), это не ошибка. Показываем подсказку «включи шаринг» и
+            // прячем возможный устаревший кэш чужих результатов.
+            leaderboard = []
+            leaderboardError = nil
+            leaderboardSharingOff = true
         } catch {
             // Если кэша не было — показываем ошибку. Иначе тихо живём с кэшем.
             if leaderboard.isEmpty {

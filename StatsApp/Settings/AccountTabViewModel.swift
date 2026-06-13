@@ -94,7 +94,14 @@ final class AccountTabViewModel: ObservableObject {
         errorMessage = nil
         do {
             let linkExisting: Bool
-            if case .created = state { linkExisting = true } else { linkExisting = false }
+            let priorSharing: Bool
+            if case let .created(existing) = state {
+                linkExisting = true
+                priorSharing = existing.sharingEnabled
+            } else {
+                linkExisting = false
+                priorSharing = false
+            }
             let resp = try await auth.signIn(provider: "github", includePrivate: includePrivate, linkExisting: linkExisting)
 
             try secretsStore.setAiuse(resp.deviceToken)
@@ -111,7 +118,9 @@ final class AccountTabViewModel: ObservableObject {
                 friendCode: resp.friendCode,
                 displayName: resp.githubLogin ?? "anon",
                 avatarPath: nil,
-                sharingEnabled: false,
+                // Привязка к существующему аккаунту не сбрасывает его выбор шаринга;
+                // новый аккаунт через провайдера приватен по умолчанию (совпадает с сервером).
+                sharingEnabled: linkExisting ? priorSharing : false,
                 serverUserId: resp.serverUserId,
                 avatarBlob: nil,
                 avatarMime: nil,
