@@ -53,7 +53,16 @@ final class SnapshotSyncer {
             return 0
         }
 
-        // 2. Обновляем pending_snapshots из ai_usage за нужное окно.
+        // 2. Backfill даёт «похороненным» по attempts снапшотам новый шанс:
+        //    транзиентная сетевая ошибка (-1005 и т.п.) не должна блокировать
+        //    отправку навсегда после 5 неудач.
+        if backfill {
+            try await db.write { db in
+                try StatsQueries.resetAllPendingAttempts(db)
+            }
+        }
+
+        // 3. Обновляем pending_snapshots из ai_usage за нужное окно.
         let lookback = backfill ? backfillLookbackDays : lookbackDays
         let sinceDay = Self.isoDayString(date: now().addingTimeInterval(-Double(lookback) * 86400))
         try await db.write { db in

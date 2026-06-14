@@ -270,6 +270,14 @@ enum StatsQueries {
         }
     }
 
+    /// Сбрасывает attempts/last_error у всех pending — даёт «похороненным» по лимиту
+    /// попыток снапшотам новый шанс. Зовётся при backfill: транзиентная сетевая ошибка
+    /// (например -1005 «network connection was lost») не должна блокировать отправку
+    /// навсегда — после 5 неудач снапшот иначе выпадал из выборки `attempts < 5`.
+    static func resetAllPendingAttempts(_ db: GRDB.Database) throws {
+        try db.execute(sql: "UPDATE pending_snapshots SET attempts = 0, last_error = NULL")
+    }
+
     // MARK: - aiuse: friend_profiles
 
     static func upsertFriendProfile(_ db: GRDB.Database, _ row: FriendProfileRow) throws {
