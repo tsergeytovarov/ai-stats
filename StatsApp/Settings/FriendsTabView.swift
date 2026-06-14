@@ -60,7 +60,7 @@ struct FriendsTabView: View {
             AvatarView(data: friend.avatarBlob, size: 32)
             VStack(alignment: .leading, spacing: 2) {
                 Text(friend.displayName).font(.body)
-                Text(formatFriendCode(friend.friendCode))
+                Text(FriendCode.formatted(friend.friendCode))
                     .font(.system(.caption, design: .monospaced))
                     .foregroundStyle(.secondary)
                 if !friend.sharingEnabled {
@@ -82,12 +82,5 @@ struct FriendsTabView: View {
             .fixedSize()
         }
         .padding(.vertical, 6)
-    }
-
-    private func formatFriendCode(_ raw: String) -> String {
-        guard raw.count == 10 else { return raw }
-        let i1 = raw.index(raw.startIndex, offsetBy: 4)
-        let i2 = raw.index(raw.startIndex, offsetBy: 8)
-        return "\(raw[..<i1])-\(raw[i1..<i2])-\(raw[i2...])"
     }
 }

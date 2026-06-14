@@ -36,4 +36,13 @@ enum FriendCode {
         }
         return normalized
     }
+
+    /// Форматирует код для показа: `XK7P3M9Q2A` → `XK7P-3M9Q-2A` (группы 4-4-2).
+    /// Длину, отличную от канонических 10 символов, возвращает без изменений.
+    static func formatted(_ raw: String) -> String {
+        guard raw.count == 10 else { return raw }
+        let i1 = raw.index(raw.startIndex, offsetBy: 4)
+        let i2 = raw.index(raw.startIndex, offsetBy: 8)
+        return "\(raw[..<i1])-\(raw[i1..<i2])-\(raw[i2...])"
+    }
 }

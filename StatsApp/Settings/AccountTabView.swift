@@ -141,12 +141,12 @@ struct AccountTabView: View {
 
         Text("Твой код для друзей").font(.headline)
         HStack {
-            Text(formatFriendCode(profile.friendCode))
+            Text(FriendCode.formatted(profile.friendCode))
                 .font(.system(.title3, design: .monospaced))
             Spacer()
             Button("Копировать") {
                 NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(profile.friendCode, forType: .string)
+                NSPasteboard.general.setString(FriendCode.formatted(profile.friendCode), forType: .string)
             }
         }
 
@@ -201,7 +201,6 @@ struct AccountTabView: View {
         }
     }
 
-    /// "XK7P3M9Q2A" → "XK7P-3M9Q-2A"
     private func saveName() async {
         let name = editingName.trimmingCharacters(in: .whitespaces)
         guard !name.isEmpty else { return }
@@ -209,13 +208,6 @@ struct AccountTabView: View {
         if viewModel.errorMessage == nil {
             isEditingName = false
         }
-    }
-
-    private func formatFriendCode(_ raw: String) -> String {
-        guard raw.count == 10 else { return raw }
-        let i1 = raw.index(raw.startIndex, offsetBy: 4)
-        let i2 = raw.index(raw.startIndex, offsetBy: 8)
-        return "\(raw[..<i1])-\(raw[i1..<i2])-\(raw[i2...])"
     }
 
     private func pickAvatar() {

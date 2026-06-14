@@ -84,4 +84,21 @@ final class FriendCodeTests: XCTestCase {
             XCTFail("неожиданная ошибка: \(error)")
         }
     }
+
+    // MARK: - formatted
+
+    func test_formatted_groups_canonical_code_4_4_2() {
+        XCTAssertEqual(FriendCode.formatted("XK7P3M9Q2A"), "XK7P-3M9Q-2A")
+    }
+
+    func test_formatted_returns_non_canonical_length_unchanged() {
+        // Короче/длиннее 10 символов — не трогаем (legacy/частичный ввод).
+        XCTAssertEqual(FriendCode.formatted("XK7P3M9Q"), "XK7P3M9Q")
+        XCTAssertEqual(FriendCode.formatted(""), "")
+    }
+
+    func test_formatted_normalize_roundtrip() {
+        // То, что показали с дефисами, normalize возвращает к канону.
+        XCTAssertEqual(FriendCode.normalize(FriendCode.formatted("XK7P3M9Q2A")), "XK7P3M9Q2A")
+    }
 }
