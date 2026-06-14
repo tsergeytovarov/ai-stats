@@ -45,7 +45,7 @@ enum StatsQueries {
         let placeholders = days.map { _ in "?" }.joined(separator: ",")
         let sql = """
             SELECT COALESCE(SUM(cost_usd), 0) AS c,
-                   COALESCE(SUM(input_tokens), 0) AS i,
+                   COALESCE(SUM(input_tokens_no_cache), 0) AS i,
                    COALESCE(SUM(output_tokens), 0) AS o
             FROM ai_usage WHERE day IN (\(placeholders))
         """
@@ -63,7 +63,7 @@ enum StatsQueries {
         let sql = """
             SELECT source,
                    SUM(cost_usd) AS c,
-                   SUM(input_tokens) AS i,
+                   SUM(input_tokens_no_cache) AS i,
                    SUM(output_tokens) AS o
             FROM ai_usage WHERE day IN (\(placeholders))
             GROUP BY source ORDER BY source
@@ -102,7 +102,7 @@ enum StatsQueries {
         guard !days.isEmpty else { return [] }
         let placeholders = days.map { _ in "?" }.joined(separator: ",")
         let sql = """
-            SELECT model, source, SUM(cost_usd) AS c, SUM(input_tokens) AS i, SUM(output_tokens) AS o
+            SELECT model, source, SUM(cost_usd) AS c, SUM(input_tokens_no_cache) AS i, SUM(output_tokens) AS o
             FROM ai_usage_model WHERE day IN (\(placeholders))
             GROUP BY model, source
             ORDER BY c DESC

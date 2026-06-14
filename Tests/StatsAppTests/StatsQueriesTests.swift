@@ -14,9 +14,9 @@ final class StatsQueriesTests: XCTestCase {
     private func seed() throws {
         try dbq.write { db in
             let ai = [
-                AIUsageRow(id: nil, day: "2024-05-22", source: "claude", modelsJson: "[]", inputTokens: 100, outputTokens: 50, costUsd: 2.0, updatedAt: "now"),
-                AIUsageRow(id: nil, day: "2024-05-22", source: "codex", modelsJson: "[]", inputTokens: 200, outputTokens: 100, costUsd: 3.0, updatedAt: "now"),
-                AIUsageRow(id: nil, day: "2024-05-20", source: "claude", modelsJson: "[]", inputTokens: 80, outputTokens: 20, costUsd: 1.5, updatedAt: "now"),
+                AIUsageRow(id: nil, day: "2024-05-22", source: "claude", modelsJson: "[]", inputTokens: 100, inputTokensNoCache: 100, outputTokens: 50, costUsd: 2.0, updatedAt: "now"),
+                AIUsageRow(id: nil, day: "2024-05-22", source: "codex", modelsJson: "[]", inputTokens: 200, inputTokensNoCache: 200, outputTokens: 100, costUsd: 3.0, updatedAt: "now"),
+                AIUsageRow(id: nil, day: "2024-05-20", source: "claude", modelsJson: "[]", inputTokens: 80, inputTokensNoCache: 80, outputTokens: 20, costUsd: 1.5, updatedAt: "now"),
             ]
             for var row in ai { try row.insert(db) }
 
@@ -45,6 +45,25 @@ final class StatsQueriesTests: XCTestCase {
         XCTAssertEqual(bySource.count, 2)
         XCTAssertEqual(bySource.first { $0.source == "claude" }?.costUsd, 2.0)
         XCTAssertEqual(bySource.first { $0.source == "codex" }?.costUsd, 3.0)
+    }
+
+    func test_aiTotals_shows_tokens_without_cache() throws {
+        // input_tokens (с кэшем) = 1000, input_tokens_no_cache = 300.
+        try dbq.write { db in
+            var row = AIUsageRow(
+                id: nil, day: "2024-06-01", source: "claude", modelsJson: "[]",
+                inputTokens: 1000, inputTokensNoCache: 300, outputTokens: 200,
+                costUsd: 5.0, updatedAt: "now"
+            )
+            try row.insert(db)
+        }
+        let totals = try dbq.read { db in
+            try StatsQueries.aiTotals(in: db, days: ["2024-06-01"])
+        }
+        // На дашборд идёт «честный» объём без кэша — 300, а не раздутые 1000.
+        XCTAssertEqual(totals.totalInputTokens, 300)
+        // Стоимость считается отдельно (по всем токенам) и не занижается.
+        XCTAssertEqual(totals.totalCost, 5.0, accuracy: 0.001)
     }
 
     func test_githubTotals_returns_commits_and_repo_count() throws {
