@@ -33,6 +33,9 @@ struct CategoryPill: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: BrandRadius.pill, style: .continuous))
                 .shadow(color: isActive ? BrandColor.pink.opacity(0.45) : .clear, radius: 6, x: 0, y: 4)
+                // Без contentShape тап ловит только непрозрачный текст: фон неактивного
+                // пилла — Color.clear, поэтому padding оставался мёртвой зоной.
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isActive ? [.isSelected] : [])
@@ -65,6 +68,8 @@ struct PeriodSegment: View {
                         )
                         .clipShape(RoundedRectangle(cornerRadius: BrandRadius.pill, style: .continuous))
                         .shadow(color: p == selection ? BrandColor.cyan.opacity(0.45) : .clear, radius: 4, x: 0, y: 2)
+                        // Вся область сегмента кликабельна, а не только глиф текста.
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }
