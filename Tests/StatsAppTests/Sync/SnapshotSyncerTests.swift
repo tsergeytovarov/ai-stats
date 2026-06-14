@@ -177,4 +177,68 @@ final class SnapshotSyncerTests: XCTestCase {
         let remaining = try await db.read { try StatsQueries.loadReadyPendingSnapshots($0) }
         XCTAssertEqual(remaining.count, 0)
     }
+
+    // MARK: - backfill
+
+    @MainActor
+    func testBackfill_includesHistoryBeyondLookback() async throws {
+        try insertMyProfile()
+        // ~56 дней назад — заведомо вне обычного 7-дневного окна.
+        try insertUsage(day: "2026-04-01", input: 100, output: 200)
+        apiResponse = .success(SnapshotsResponse(accepted: 1))
+        let syncer = makeSyncer()
+
+        // Обычный тик старьё не трогает.
+        let incremental = try await syncer.runOnce()
+        XCTAssertEqual(incremental, 0)
+        XCTAssertEqual(apiCalls.count, 0)
+
+        // Backfill заливает всю историю.
+        let backfilled = try await syncer.runOnce(backfill: true)
+        XCTAssertEqual(backfilled, 1)
+        XCTAssertEqual(apiCalls.count, 1)
+        XCTAssertEqual(apiCalls.first?.hourBucket, "2026-04-01T00:00:00Z")
+    }
+
+    @MainActor
+    func testBackfill_paginatesBeyondBatchLimit() async throws {
+        try insertMyProfile()
+        // 200 дней истории — больше одного батча (168): проверяем пагинацию.
+        let nowDate = Date(timeIntervalSince1970: 1779840000)  // 2026-05-27
+        for i in 1...200 {
+            let day = SnapshotSyncer.isoDayString(date: nowDate.addingTimeInterval(-Double(i) * 86400))
+            try insertUsage(day: day, input: 1, output: 1)
+        }
+        apiResponse = .success(SnapshotsResponse(accepted: 0))
+        let syncer = makeSyncer()
+
+        _ = try await syncer.runOnce(backfill: true)
+
+        XCTAssertEqual(apiCalls.count, 200, "все 200 дней должны уйти через несколько батчей")
+        let remaining = try await db.read { try StatsQueries.loadReadyPendingSnapshots($0) }
+        XCTAssertEqual(remaining.count, 0)
+    }
+
+    @MainActor
+    func testBackfill_resetsStuckAttempts() async throws {
+        try insertMyProfile()
+        try insertUsage(day: "2026-05-25", input: 100, output: 200)
+
+        // Хороним снапшот: 5 неудачных попыток отправки (как у simonenko с -1005).
+        apiResponse = .failure(AiuseAPIError.http(status: 503, body: ""))
+        let syncer = makeSyncer()
+        for _ in 0..<5 { _ = try? await syncer.runOnce() }
+
+        // Обычный тик «похороненный» attempts>=5 уже не видит.
+        apiResponse = .success(SnapshotsResponse(accepted: 1))
+        apiCalls = []
+        let incremental = try await syncer.runOnce()
+        XCTAssertEqual(incremental, 0)
+        XCTAssertEqual(apiCalls.count, 0)
+
+        // Backfill сбрасывает attempts → снапшот снова уходит.
+        let backfilled = try await syncer.runOnce(backfill: true)
+        XCTAssertEqual(backfilled, 1)
+        XCTAssertEqual(apiCalls.count, 1)
+    }
 }

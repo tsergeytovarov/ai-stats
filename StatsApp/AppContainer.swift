@@ -176,7 +176,20 @@ final class AppContainer {
             db: dbPool
         )
         vm.onSignedIn = { [weak self] in await self?.refreshSourcesAfterSignIn() }
+        vm.onSharingEnabled = { [weak self] in await self?.runSnapshotBackfillNow() }
         return vm
+    }
+
+    /// Немедленная выгрузка снапшотов с backfill всей истории — вызывается при
+    /// включении шаринга и входе в шарящий аккаунт, чтобы не ждать периодического
+    /// ccusage-тика (раньше toggleSharing только PATCH'ил флаг, и снапшоты висели
+    /// неотправленными до следующего тика — до 15 минут, а история вообще не уходила).
+    func runSnapshotBackfillNow() async {
+        do {
+            _ = try await snapshotSyncer.runOnce(backfill: true)
+        } catch {
+            AppLogger.aiuse.error("snapshot backfill failed: \(error.localizedDescription, privacy: .private)")
+        }
     }
 
     /// Пересобирает fetcher-источники из актуальных box'ов (токен/логин обновлены

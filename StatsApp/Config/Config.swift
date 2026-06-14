@@ -32,7 +32,7 @@ struct Config: Equatable {
             syncIntervalMinutes: container.syncIntervalMinutes ?? 15,
             ccusageCommand: container.ccusageCommand ?? ["npx", "-y", "ccusage@20"],
             enabledProviders: container.enabledProviders ?? ["claude", "codex"],
-            aiuseApiBaseURL: container.aiuseApiBaseURL ?? "https://aiuse.popovs.tech/api",
+            aiuseApiBaseURL: container.aiuseApiBaseURL.flatMap { $0.isEmpty ? nil : $0 } ?? "https://aiuse.popovs.tech/api",
             demoMode: container.demoMode ?? false
         )
     }

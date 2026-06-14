@@ -16,6 +16,10 @@ final class AccountTabViewModel: ObservableObject {
     /// Колбэк после успешного GitHub-входа (AppContainer вешает live-пересборку источников). nil в тестах → no-op.
     var onSignedIn: (() async -> Void)?
 
+    /// Колбэк при включении шаринга (или входе в уже шарящий аккаунт): AppContainer
+    /// вешает немедленную backfill-выгрузку снапшотов. nil в тестах → no-op.
+    var onSharingEnabled: (() async -> Void)?
+
     private let api: AiuseAPIClient
     private let auth: GitHubSignInService
     private let secretsStore: SecretsStore
@@ -43,7 +47,17 @@ final class AccountTabViewModel: ObservableObject {
     func reload() async {
         state = .loading
         do {
-            if let profile = try await db.read({ try StatsQueries.loadMyProfile($0) }) {
+            if var profile = try await db.read({ try StatsQueries.loadMyProfile($0) }) {
+                // Серверный sharing — источник правды. Если локальный флаг разошёлся
+                // (профиль создан до включения шаринга, либо шаринг включали на другом
+                // устройстве), он застревал бы, и SnapshotSyncer молча ничего не слал.
+                // Подтягиваем и чиним; если шаринг включился — догоняем выгрузку.
+                if let serverSharing = (try? await api.getMyProfile())?.sharingEnabled,
+                   serverSharing != profile.sharingEnabled {
+                    profile.sharingEnabled = serverSharing
+                    try? await db.write { try StatsQueries.saveMyProfile($0, profile) }
+                    if serverSharing { await onSharingEnabled?() }
+                }
                 state = .created(profile)
             } else {
                 state = .notCreated
@@ -151,6 +165,8 @@ final class AccountTabViewModel: ObservableObject {
                 }
             }
             await onSignedIn?()
+            // Вошли в аккаунт, где шаринг уже включён — догоняем выгрузку истории.
+            if resolvedSharing { await onSharingEnabled?() }
         } catch AuthError.cancelled {
             // молча — юзер сам закрыл окно входа
         } catch {
@@ -203,6 +219,9 @@ final class AccountTabViewModel: ObservableObject {
             updated.sharingEnabled = enabled
             try await db.write { try StatsQueries.saveMyProfile($0, updated) }
             state = .created(updated)
+            // Включили шаринг — сразу заливаем накопленную историю, не дожидаясь
+            // периодического ccusage-тика (иначе на борде висел бы 0 до 15 минут).
+            if enabled { await onSharingEnabled?() }
         } catch {
             errorMessage = "Не удалось переключить шаринг: \(error.localizedDescription)"
         }
