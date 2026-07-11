@@ -8,7 +8,10 @@ import GRDB
 struct AnalyticsIngestor {
 
     /// Версия расчёта (PricingTable + судейские коэффициенты). Бамп → пересчёт in-place.
-    static let currentPricingVersion = "1"
+    // Версия расчёта вердикта: бустать при ЛЮБОЙ смене логики cost/tier/exp
+    // (не только прайса) — иначе хранимые в analytics_turns вердикты остаются
+    // старыми. v2: filler-гейт подтверждений (exp_saved 0 для «да»/«ок»/«1»).
+    static let currentPricingVersion = "2"
 
     let claudeProjectsBaseURL: URL
     let codexSessionsBaseURL: URL

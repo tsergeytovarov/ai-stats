@@ -95,21 +95,26 @@ final class SyncCoordinator {
     /// `analytics_meta.last_ingest_at`. После успешного ингеста пересчитывает и
     /// пишет снапшот виджета (поля советника, C9). Возвращает true, если ингест
     /// выполнен (иначе — скип по гейту / ингест не сконфигурирован).
+    /// `force` — обойти часовой гейт (используется на старте приложения: ингест
+    /// всегда прогоняет пересчёт вердиктов по хранимым полям, а смена версии
+    /// расчёта иначе не подхватилась бы при перезапуске в пределах часа).
     @discardableResult
-    func maybeRunAnalyticsIngest() async -> Bool {
+    func maybeRunAnalyticsIngest(force: Bool = false) async -> Bool {
         guard let analyticsIngest else { return false }
         let nowDate = now()
         let iso = ISO8601DateFormatter()
         iso.formatOptions = [.withInternetDateTime]
         do {
-            let lastValue = try await db.read { db in
-                try AnalyticsMetaRow
-                    .filter(AnalyticsMetaRow.Columns.key == "last_ingest_at")
-                    .fetchOne(db)?.value
-            }
-            if let lastValue, let last = iso.date(from: lastValue),
-               nowDate.timeIntervalSince(last) < Self.analyticsIngestInterval {
-                return false  // <1ч с прошлого ингеста — скип.
+            if !force {
+                let lastValue = try await db.read { db in
+                    try AnalyticsMetaRow
+                        .filter(AnalyticsMetaRow.Columns.key == "last_ingest_at")
+                        .fetchOne(db)?.value
+                }
+                if let lastValue, let last = iso.date(from: lastValue),
+                   nowDate.timeIntervalSince(last) < Self.analyticsIngestInterval {
+                    return false  // <1ч с прошлого ингеста — скип (только для тика).
+                }
             }
 
             try await analyticsIngest()

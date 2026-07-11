@@ -166,8 +166,9 @@ final class AppContainer {
         for (name, fetchers) in sources {
             try? await syncCoordinator.runOnce(source: name, fetchers: fetchers)
         }
-        // Ингест аналитики при старте (гейт раз в час — первый запуск всегда проходит).
-        await syncCoordinator.maybeRunAnalyticsIngest()
+        // Ингест аналитики при старте — безусловно (force), чтобы смена версии
+        // расчёта вердиктов подхватилась даже при перезапуске в пределах часа.
+        await syncCoordinator.maybeRunAnalyticsIngest(force: true)
         let interval = TimeInterval(config.syncIntervalMinutes * 60)
         syncCoordinator.startTimer(interval: interval, sources: sources)
         await dropdownViewModel.reload()

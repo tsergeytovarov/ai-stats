@@ -1,8 +1,11 @@
 import Foundation
 
-/// Шпаргалка «какую модель когда» (спека 2.2). Codex — живьём из
-/// `~/.codex/models_cache.json` (только `visibility == "list"`, в порядке файла);
-/// файла нет / не парсится — Codex-раздел пустой. Claude — статическая таблица.
+/// Шпаргалка «какую модель когда» (спека 2.2). Список Codex-моделей и порядок —
+/// из `~/.codex/models_cache.json` (только `visibility == "list"`), но описания
+/// свои — курированные, на русском, по задачам (в кэше — маркетинговые blurb'ы
+/// на английском, они не говорят ДЛЯ ЧЕГО модель). Для незнакомого slug'а —
+/// fallback на текст из кэша. Файла нет / не парсится — Codex-раздел пустой.
+/// Claude — статическая таблица.
 struct ModelGuide: Equatable {
     struct Entry: Equatable {
         let slug: String
@@ -12,12 +15,23 @@ struct ModelGuide: Equatable {
     let codex: [Entry]
     let claude: [Entry]
 
-    /// Claude — фиксированный порядок haiku → sonnet → opus → fable, тексты дословно (спека 2.2).
+    /// Курированные русские описания Codex-моделей по задачам (slug → текст).
+    static let codexDescriptions: [String: String] = [
+        "gpt-5.6-sol":         "самое сложное: архитектура, длинный код, глубокий ресёрч",
+        "gpt-5.6-terra":       "повседневная работа: обычные фичи, правки, ревью",
+        "gpt-5.6-luna":        "простое и быстрое: мелкие правки, поиск, короткие вопросы",
+        "gpt-5.5":             "сложный код и ресёрч (прошлое поколение топовой)",
+        "gpt-5.4":             "надёжно для обычного повседневного кода",
+        "gpt-5.4-mini":        "простые задачи, где важнее скорость и цена",
+        "gpt-5.3-codex-spark": "мгновенные мелкие правки: когда важна скорость, а не глубина",
+    ]
+
+    /// Claude — фиксированный порядок haiku → sonnet → opus → fable, задачи, без жаргона.
     static let claudeStatic: [Entry] = [
         Entry(slug: "haiku", description: "поиск по коду, простые правки, саммари"),
         Entry(slug: "sonnet", description: "основная работа: коммиты, PR, рефакторинг"),
         Entry(slug: "opus", description: "архитектура, глубокое ревью, сложный дебаг"),
-        Entry(slug: "fable", description: "только самые тяжёлые long-horizon задачи"),
+        Entry(slug: "fable", description: "самые тяжёлые многошаговые задачи"),
     ]
 
     /// Собирает шпаргалку. `codexCacheURL` инъектируем; nil → `~/.codex/models_cache.json`.
@@ -36,7 +50,9 @@ struct ModelGuide: Equatable {
             guard (m["visibility"] as? String) == "list",
                   let slug = m["slug"] as? String
             else { return nil }
-            return Entry(slug: slug, description: m["description"] as? String ?? "")
+            // Курированный русский текст; для незнакомой модели — blurb из кэша.
+            let desc = codexDescriptions[slug] ?? (m["description"] as? String ?? "")
+            return Entry(slug: slug, description: desc)
         }
     }
 }
