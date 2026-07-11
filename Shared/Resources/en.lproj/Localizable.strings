@@ -50,4 +50,5 @@
 "period.short.week" = "W";
 "period.short.month" = "M";
 "section.expenses" = "Expenses";
+"section.analytics" = "Analytics";
 "widget.placeholder" = "Open Burn to refresh data";

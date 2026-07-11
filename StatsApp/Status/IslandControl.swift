@@ -88,15 +88,20 @@ struct FloatingIsland: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            // Пока одна категория. План C добавит вторую пилюлю «Аналитика».
             CategoryPill(title: NSLocalizedString("section.expenses", comment: ""),
                          isActive: section == .expenses) { section = .expenses }
+            CategoryPill(title: NSLocalizedString("section.analytics", comment: ""),
+                         isActive: section == .analytics) { section = .analytics }
 
-            Rectangle().fill(Color.white.opacity(0.18))
-                .frame(width: 0.5, height: 18)
-                .padding(.horizontal, 4)
+            // Переключатель периода — только у «Расходов». У «Аналитики» окно
+            // фиксировано (последние 30 дней), период-сегмент скрыт (спека 2.1).
+            if section == .expenses {
+                Rectangle().fill(Color.white.opacity(0.18))
+                    .frame(width: 0.5, height: 18)
+                    .padding(.horizontal, 4)
 
-            PeriodSegment(selection: $period)
+                PeriodSegment(selection: $period)
+            }
         }
         .padding(4)
         .background(

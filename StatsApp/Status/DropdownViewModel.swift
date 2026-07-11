@@ -18,11 +18,13 @@ extension Period {
 
 enum DropdownSection: String, CaseIterable, Identifiable {
     case expenses
+    case analytics
 
     var id: String { rawValue }
     var title: String {
         switch self {
         case .expenses: return "Расходы"
+        case .analytics: return "Аналитика"
         }
     }
 }
@@ -50,6 +52,11 @@ final class DropdownViewModel: ObservableObject {
     @Published var topModels: [ModelTotal] = []
     @Published var sparklineSeries: [Double] = []
     @Published var lastSyncDescription: String = "never"
+
+    /// Карточка «Аналитика» за фикс-окно 30 дней. nil — ещё не загружалась.
+    @Published var analyticsCard: AnalyticsCard?
+    /// Шпаргалка моделей (Codex live + Claude static). Композируется в UI отдельно от карточки.
+    @Published var modelGuide: ModelGuide?
 
     init(db: any DatabaseReader,
          syncCoordinator: SyncCoordinator) {
@@ -99,6 +106,18 @@ final class DropdownViewModel: ObservableObject {
             // GRDB errors могут содержать SQL — .private. Тип ошибки тоже не делаем .public,
             // чтобы не светить internals в Console.app.
             AppLogger.sync.error("Reload failed: \(error.localizedDescription, privacy: .private)")
+        }
+    }
+
+    /// Загружает карточку «Аналитика» из БД (окно 30 дней) + шпаргалку моделей.
+    /// Вкладка «Аналитика» без переключателя периода — окно фиксировано в builder'е.
+    func loadAnalytics() async {
+        do {
+            let card = try await db.read { db in try AnalyticsCardBuilder().build(in: db) }
+            self.analyticsCard = card
+            self.modelGuide = ModelGuide.load()
+        } catch {
+            AppLogger.sync.error("loadAnalytics failed: \(error.localizedDescription, privacy: .private)")
         }
     }
 

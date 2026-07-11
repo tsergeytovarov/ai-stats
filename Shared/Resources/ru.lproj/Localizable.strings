@@ -50,4 +50,5 @@
 "period.short.week" = "Н";
 "period.short.month" = "М";
 "section.expenses" = "Расходы";
+"section.analytics" = "Аналитика";
 "widget.placeholder" = "Открой Burn, чтобы обновить данные";

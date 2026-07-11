@@ -38,12 +38,19 @@ struct DropdownView: View {
                 .padding(.bottom, BrandSpacing.islandBottomOffset)
         }
         .frame(width: 400, height: 560)
+        .onChange(of: viewModel.section) { _, newValue in
+            if newValue == .analytics {
+                Task { await viewModel.loadAnalytics() }
+            }
+        }
     }
 
     @ViewBuilder private var content: some View {
         switch viewModel.section {
         case .expenses:
             DropdownAISection(viewModel: viewModel)
+        case .analytics:
+            DropdownAnalyticsSection(viewModel: viewModel)
         }
     }
 }
