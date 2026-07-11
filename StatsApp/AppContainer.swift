@@ -73,7 +73,13 @@ final class AppContainer {
             webAuth: ASWebAuthenticator()
         )
 
-        let coordinator = SyncCoordinator(db: dbPool)
+        // Ингестор аналитики читает ~/.claude и ~/.codex; SyncCoordinator дёргает
+        // его с гейтом раз в час (спека 5.1).
+        let ingestor = AnalyticsIngestor(dbWriter: dbPool)
+        let coordinator = SyncCoordinator(
+            db: dbPool,
+            analyticsIngest: { try await ingestor.ingest() }
+        )
         self.syncCoordinator = coordinator
         self.dropdownViewModel = DropdownViewModel(
             db: dbPool,
@@ -160,6 +166,8 @@ final class AppContainer {
         for (name, fetchers) in sources {
             try? await syncCoordinator.runOnce(source: name, fetchers: fetchers)
         }
+        // Ингест аналитики при старте (гейт раз в час — первый запуск всегда проходит).
+        await syncCoordinator.maybeRunAnalyticsIngest()
         let interval = TimeInterval(config.syncIntervalMinutes * 60)
         syncCoordinator.startTimer(interval: interval, sources: sources)
         await dropdownViewModel.reload()

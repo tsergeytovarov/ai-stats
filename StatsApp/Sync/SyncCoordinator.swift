@@ -23,14 +23,22 @@ final class SyncCoordinator {
     private var configuredInterval: TimeInterval = 0
     private(set) var lastSyncAt: [String: Date] = [:]
 
+    /// Инъектируемый ингест аналитики. Гейт «не чаще раза в час» —
+    /// через `analytics_meta.last_ingest_at`. nil — ингест не сконфигурирован.
+    private let analyticsIngest: (() async throws -> Void)?
+    /// Минимальный интервал между ингестами аналитики (спека 5.1: не чаще раза в час).
+    private static let analyticsIngestInterval: TimeInterval = 3600
+
     init(db: any DatabaseWriter,
          testWakeCenter: NotificationCenter? = nil,
          testWakeName: Notification.Name? = nil,
-         now: @escaping () -> Date = Date.init) {
+         now: @escaping () -> Date = Date.init,
+         analyticsIngest: (() async throws -> Void)? = nil) {
         self.db = db
         self.testWakeCenter = testWakeCenter
         self.testWakeName = testWakeName
         self.now = now
+        self.analyticsIngest = analyticsIngest
     }
 
     deinit {
@@ -79,6 +87,45 @@ final class SyncCoordinator {
     func runAllSources() async {
         for (name, fetchers) in configuredSources {
             try? await runOnce(source: name, fetchers: fetchers)
+        }
+        await maybeRunAnalyticsIngest()
+    }
+
+    /// Ингест аналитики с гейтом «не чаще раза в час» (спека 5.1). Метка времени —
+    /// `analytics_meta.last_ingest_at`. После успешного ингеста пересчитывает и
+    /// пишет снапшот виджета (поля советника, C9). Возвращает true, если ингест
+    /// выполнен (иначе — скип по гейту / ингест не сконфигурирован).
+    @discardableResult
+    func maybeRunAnalyticsIngest() async -> Bool {
+        guard let analyticsIngest else { return false }
+        let nowDate = now()
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime]
+        do {
+            let lastValue = try await db.read { db in
+                try AnalyticsMetaRow
+                    .filter(AnalyticsMetaRow.Columns.key == "last_ingest_at")
+                    .fetchOne(db)?.value
+            }
+            if let lastValue, let last = iso.date(from: lastValue),
+               nowDate.timeIntervalSince(last) < Self.analyticsIngestInterval {
+                return false  // <1ч с прошлого ингеста — скип.
+            }
+
+            try await analyticsIngest()
+
+            try await db.write { db in
+                try AnalyticsMetaRow(key: "last_ingest_at", value: iso.string(from: nowDate))
+                    .insert(db, onConflict: .replace)
+            }
+            // Пересчёт снапшота с полями советника (C9) — виджет обновляется без
+            // открытия вкладки «Аналитика».
+            try? buildAndWriteWidgetSnapshot()
+            WidgetCenter.shared.reloadAllTimelines()
+            return true
+        } catch {
+            AppLogger.sync.error("analytics ingest failed: \(error.localizedDescription, privacy: .private)")
+            return false
         }
     }
 
