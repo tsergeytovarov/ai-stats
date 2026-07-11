@@ -34,7 +34,7 @@ final class AnalyticsVerdictTests: XCTestCase {
             nEdits: 0, nTools: 0,
             inputTokens: 100, outputTokens: 100,
             cacheRead: 0, cacheCreate5m: 0, cacheCreate1h: 0,
-            promptChars: 50
+            promptChars: 50, promptHead: "как тут устроен кэш?"
         )
         XCTAssertEqual(v.heurTier, 2)
         XCTAssertEqual(v.cfModel, "claude-haiku-4-5")
@@ -51,7 +51,7 @@ final class AnalyticsVerdictTests: XCTestCase {
             nEdits: 5, nTools: 10,
             inputTokens: 1000, outputTokens: 10_000,
             cacheRead: 0, cacheCreate5m: 0, cacheCreate1h: 0,
-            promptChars: 5000
+            promptChars: 5000, promptHead: "перепиши модуль по спецификации ниже"
         )
         XCTAssertEqual(v.heurTier, 0)
         XCTAssertNil(v.cfModel)
@@ -66,7 +66,7 @@ final class AnalyticsVerdictTests: XCTestCase {
             nEdits: 0, nTools: 0,
             inputTokens: 1000, outputTokens: 100,
             cacheRead: 0, cacheCreate5m: 0, cacheCreate1h: 0,
-            promptChars: 10
+            promptChars: 10, promptHead: "объясни это"
         )
         XCTAssertNil(v.heurTier)
         XCTAssertNil(v.cfModel)
@@ -84,13 +84,43 @@ final class AnalyticsVerdictTests: XCTestCase {
             nEdits: 0, nTools: 2,
             inputTokens: 1000, outputTokens: 2000,
             cacheRead: 0, cacheCreate5m: 0, cacheCreate1h: 0,
-            promptChars: 100
+            promptChars: 100, promptHead: "сделай ревью диффа"
         )
         XCTAssertEqual(v.heurTier, 1)
         XCTAssertEqual(v.cfModel, "gpt-5.4")
         XCTAssertEqual(v.costUsd, 0.065, accuracy: 1e-9)
         XCTAssertEqual(v.cfUsd ?? -1, 0.0325, accuracy: 1e-9)
         XCTAssertEqual(v.expSavedUsd, 0.0325, accuracy: 1e-9)
+    }
+
+    // MARK: - filler (подтверждения не считаются утечкой)
+
+    func test_filler_confirmations_have_zero_saving() {
+        for head in ["да", "ок", "ок ок", "1", "1 — 6 2 — 10", "нет", "+", "   "] {
+            let v = TurnCostCalculator.verdict(
+                source: "claude-code", model: "claude-opus-4-8",
+                nEdits: 0, nTools: 0,
+                inputTokens: 100, outputTokens: 100,
+                cacheRead: 0, cacheCreate5m: 0, cacheCreate1h: 0,
+                promptChars: Int64(head.count), promptHead: head
+            )
+            XCTAssertNil(v.heurTier, "filler '\(head)' не должен получать tier")
+            XCTAssertEqual(v.expSavedUsd, 0, "filler '\(head)' — не утечка")
+            XCTAssertGreaterThan(v.costUsd, 0, "стоимость filler всё равно считается")
+        }
+    }
+
+    func test_real_short_command_is_not_filler() {
+        // «коммит давай» — реальная команда, не подтверждение → остаётся кандидатом.
+        let v = TurnCostCalculator.verdict(
+            source: "claude-code", model: "claude-opus-4-8",
+            nEdits: 0, nTools: 0,
+            inputTokens: 100, outputTokens: 100,
+            cacheRead: 0, cacheCreate5m: 0, cacheCreate1h: 0,
+            promptChars: 12, promptHead: "коммит давай"
+        )
+        XCTAssertEqual(v.heurTier, 2)
+        XCTAssertGreaterThan(v.expSavedUsd, 0)
     }
 
     // MARK: - enrich

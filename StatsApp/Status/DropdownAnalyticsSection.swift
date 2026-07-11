@@ -182,15 +182,11 @@ struct DropdownAnalyticsSection: View {
 
     // MARK: - Форматтеры
 
-    /// «Утекает ≈9% объёма = $168/мес» (+ « ≈5.9 п.п. недельного лимита» для Codex).
+    /// «Утекает ≈9% объёма = $168/мес». Пересчёт в п.п. недельного лимита убран:
+    /// путал и был только у Codex (у Claude лимит локально не виден), а средний
+    /// недельный лимит уже показан отдельной строкой выше.
     static func leakLine(leakPct: Double, expSaved: Double, avgWeek: Double?) -> String {
-        var line = "Утекает ≈\(intPct(leakPct))% объёма = \(MoneyFormatter.widget(expSaved))/мес"
-        if let avgWeek {
-            // п.п. недельного лимита = доля утечки от объёма × средненедельный % (спека 5.4).
-            let pp = leakPct / 100.0 * avgWeek
-            line += " ≈ \(String(format: "%.1f", pp)) п.п. недельного лимита"
-        }
-        return line
+        "Утекает ≈\(intPct(leakPct))% объёма = \(MoneyFormatter.widget(expSaved))/мес"
     }
 
     static func intPct(_ value: Double) -> String {

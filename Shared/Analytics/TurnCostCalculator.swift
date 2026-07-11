@@ -14,6 +14,27 @@ enum TurnCostCalculator {
         var expSavedUsd: Double
     }
 
+    /// Стоп-лист коротких подтверждений/реплик (нормализованные слова, lowercase).
+    private static let confirmationWords: Set<String> = [
+        "да", "ага", "угу", "ок", "окей", "нет", "готово", "ясно", "понял", "поняла",
+        "спс", "спасибо", "yes", "no", "ok", "okay", "yep", "y", "n"
+    ]
+
+    /// Ход-«filler»: подтверждение/реплика внутри уже идущей сессии, а не отдельный
+    /// запрос. Его нельзя перекинуть на другую модель (он продолжает сессию), поэтому
+    /// он не может быть «утечкой» — exp_saved = 0. Правило: нет букв вообще («1»,
+    /// «1 — 6 2 — 10», «+») ИЛИ все слова из стоп-листа подтверждений («да», «ок ок»).
+    static func isFiller(_ promptHead: String) -> Bool {
+        let s = promptHead.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if s.isEmpty { return true }
+        // Спец-обёртки (task-notification / слэш-команды) — не filler, у них своя судьба.
+        if s.hasPrefix("<") { return false }
+        let hasLetters = s.contains { $0.isLetter }
+        if !hasLetters { return true }
+        let words = s.split { !$0.isLetter }.map(String.init)
+        return !words.isEmpty && words.allSatisfy { confirmationWords.contains($0) }
+    }
+
     /// Минимально достаточная ступень по форме хода (спека 5.3). Вызывается только
     /// для T0-моделей; для не-T0 гейт стоит в `verdict`.
     static func heurTier(nEdits: Int64, nTools: Int64, outTok: Int64, promptChars: Int64) -> Int {
@@ -43,14 +64,15 @@ enum TurnCostCalculator {
         nEdits: Int64, nTools: Int64,
         inputTokens: Int64, outputTokens: Int64,
         cacheRead: Int64, cacheCreate5m: Int64, cacheCreate1h: Int64,
-        promptChars: Int64
+        promptChars: Int64, promptHead: String
     ) -> Verdict {
         let c = cost(model: model,
                      inputTokens: inputTokens, outputTokens: outputTokens,
                      cacheRead: cacheRead, cacheCreate5m: cacheCreate5m, cacheCreate1h: cacheCreate1h)
 
-        // Гейт: вердикт только T0-ходам.
-        guard ModelLadder.isT0(model) else {
+        // Гейт: вердикт только T0-ходам. Filler-подтверждения — не утечка (нельзя
+        // переключить модель у реплики, продолжающей сессию) → exp_saved 0.
+        guard ModelLadder.isT0(model), !isFiller(promptHead) else {
             return Verdict(costUsd: c, heurTier: nil, cfModel: nil, cfUsd: nil, expSavedUsd: 0)
         }
 
@@ -88,7 +110,7 @@ enum TurnCostCalculator {
             nEdits: turn.nEdits, nTools: turn.nToolCalls,
             inputTokens: turn.inputTokens, outputTokens: turn.outputTokens,
             cacheRead: turn.cacheRead, cacheCreate5m: turn.cacheCreate5m, cacheCreate1h: turn.cacheCreate1h,
-            promptChars: turn.promptChars
+            promptChars: turn.promptChars, promptHead: turn.promptHead
         )
         return AnalyticsTurnRow(
             id: nil,
@@ -125,7 +147,7 @@ enum TurnCostCalculator {
             nEdits: row.nEdits, nTools: row.nToolCalls,
             inputTokens: row.inputTokens, outputTokens: row.outputTokens,
             cacheRead: row.cacheRead, cacheCreate5m: row.cacheCreate5m, cacheCreate1h: row.cacheCreate1h,
-            promptChars: row.promptChars
+            promptChars: row.promptChars, promptHead: row.promptHead
         )
         row.costUsd = v.costUsd
         row.heurTier = v.heurTier
