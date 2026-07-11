@@ -98,6 +98,8 @@ targets:
         buildPhase: resources
       - path: Tests/StatsAppTests/Fixtures/ccusage-codex-daily.json
         buildPhase: resources
+      - path: Tests/StatsAppTests/Fixtures/models_cache.json
+        buildPhase: resources
     dependencies:
       - target: StatsApp
       - package: GRDB
