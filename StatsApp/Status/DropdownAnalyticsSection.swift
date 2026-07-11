@@ -144,18 +144,24 @@ struct DropdownAnalyticsSection: View {
     }
 
     private func guideGroup(title: String, entries: [ModelGuide.Entry]) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: 5) {
             Text(title)
                 .font(BrandFont.caption)
                 .foregroundStyle(TextColor.secondary)
-            ForEach(entries, id: \.slug) { e in
-                HStack(alignment: .top, spacing: 6) {
-                    Text(e.slug)
-                        .font(BrandFont.caption)
-                        .foregroundStyle(BrandColor.pinkLight)
-                    Text(e.description)
-                        .font(BrandFont.caption)
-                        .foregroundStyle(TextColor.muted)
+            // Grid: колонка слагов авто-выравнивается по самому длинному,
+            // описания встают в ровную левую колонку и переносятся внутри неё.
+            Grid(alignment: .topLeading, horizontalSpacing: 10, verticalSpacing: 5) {
+                ForEach(entries, id: \.slug) { e in
+                    GridRow {
+                        Text(e.slug)
+                            .font(BrandFont.caption)
+                            .foregroundStyle(BrandColor.pinkLight)
+                            .gridColumnAlignment(.leading)
+                        Text(e.description)
+                            .font(BrandFont.caption)
+                            .foregroundStyle(TextColor.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
         }
