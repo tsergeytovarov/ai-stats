@@ -23,7 +23,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Отключаем под XCTest: test host = тоже Burn.app, и если в menu bar уже
         // запущена prod-копия — guard убил бы test runner.
         let isRunningTests = NSClassFromString("XCTest") != nil
-        if !isRunningTests, let bundleID = Bundle.main.bundleIdentifier {
+        // Под XCTest test host = сам Burn.app. Полный boot (модальный
+        // first-launch alert через runModal, тяжёлый container.start с
+        // ccusage-сабпроцессом и сетью) блокирует main-thread → раннер
+        // виснет «before establishing connection». Тесты конструируют свои
+        // объекты через @testable import и в prod-контейнере не нуждаются —
+        // отдаём run loop раннеру и выходим.
+        if isRunningTests { return }
+
+        if let bundleID = Bundle.main.bundleIdentifier {
             let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
                 .filter { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier }
             if let other = running.first {
