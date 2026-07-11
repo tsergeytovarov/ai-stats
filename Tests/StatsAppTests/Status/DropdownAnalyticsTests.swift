@@ -33,7 +33,7 @@ final class DropdownAnalyticsTests: XCTestCase {
 
         let card = try XCTUnwrap(vm.analyticsCard)
         XCTAssertEqual(card.state, .ready)
-        XCTAssertEqual(card.topLeakTitle, "ты — рерайтер роль x")
+        XCTAssertEqual(card.topLeakTitle, "Регулярная роль: Рерайтер роль x")
         XCTAssertEqual(card.sources.first?.source, "codex")
         XCTAssertNotNil(vm.modelGuide)
     }

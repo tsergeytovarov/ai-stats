@@ -107,7 +107,9 @@ final class AnalyticsCardTests: XCTestCase {
         XCTAssertEqual(top.model, "gpt-5.5")
         XCTAssertEqual(top.expSavedUsd, 15.0, accuracy: 1e-9)
         XCTAssertEqual(top.adviceText, "Зафиксируй модель этой роли в конфиге пайплайна: gpt-5.4")
-        XCTAssertEqual(card.topLeakTitle, "ты — рерайтер роль x")
+        // Заголовок «по сути», а не сырой промпт.
+        XCTAssertEqual(top.title, "Регулярная роль: Рерайтер роль x")
+        XCTAssertEqual(card.topLeakTitle, "Регулярная роль: Рерайтер роль x")
 
         let bg = card.leaks[1]
         XCTAssertEqual(bg.source, "claude-code")

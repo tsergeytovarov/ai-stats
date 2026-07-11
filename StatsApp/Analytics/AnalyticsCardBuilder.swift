@@ -166,28 +166,49 @@ struct AnalyticsCardBuilder {
         return String(h.prefix(60))
     }
 
+    /// Осмысленный заголовок кластера «по сути», а не сырой повторяющийся промпт.
+    /// Роль пайплайна («ты — X») → «Регулярная роль: X»; прочие повторы →
+    /// «Повторяющаяся задача: …».
     private static func title(forKey key: String) -> String {
         switch key {
         case "<слэш-команды>": return "Слэш-команды"
         case "<фоновые уведомления>": return "Фоновые уведомления"
-        default: return key
+        default:
+            if key.hasPrefix("ты — ") {
+                return "Регулярная роль: \(capFirst(roleName(key)))"
+            }
+            let preview = key.trimmingCharacters(in: .whitespaces).prefix(36)
+            return "Повторяющаяся задача: «\(capFirst(String(preview)))…»"
         }
     }
 
-    /// Тексты советов — дословно из спеки 5.5, тип по нормализованному ключу.
+    /// Имя роли: текст после «ты — » до первой запятой/точки («voice match, …» →
+    /// «voice match»; «агрегатор в трубе рерайта. …» → «агрегатор в трубе рерайта»).
+    private static func roleName(_ key: String) -> String {
+        let rest = key.dropFirst("ты — ".count)
+        let end = rest.firstIndex { $0 == "," || $0 == "." } ?? rest.endIndex
+        return rest[..<end].trimmingCharacters(in: .whitespaces)
+    }
+
+    private static func capFirst(_ s: String) -> String {
+        guard let f = s.first else { return s }
+        return f.uppercased() + s.dropFirst()
+    }
+
+    /// Совет по типу кластера. Общий смысл — «регулярная задача на дорогой модели,
+    /// можно дешевле»; для роли пайплайна — точнее (зафиксировать модель в конфиге).
     private static func advice(forKey key: String, source: String) -> String {
+        let cheaper = source == "codex" ? "gpt-5.4" : "sonnet-4-6"
         if key.hasPrefix("ты — ") {
-            let model = source == "codex" ? "gpt-5.4" : "sonnet-4-6"
-            return "Зафиксируй модель этой роли в конфиге пайплайна: \(model)"
+            return "Зафиксируй модель этой роли в конфиге пайплайна: \(cheaper)"
         }
         switch key {
         case "<фоновые уведомления>":
             return "Фоновые уведомления обрабатывай дешёвой моделью"
         case "<слэш-команды>":
-            return "Слэш-команды наследуют модель сессии — тяжёлые команды запускай в сессии на средней модели"
+            return "Слэш-команды наследуют модель сессии — тяжёлые запускай на средней модели"
         default:
-            let model = source == "codex" ? "luna/spark" : "haiku"
-            return "Короткие вопросы — в лёгкий чат на \(model)"
+            return "Регулярная задача на дорогой модели — попробуй \(cheaper)"
         }
     }
 

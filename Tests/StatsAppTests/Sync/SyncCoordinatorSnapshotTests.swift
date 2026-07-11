@@ -106,7 +106,7 @@ final class SyncCoordinatorSnapshotTests: XCTestCase {
 
         XCTAssertNotNil(snapshot.advisorComputedAt)
         XCTAssertEqual(snapshot.leakUsdPerMonth ?? -1, 30.0, accuracy: 1e-9)  // 60 × 0.5
-        XCTAssertEqual(snapshot.topLeakTitle, "ты — рерайтер роль x")
+        XCTAssertEqual(snapshot.topLeakTitle, "Регулярная роль: Рерайтер роль x")
     }
 
     /// ≥50 ходов, но Σexp ≤ $1 → computedAt задан, title nil (строка «Утечек не видно»).
