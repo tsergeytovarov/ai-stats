@@ -59,15 +59,20 @@ struct LargeView: View {
 
             Rectangle().fill(SurfaceColor.dividerSubtle).frame(height: 0.5)
 
-            // Sparkline bottom
-            VStack(alignment: .leading, spacing: 4) {
-                Text("section.trend")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.5))
-                Sparkline(values: [], variant: .ai).frame(height: 24)
+            // Строка советника (спека 2.3) вместо лидерборда. Скрыта, пока
+            // расчёта не было или данных мало (advisorLine == nil).
+            Group {
+                if let line = entry.advisorLine {
+                    Text(line)
+                        .font(BrandFont.caption)
+                        .foregroundStyle(BrandColor.cyanLight)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 6)
+            .padding(.vertical, 8)
             .frame(maxHeight: .infinity, alignment: .top)
         }
     }

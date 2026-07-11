@@ -66,5 +66,33 @@ final class WidgetSnapshotTests: XCTestCase {
         let snapshot = try decoder.decode(WidgetSnapshot.self, from: json)
         XCTAssertEqual(snapshot.schemaVersion, 2)
         XCTAssertEqual(snapshot.day.aiCostPrev, 0)
+        // Аддитивные поля советника отсутствуют → nil.
+        XCTAssertNil(snapshot.advisorComputedAt)
+        XCTAssertNil(snapshot.leakUsdPerMonth)
+        XCTAssertNil(snapshot.topLeakTitle)
+    }
+
+    func test_roundtrip_preserves_advisor_fields() throws {
+        let slice = WidgetSnapshot.PeriodSlice(aiCost: 1, aiCostPrev: 0, aiTokens: 1, topModels: [])
+        let computedAt = Date(timeIntervalSince1970: 1_752_235_200)  // 2025-07-11T12:00:00Z
+        let snapshot = WidgetSnapshot(
+            generatedAt: computedAt,
+            day: slice, week: slice, month: slice,
+            advisorComputedAt: computedAt,
+            leakUsdPerMonth: 168.0,
+            topLeakTitle: "Фоновые уведомления"
+        )
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(snapshot)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(WidgetSnapshot.self, from: data)
+
+        XCTAssertEqual(decoded, snapshot)
+        XCTAssertEqual(decoded.advisorComputedAt, computedAt)
+        XCTAssertEqual(decoded.leakUsdPerMonth ?? -1, 168.0, accuracy: 0.001)
+        XCTAssertEqual(decoded.topLeakTitle, "Фоновые уведомления")
     }
 }

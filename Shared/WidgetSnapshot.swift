@@ -11,18 +11,33 @@ struct WidgetSnapshot: Codable, Equatable {
     let week: PeriodSlice
     let month: PeriodSlice
 
+    // Поля советника (спека 2.3). Глобальные (не по периоду) — одна строка в Large.
+    // Расчёта ещё не было / «мало данных» → все nil → строка Large скрыта.
+    /// Момент последнего успешного расчёта карточки; nil — расчёта не было.
+    let advisorComputedAt: Date?
+    /// Суммарная Σexp_saved по обоим источникам за окно 30 дней (в месяц).
+    let leakUsdPerMonth: Double?
+    /// Заголовок топ-1 кластера; nil — ни один кластер не прошёл фильтр.
+    let topLeakTitle: String?
+
     init(
         schemaVersion: Int = 2,
         generatedAt: Date,
         day: PeriodSlice,
         week: PeriodSlice,
-        month: PeriodSlice
+        month: PeriodSlice,
+        advisorComputedAt: Date? = nil,
+        leakUsdPerMonth: Double? = nil,
+        topLeakTitle: String? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.generatedAt = generatedAt
         self.day = day
         self.week = week
         self.month = month
+        self.advisorComputedAt = advisorComputedAt
+        self.leakUsdPerMonth = leakUsdPerMonth
+        self.topLeakTitle = topLeakTitle
     }
 
     init(from decoder: Decoder) throws {
@@ -33,10 +48,15 @@ struct WidgetSnapshot: Codable, Equatable {
         self.day = try c.decode(PeriodSlice.self, forKey: .day)
         self.week = try c.decode(PeriodSlice.self, forKey: .week)
         self.month = try c.decode(PeriodSlice.self, forKey: .month)
+        // Аддитивные поля советника — decodeIfPresent (старые снапшоты их не имеют).
+        self.advisorComputedAt = try c.decodeIfPresent(Date.self, forKey: .advisorComputedAt)
+        self.leakUsdPerMonth = try c.decodeIfPresent(Double.self, forKey: .leakUsdPerMonth)
+        self.topLeakTitle = try c.decodeIfPresent(String.self, forKey: .topLeakTitle)
     }
 
     private enum CodingKeys: String, CodingKey {
         case schemaVersion, generatedAt, day, week, month
+        case advisorComputedAt, leakUsdPerMonth, topLeakTitle
     }
 
     struct PeriodSlice: Codable, Equatable {

@@ -150,19 +150,38 @@ final class SyncCoordinator {
         let weekPrev = DateUtils.previousPeriodDays(endingAt: nowDate, lookback: Period.week.lookbackDays)
         let monthPrev = DateUtils.previousPeriodDays(endingAt: nowDate, lookback: Period.month.lookbackDays)
 
-        let (day, week, month): (WidgetSnapshot.PeriodSlice, WidgetSnapshot.PeriodSlice, WidgetSnapshot.PeriodSlice) = try db.read { db in
+        let (day, week, month, card): (WidgetSnapshot.PeriodSlice, WidgetSnapshot.PeriodSlice, WidgetSnapshot.PeriodSlice, AnalyticsCard) = try db.read { db in
             (
                 try Self.makeSlice(in: db, days: dayDays, prevDays: dayPrev),
                 try Self.makeSlice(in: db, days: weekDays, prevDays: weekPrev),
-                try Self.makeSlice(in: db, days: monthDays, prevDays: monthPrev)
+                try Self.makeSlice(in: db, days: monthDays, prevDays: monthPrev),
+                try AnalyticsCardBuilder(now: now).build(in: db)
             )
+        }
+
+        // Поля советника — только для собранной карточки (.ready). В режимах
+        // «нет данных»/«мало данных» остаются nil → строка Large скрыта (спека 2.3).
+        let advisorComputedAt: Date?
+        let leakUsdPerMonth: Double?
+        let topLeakTitle: String?
+        if card.state == .ready {
+            advisorComputedAt = card.advisorComputedAt
+            leakUsdPerMonth = card.totalExpSavedUsd
+            topLeakTitle = card.topLeakTitle
+        } else {
+            advisorComputedAt = nil
+            leakUsdPerMonth = nil
+            topLeakTitle = nil
         }
 
         return WidgetSnapshot(
             generatedAt: nowDate,
             day: day,
             week: week,
-            month: month
+            month: month,
+            advisorComputedAt: advisorComputedAt,
+            leakUsdPerMonth: leakUsdPerMonth,
+            topLeakTitle: topLeakTitle
         )
     }
 
