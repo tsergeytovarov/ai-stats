@@ -1,14 +1,14 @@
 cask "ai-stats" do
-  version "0.6.8"
+  version "1.0.0"
 
   # SHA256 высчитывается на каждый релиз. Подставляется build-dmg.sh-скриптом
   # после создания DMG. Для разработки можно временно использовать :no_check,
   # но НЕ публиковать с ним — потеряешь integrity-проверку.
-  sha256 "cd60a556886539306485a6061f701567b2b544f2c82b2bcb254cd9910796d58e"
+  sha256 "04d35e96cc3d0ff36ed951e0facd499cc1f7f033079983fe581041a3299232ff"
 
   url "https://github.com/tsergeytovarov/ai-stats/releases/download/v#{version}/burn-#{version}.dmg"
   name "Burn"
-  desc "macOS menu bar app для статистики использования AI-агентов и активности на GitHub"
+  desc "macOS menu bar app для статистики трат на AI-агентов и советника по выбору моделей"
   homepage "https://github.com/tsergeytovarov/ai-stats"
 
   # В DMG лежит Burn.app — Homebrew Cask делает symlink в /Applications.

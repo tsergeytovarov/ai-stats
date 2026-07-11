@@ -13,20 +13,33 @@ brew trust --cask tsergeytovarov/tap/ai-stats
 brew install --cask ai-stats
 ```
 
-> **Статус:** personal MVP. Внутренние идентификаторы (bundle ID `com.sergeytovarov.aistats`, пути `~/.config/ai-stats/`) пока не переименованы под Burn — это запланировано к v1.0. На пользователя смотрит уже **Burn**: capsule в menu bar и имя Burn в Spotlight. Иконки в Dock и в Cmd+Tab нет — это menu-bar-only приложение.
+> **Статус:** personal MVP. Внутренние идентификаторы (bundle ID `com.sergeytovarov.aistats`, пути `~/.config/ai-stats/`) под Burn не переименованы — ренейминг ломает Keychain и app-group-контейнер у установленных копий, поэтому отложен на отдельный релиз с миграцией. На пользователя смотрит уже **Burn**: capsule в menu bar и имя Burn в Spotlight. Иконки в Dock и в Cmd+Tab нет — это menu-bar-only приложение.
 
 **Визуал:** редизайн под Apple Liquid Glass — pink+cyan палитра с внутренним brand-градиентом (не зависит от обоев), floating glass island для периода, виджеты на едином visual language.
 
 ## Что показывает
+
+Popover — две вкладки: **Расходы** и **Аналитика**.
+
+**Расходы:**
 
 - Сегодняшние / недельные / месячные траты по AI-агентам через `ccusage` + собственный pricing table (USD за 1M токенов, актуально на 2026 год, вкл. claude-opus/sonnet/haiku 4.x и gpt-5.x).
 - Топ моделей за выбранный период с разбивкой по стоимости.
 - 30-дневный sparkline-тренд AI-трат.
 - Виджеты на десктопе (Small / Medium / Large): сумма за период с дельтой vs прошлый период; в Medium и Large — ещё и топ моделей.
 
+**Аналитика** (за фикс-окно 30 дней) — советник по выбору модели: читает историю Claude Code и Codex локально и показывает, где дорогая модель тратилась на задачу, которую потянула бы модель дешевле.
+
+- Сколько денег «утекает» на переусложнённых моделях и сколько лимита это съедает.
+- Главные утечки: регулярные задачи и роли пайплайнов на дорогой модели + конкретный совет, чем заменить.
+- Топ-6 моделей за 30 дней по числу токенов (не по деньгам).
+- Шпаргалка: какую модель под какую задачу.
+
+> **Приватность аналитики.** Разбор истории агентов идёт полностью на устройстве. Тексты промптов (обрезанные до 300 символов) хранятся только в локальной БД и на сервер не уходят.
+
 ## Скриншоты
 
-**Popover** — клик по capsule в menu bar открывает дроп с детализацией «Расходы». Floating island внизу переключает период (День / Неделя / Месяц):
+**Popover** — клик по capsule в menu bar открывает дроп с двумя вкладками (Расходы / Аналитика). Floating island внизу переключает период (День / Неделя / Месяц):
 
 | Расходы · неделя | Расходы · месяц |
 |---|---|
@@ -184,7 +197,8 @@ open build/Build/Products/Release/Burn.app
 
 ### Спек и план
 
-- Дизайн: [docs/superpowers/specs/2026-05-22-ai-stats-design.md](docs/superpowers/specs/2026-05-22-ai-stats-design.md)
+- Дизайн v1.0 (выпил GitHub/друзей, подсистема Аналитики): [docs/spp/04-specs/2026-07-11-burn-next-design.md](docs/spp/04-specs/2026-07-11-burn-next-design.md)
+- Исходный дизайн v0.1: [docs/superpowers/specs/2026-05-22-ai-stats-design.md](docs/superpowers/specs/2026-05-22-ai-stats-design.md)
 - План реализации v0.1: [docs/superpowers/plans/2026-05-22-ai-stats-v0.1.md](docs/superpowers/plans/2026-05-22-ai-stats-v0.1.md)
 
 ## Лицензия
