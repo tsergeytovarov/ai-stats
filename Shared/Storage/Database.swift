@@ -186,6 +186,71 @@ enum Database {
             try db.execute(sql: "ALTER TABLE my_profile ADD COLUMN avatar_mime TEXT")
             try db.execute(sql: "ALTER TABLE my_profile ADD COLUMN avatar_etag TEXT")
         }
+        migrator.registerMigration("v9_analytics") { db in
+            // Подсистема «Аналитика»: собственный парсинг транскриптов Claude Code / Codex
+            // в per-turn таблицу. Хранит всю доступную историю (окно 30 дней накладывается
+            // на этапе расчёта карточки). prompt_head — только локально, никогда в сеть.
+            try db.execute(sql: """
+                CREATE TABLE analytics_turns (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    source TEXT NOT NULL,
+                    ts TEXT NOT NULL,
+                    day TEXT NOT NULL,
+                    session TEXT NOT NULL,
+                    project TEXT NOT NULL,
+                    model TEXT NOT NULL,
+                    effort TEXT NOT NULL DEFAULT '',
+                    origin TEXT NOT NULL,
+                    prompt_head TEXT NOT NULL DEFAULT '',
+                    prompt_chars INTEGER NOT NULL DEFAULT 0,
+                    n_requests INTEGER NOT NULL DEFAULT 0,
+                    n_tool_calls INTEGER NOT NULL DEFAULT 0,
+                    n_edits INTEGER NOT NULL DEFAULT 0,
+                    input_tokens INTEGER NOT NULL DEFAULT 0,
+                    cache_read INTEGER NOT NULL DEFAULT 0,
+                    cache_create_5m INTEGER NOT NULL DEFAULT 0,
+                    cache_create_1h INTEGER NOT NULL DEFAULT 0,
+                    output_tokens INTEGER NOT NULL DEFAULT 0,
+                    cost_usd REAL NOT NULL DEFAULT 0,
+                    heur_tier INTEGER,
+                    cf_model TEXT,
+                    cf_usd REAL,
+                    exp_saved_usd REAL NOT NULL DEFAULT 0,
+                    UNIQUE(source, session, ts)
+                )
+            """)
+            try db.execute(sql: "CREATE INDEX idx_analytics_turns_day ON analytics_turns(day)")
+
+            // Файловый гейт инкрементальности: перечитываем файл целиком только если
+            // изменились mtime/size (оффсетное дочитывание запрещено — см. спеку 5.1).
+            try db.execute(sql: """
+                CREATE TABLE analytics_ingest_state (
+                    path TEXT PRIMARY KEY,
+                    mtime REAL,
+                    size INTEGER
+                )
+            """)
+
+            // Ключ-значение: pricing_version (пересчёт in-place), last_ingest_at и т.п.
+            try db.execute(sql: """
+                CREATE TABLE analytics_meta (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )
+            """)
+
+            // Наблюдения лимитов Codex (primary 5h / secondary week). INSERT OR REPLACE
+            // по UNIQUE — перечитывание файла не плодит дублей.
+            try db.execute(sql: """
+                CREATE TABLE analytics_rate_limits (
+                    path TEXT NOT NULL,
+                    ts TEXT NOT NULL,
+                    window TEXT NOT NULL,
+                    used_percent REAL,
+                    UNIQUE(path, ts, window)
+                )
+            """)
+        }
         try migrator.migrate(writer)
     }
 
