@@ -38,6 +38,9 @@ RATES = {
     "claude-fable":      (10.00, 50.00, 1.00, 12.50, 20.00),
     "claude-mythos":     (10.00, 50.00, 1.00, 12.50, 20.00),
     "gpt-5.6-sol":       (5.00, 30.00, 0.50, 0.0, 0.0),   # ДОПУЩЕНИЕ: как gpt-5.5
+    "gpt-5.6-terra":     (2.50, 15.00, 0.25, 0.0, 0.0),   # ДОПУЩЕНИЕ: как gpt-5.4
+    "gpt-5.6-luna":      (0.75, 4.50, 0.075, 0.0, 0.0),   # ДОПУЩЕНИЕ: как gpt-5.4-mini
+    "gpt-5.3-codex-spark": (0.75, 4.50, 0.075, 0.0, 0.0), # ДОПУЩЕНИЕ: как mini
     "gpt-5.5":           (5.00, 30.00, 0.50, 0.0, 0.0),
     "gpt-5.4":           (2.50, 15.00, 0.25, 0.0, 0.0),
     "gpt-5.4-mini":      (0.75, 4.50, 0.075, 0.0, 0.0),
@@ -49,9 +52,12 @@ def rate_for(model: str):
     if model in RATES:
         return RATES[model]
     for prefix in ("claude-opus", "claude-sonnet", "claude-haiku", "claude-fable",
-                   "claude-mythos", "gpt-5.4-mini", "gpt-5.6-sol", "gpt-5.5", "gpt-5.4"):
+                   "claude-mythos", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna",
+                   "gpt-5.3-codex-spark", "gpt-5.4-mini", "gpt-5.5", "gpt-5.4"):
         if model.startswith(prefix):
             return RATES[prefix]
+    if model.startswith("gpt-5.6-"):
+        return RATES["gpt-5.5"]  # family-fallback: неизвестная gpt-5.6-* — консервативно сверху
     return (0.0, 0.0, 0.0, 0.0, 0.0)
 
 

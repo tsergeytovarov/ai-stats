@@ -54,12 +54,16 @@ def codex_guide() -> list[tuple[str, str]]:
 
 
 def norm_prefix(head: str) -> str:
-    """Ключ кластера: нормализованное начало промпта."""
+    """Ключ кластера: нормализованное начало промпта.
+
+    Любой auto-ход (промпт с '<', кроме слэш-команд) — спецкластер «Фоновые
+    уведомления»: совет «болталки» к системной обвязке неприменим.
+    """
     h = head.strip().lower()
-    if h.startswith("<task-notification"):
-        return "<фоновые task-notification>"
     if h.startswith("<command-"):
         return "<слэш-команды>"
+    if h.startswith("<"):
+        return "<фоновые уведомления>"
     return h[:60]
 
 
