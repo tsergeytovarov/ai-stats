@@ -92,8 +92,12 @@ Floating island внизу переключает **две** вкладки (в�
 
 ### 2.4 Настройки
 
-- Остаются вкладки: **Общие** (автозапуск и т.п.), **Аккаунт** (авторизация — нужна
-  для синка своей статистики между устройствами, `SnapshotSyncer` не меняется).
+- Остаются вкладки: **Общие** (автозапуск и т.п.), **Аккаунт** (авторизация).
+- **Правка курса (решение 2026-07-11):** `SnapshotSyncer` + эндпоинт `/snapshots` +
+  тумблер «шарить статистику» существовали ТОЛЬКО чтобы кормить серверный лидерборд
+  (наверх пушились токены, обратно ничего не тянулось — cross-device синка по факту
+  не было). Всё это **выпиливается вместе с лидербордом**. Авторизация (аккаунт, вход,
+  удаление) остаётся; реальный cross-device синк — отдельная будущая фича, не эта версия.
 - **Важно:** авторизация построена на GitHub OAuth (`AuthService: GitHubSignInService`),
   поэтому `Config.githubToken/githubLogin`, `AuthDTO.githubToken/githubLogin` и
   `GithubAvatar` (аватар аккаунта) **остаются** — это часть аккаунта, а не вкладки GitHub.
@@ -119,16 +123,17 @@ Floating island внизу переключает **две** вкладки (в�
 | `Shared/Design/FriendRow.swift`; в `CrumbCategory` — кейсы `.github` и `.friends` (остаётся `.ai`) | Sparkline-категория github тоже |
 | `FriendsTabView(-ViewModel)`, `BlockedTabView(-ViewModel)`, `FriendCode` | |
 | Friend-code блок в `AccountTabView` (показ, копирование, перегенерация) + `regenerateFriendCode` в `AiuseAPIClient` | поля `friendCode` в DTO остаются, не показываются |
-| Лидерборд-эндпоинты в `AiuseAPIClient` (friends/leaderboard/blocked) | snapshot-эндпоинты остаются |
+| Эндпоинты `AiuseAPIClient`: friends/leaderboard/blocked/avatar/regenerate + `/snapshots` | остаются только auth/аккаунт: exchange, профиль, удаление |
 | `StatsApp/Sync/FriendsPullSyncer.swift`, `LeaderboardPullSyncer.swift` | `SyncCoordinator` остаётся **с правками**: из него удаляются вызовы pull-синкеров |
 | Аватарная обвязка лидерборда в `WidgetSnapshotIO` (`writeAvatar/readAvatar/pruneAvatars`, каталог `avatars/`) | аватар самого аккаунта в настройках не задет |
 | Поля GitHub/друзей в `WidgetSnapshot` (`commits`, `uniqueRepos`, `githubEnabled`, `leaderboard`, `myFriendCode` и пр.) | см. 7 — версионирование снапшота |
+| `StatsApp/Sync/SnapshotSyncer.swift` + эндпоинт `/snapshots` + DTO + тумблер шаринга | только кормили лидерборд, cross-device синка нет — выпил вместе с ним |
 | Строки локализации и скриншоты README по GitHub/друзьям | README обновить |
 
 Остаётся: `AuthService` (GitHub OAuth — базис аккаунта), `GithubAvatar` (аватар в
 Аккаунте), GitHub-ключи в `Config`/`AuthDTO`, `KeychainStore`, `AiuseAPIClient`
-(auth + snapshots), `SnapshotSyncer`, `SyncCoordinator` (после правок), ccusage-пайплайн
-для «Расходов».
+(auth/аккаунт: exchange, профиль, удаление), `SyncCoordinator` (после правок),
+ccusage-пайплайн для «Расходов».
 
 ## 4. Прайсы (PricingTable.swift)
 
@@ -229,9 +234,10 @@ analytics_rate_limits (
 кластеризуются в спецкластер «Фоновые уведомления» (см. 5.5) и не попадают в
 кластеры «болталки».
 
-**Приватность (жёсткое правило):** `prompt_head` никогда не покидает устройство —
-в `SnapshotSyncer`/aiuse-api уходят только дневные агрегаты, как сейчас. В экспорт БД
-(`DatabaseExporter`) prompt_head входит (локальный файл пользователя) — допустимо.
+**Приватность (жёсткое правило):** `prompt_head` никогда не покидает устройство.
+После выпила `/snapshots` (см. 3) аналитика вообще никуда не шлётся по сети —
+только локальная БД. В экспорт БД (`DatabaseExporter`) prompt_head входит
+(локальный файл пользователя) — допустимо.
 
 ### 5.3 Вердикты: лестницы и коэффициенты
 
@@ -381,7 +387,8 @@ analytics_rate_limits (
    opus-4-8 ≈ $92/мес.
 4. gpt-5.6-sol/terra/luna и spark имеют ненулевую стоимость в топе моделей.
 5. GitHub-статистика и друзья отсутствуют в UI, настройках и сетевых вызовах;
-   остаются только вызовы auth, аккаунта (профиль, аватар, удаление) и snapshot-синка.
+   остаются только вызовы auth/аккаунта (exchange, профиль, аватар, удаление).
+   `SnapshotSyncer` и `/snapshots` удалены.
    Авторизация и синк работают.
 6. Large-виджет показывает строку советника; Small/Medium — без упоминаний коммитов.
 7. Тесты: парсер обоих форматов (фикстуры — анонимизированные срезы реальных
