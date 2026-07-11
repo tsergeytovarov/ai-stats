@@ -19,13 +19,6 @@ final class StatsQueriesTests: XCTestCase {
                 AIUsageRow(id: nil, day: "2024-05-20", source: "claude", modelsJson: "[]", inputTokens: 80, inputTokensNoCache: 80, outputTokens: 20, costUsd: 1.5, updatedAt: "now"),
             ]
             for var row in ai { try row.insert(db) }
-
-            let gh = [
-                GitHubRow(id: nil, day: "2024-05-22", repo: "popovs/x", commits: 3, updatedAt: "now"),
-                GitHubRow(id: nil, day: "2024-05-22", repo: "popovs/y", commits: 2, updatedAt: "now"),
-                GitHubRow(id: nil, day: "2024-05-20", repo: "popovs/x", commits: 7, updatedAt: "now"),
-            ]
-            for var row in gh { try row.insert(db) }
         }
     }
 
@@ -66,69 +59,11 @@ final class StatsQueriesTests: XCTestCase {
         XCTAssertEqual(totals.totalCost, 5.0, accuracy: 0.001)
     }
 
-    func test_githubTotals_returns_commits_and_repo_count() throws {
-        let totals = try dbq.read { db in
-            try StatsQueries.githubTotals(in: db, days: ["2024-05-22"])
-        }
-        XCTAssertEqual(totals.totalCommits, 5)
-        XCTAssertEqual(totals.uniqueRepos, 2)
-    }
-
     func test_dailyCostSparkline_returns_dense_array() throws {
         let series = try dbq.read { db in
             try StatsQueries.dailyAICostSeries(in: db, days: ["2024-05-20", "2024-05-21", "2024-05-22"])
         }
         XCTAssertEqual(series, [1.5, 0.0, 5.0])
-    }
-
-    // MARK: - githubLOC
-
-    private func seedLOC() throws {
-        try dbq.write { db in
-            var r1 = GitHubLOCDailyRow(id: nil, day: "2024-05-22", repo: "popovs/x", additions: 120, deletions: 30, updatedAt: "now")
-            try r1.insert(db)
-            var r2 = GitHubLOCDailyRow(id: nil, day: "2024-05-22", repo: "popovs/y", additions: 50, deletions: 10, updatedAt: "now")
-            try r2.insert(db)
-            var r3 = GitHubLOCDailyRow(id: nil, day: "2024-05-28", repo: "popovs/x", additions: 200, deletions: 80, updatedAt: "now")
-            try r3.insert(db)
-        }
-    }
-
-    func test_githubLOC_sums_days_directly() throws {
-        try seedLOC()
-        // 2024-05-22 → x:120+y:50=170 additions, 30+10=40 deletions
-        let loc = try dbq.read { db in
-            try StatsQueries.githubLOC(in: db, days: ["2024-05-22"])
-        }
-        XCTAssertEqual(loc.additions, 170)
-        XCTAssertEqual(loc.deletions, 40)
-    }
-
-    func test_githubLOC_spans_two_days() throws {
-        try seedLOC()
-        let loc = try dbq.read { db in
-            try StatsQueries.githubLOC(in: db, days: ["2024-05-22", "2024-05-28"])
-        }
-        XCTAssertEqual(loc.additions, 170 + 200)
-        XCTAssertEqual(loc.deletions, 40 + 80)
-    }
-
-    func test_githubLOC_empty_days_returns_zeros() throws {
-        try seedLOC()
-        let loc = try dbq.read { db in
-            try StatsQueries.githubLOC(in: db, days: [])
-        }
-        XCTAssertEqual(loc.additions, 0)
-        XCTAssertEqual(loc.deletions, 0)
-    }
-
-    func test_githubLOC_no_data_for_days_returns_zeros() throws {
-        try seedLOC()
-        let loc = try dbq.read { db in
-            try StatsQueries.githubLOC(in: db, days: ["2024-01-01"])
-        }
-        XCTAssertEqual(loc.additions, 0)
-        XCTAssertEqual(loc.deletions, 0)
     }
 
     // MARK: - topModels

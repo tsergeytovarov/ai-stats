@@ -23,9 +23,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             onExport: { [weak self] in self?.doExport() },
             onImport: { [weak self] in self?.doImport() },
             onRefreshNow: { [weak self] in self?.doRefresh() },
-            accountViewModel: self.container.makeAccountTabViewModel(),
-            friendsViewModel: self.container.makeFriendsTabViewModel(),
-            blockedViewModel: self.container.makeBlockedTabViewModel()
+            accountViewModel: self.container.makeAccountTabViewModel()
         )
         let hosting = NSHostingController(rootView: view)
         let win = NSWindow(contentViewController: hosting)

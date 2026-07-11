@@ -88,12 +88,9 @@ struct FloatingIsland: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            CategoryPill(title: NSLocalizedString("section.ai", comment: ""),
-                         isActive: section == .ai) { section = .ai }
-            CategoryPill(title: NSLocalizedString("section.github", comment: ""),
-                         isActive: section == .github) { section = .github }
-            CategoryPill(title: NSLocalizedString("section.friends", comment: ""),
-                         isActive: section == .leaderboard) { section = .leaderboard }
+            // Пока одна категория. План C добавит вторую пилюлю «Аналитика».
+            CategoryPill(title: NSLocalizedString("section.expenses", comment: ""),
+                         isActive: section == .expenses) { section = .expenses }
 
             Rectangle().fill(Color.white.opacity(0.18))
                 .frame(width: 0.5, height: 18)

@@ -96,11 +96,7 @@ targets:
           - "Fixtures/**"
       - path: Tests/StatsAppTests/Fixtures/ccusage-claude-daily.json
         buildPhase: resources
-      - path: Tests/StatsAppTests/Fixtures/github-response.json
-        buildPhase: resources
       - path: Tests/StatsAppTests/Fixtures/ccusage-codex-daily.json
-        buildPhase: resources
-      - path: Tests/StatsAppTests/Fixtures/github-commit-history.json
         buildPhase: resources
     dependencies:
       - target: StatsApp

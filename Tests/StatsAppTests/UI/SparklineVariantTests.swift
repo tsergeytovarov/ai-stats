@@ -9,10 +9,4 @@ final class SparklineVariantTests: XCTestCase {
         let first = NSColor(v.strokeColors[0]).usingColorSpace(.sRGB)!
         XCTAssertEqual(first.greenComponent, 95/255.0, accuracy: 0.005)  // #FF5FA0
     }
-
-    func test_githubVariant_usesCyanColors() {
-        let v = SparklineVariant.github
-        let first = NSColor(v.strokeColors[0]).usingColorSpace(.sRGB)!
-        XCTAssertEqual(first.greenComponent, 230/255.0, accuracy: 0.005)  // #4FE6FF
-    }
 }

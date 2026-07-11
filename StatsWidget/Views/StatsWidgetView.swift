@@ -15,12 +15,64 @@ struct StatsWidgetView: View {
     }
 }
 
+// MARK: - shared chrome
+
+/// Плейсхолдер, когда снапшота нет/не читается — виджет просит открыть Burn.
+struct WidgetPlaceholderView: View {
+    var body: some View {
+        VStack {
+            Spacer()
+            Text("widget.placeholder")
+                .font(BrandFont.caption)
+                .foregroundStyle(TextColor.muted)
+                .multilineTextAlignment(.center)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(14)
+    }
+}
+
+@ViewBuilder
+func burnWidgetBackground() -> some View {
+    ZStack {
+        Color(red: 20/255, green: 8/255, blue: 30/255)
+        LinearGradient(
+            gradient: Gradient(stops: [
+                .init(color: Color(red: 1.0, green: 45/255, blue: 109/255).opacity(0.55), location: 0),
+                .init(color: .clear, location: 0.7)
+            ]),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        LinearGradient(
+            gradient: Gradient(stops: [
+                .init(color: .clear, location: 0.3),
+                .init(color: Color(red: 0, green: 184/255, blue: 230/255).opacity(0.45), location: 1.0)
+            ]),
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+}
+
 // MARK: - Small
 
 struct SmallView: View {
     let entry: StatsEntry
 
     var body: some View {
+        Group {
+            if entry.isPlaceholder {
+                WidgetPlaceholderView()
+            } else {
+                content
+            }
+        }
+        .containerBackground(for: .widget) { burnWidgetBackground() }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             Crumb(category: .ai, title: "AI", period: entry.period.localizedTitle)
 
@@ -36,7 +88,7 @@ struct SmallView: View {
                     .padding(.top, 2)
             }
 
-            Text(DropdownFormat.tokens(entry.aiTokens) + " tok · \(entry.commits) c")
+            Text(DropdownFormat.tokens(entry.aiTokens) + " tok")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(BrandColor.cyanLight.opacity(0.75))
                 .padding(.top, 2)
@@ -47,27 +99,6 @@ struct SmallView: View {
                 .frame(height: 22)
         }
         .padding(14)
-        .containerBackground(for: .widget) {
-            ZStack {
-                Color(red: 20/255, green: 8/255, blue: 30/255)
-                LinearGradient(
-                    gradient: Gradient(stops: [
-                        .init(color: Color(red: 1.0, green: 45/255, blue: 109/255).opacity(0.55), location: 0),
-                        .init(color: .clear, location: 0.7)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                LinearGradient(
-                    gradient: Gradient(stops: [
-                        .init(color: .clear, location: 0.3),
-                        .init(color: Color(red: 0, green: 184/255, blue: 230/255).opacity(0.45), location: 1.0)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            }
-        }
     }
 }
 
@@ -77,6 +108,17 @@ struct MediumView: View {
     let entry: StatsEntry
 
     var body: some View {
+        Group {
+            if entry.isPlaceholder {
+                WidgetPlaceholderView()
+            } else {
+                content
+            }
+        }
+        .containerBackground(for: .widget) { burnWidgetBackground() }
+    }
+
+    private var content: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 0) {
                 Crumb(category: .ai, title: "AI", period: entry.period.localizedTitle)
@@ -88,7 +130,7 @@ struct MediumView: View {
                         .foregroundStyle(BrandColor.cyanLight)
                         .padding(.top, 2)
                 }
-                Text(DropdownFormat.tokens(entry.aiTokens) + " tok · \(entry.commits) c")
+                Text(DropdownFormat.tokens(entry.aiTokens) + " tok")
                     .font(.system(size: 10))
                     .foregroundStyle(BrandColor.cyanLight.opacity(0.75))
                     .padding(.top, 2)
@@ -119,27 +161,6 @@ struct MediumView: View {
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
-        .containerBackground(for: .widget) {
-            ZStack {
-                Color(red: 20/255, green: 8/255, blue: 30/255)
-                LinearGradient(
-                    gradient: Gradient(stops: [
-                        .init(color: Color(red: 1.0, green: 45/255, blue: 109/255).opacity(0.55), location: 0),
-                        .init(color: .clear, location: 0.7)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                LinearGradient(
-                    gradient: Gradient(stops: [
-                        .init(color: .clear, location: 0.3),
-                        .init(color: Color(red: 0, green: 184/255, blue: 230/255).opacity(0.45), location: 1.0)
-                    ]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            }
         }
     }
 }

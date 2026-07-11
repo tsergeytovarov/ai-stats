@@ -65,19 +65,6 @@ final class NeverDecreaseUpserterTests: XCTestCase {
         }
     }
 
-    func test_github_insert_and_never_decrease() throws {
-        let make: (Int64) -> GitHubRow = { commits in
-            GitHubRow(id: nil, day: "2024-05-22", repo: "popovs/x", commits: commits, updatedAt: "2024-05-22T10:00:00Z")
-        }
-        try dbq.write { db in
-            try NeverDecreaseUpserter.upsertGitHub(make(3), in: db)
-            try NeverDecreaseUpserter.upsertGitHub(make(5), in: db)
-            try NeverDecreaseUpserter.upsertGitHub(make(2), in: db)
-            let row = try GitHubRow.fetchOne(db)!
-            XCTAssertEqual(row.commits, 5)
-        }
-    }
-
     // MARK: - AIUsageModel
 
     private func makeModelRow(day: String = "2024-05-22", source: String = "claude",
@@ -118,71 +105,6 @@ final class NeverDecreaseUpserterTests: XCTestCase {
             try NeverDecreaseUpserter.upsertAIUsageModel(makeModelRow(model: "claude-opus-4-7"), in: db)
             try NeverDecreaseUpserter.upsertAIUsageModel(makeModelRow(model: "claude-sonnet-4-6"), in: db)
             XCTAssertEqual(try AIUsageModelRow.fetchCount(db), 2)
-        }
-    }
-
-    // MARK: - LOC Daily
-
-    private func makeLOCRow(day: String = "2024-05-22", repo: String = "popovs/x",
-                             additions: Int64 = 100, deletions: Int64 = 50) -> GitHubLOCDailyRow {
-        GitHubLOCDailyRow(id: nil, day: day, repo: repo,
-                          additions: additions, deletions: deletions,
-                          updatedAt: "2024-05-22T10:00:00Z")
-    }
-
-    func test_loc_insert_when_no_existing_row() throws {
-        try dbq.write { db in
-            try NeverDecreaseUpserter.upsertGitHubLOCDaily(makeLOCRow(), in: db)
-            XCTAssertEqual(try GitHubLOCDailyRow.fetchCount(db), 1)
-        }
-    }
-
-    func test_loc_update_when_new_total_greater() throws {
-        try dbq.write { db in
-            try NeverDecreaseUpserter.upsertGitHubLOCDaily(makeLOCRow(additions: 100, deletions: 50), in: db)
-            try NeverDecreaseUpserter.upsertGitHubLOCDaily(makeLOCRow(additions: 200, deletions: 80), in: db)
-            let row = try GitHubLOCDailyRow.fetchOne(db)!
-            XCTAssertEqual(row.additions, 200)
-            XCTAssertEqual(row.deletions, 80)
-        }
-    }
-
-    func test_loc_keep_old_when_new_total_lower() throws {
-        try dbq.write { db in
-            try NeverDecreaseUpserter.upsertGitHubLOCDaily(makeLOCRow(additions: 500, deletions: 200), in: db)
-            try NeverDecreaseUpserter.upsertGitHubLOCDaily(makeLOCRow(additions: 10, deletions: 5), in: db)
-            let row = try GitHubLOCDailyRow.fetchOne(db)!
-            XCTAssertEqual(row.additions, 500)
-            XCTAssertEqual(row.deletions, 200)
-        }
-    }
-
-    func test_loc_keep_old_when_new_total_equal() throws {
-        try dbq.write { db in
-            var first = makeLOCRow(additions: 100, deletions: 50)
-            first.updatedAt = "2024-01-01T00:00:00Z"
-            try NeverDecreaseUpserter.upsertGitHubLOCDaily(first, in: db)
-            var second = makeLOCRow(additions: 100, deletions: 50)
-            second.updatedAt = "2024-12-31T00:00:00Z"
-            try NeverDecreaseUpserter.upsertGitHubLOCDaily(second, in: db)
-            let row = try GitHubLOCDailyRow.fetchOne(db)!
-            XCTAssertEqual(row.updatedAt, "2024-01-01T00:00:00Z")
-        }
-    }
-
-    func test_loc_different_days_same_repo_coexist() throws {
-        try dbq.write { db in
-            try NeverDecreaseUpserter.upsertGitHubLOCDaily(makeLOCRow(day: "2024-05-20"), in: db)
-            try NeverDecreaseUpserter.upsertGitHubLOCDaily(makeLOCRow(day: "2024-05-21"), in: db)
-            XCTAssertEqual(try GitHubLOCDailyRow.fetchCount(db), 2)
-        }
-    }
-
-    func test_loc_different_repos_same_day_coexist() throws {
-        try dbq.write { db in
-            try NeverDecreaseUpserter.upsertGitHubLOCDaily(makeLOCRow(repo: "popovs/x"), in: db)
-            try NeverDecreaseUpserter.upsertGitHubLOCDaily(makeLOCRow(repo: "popovs/y"), in: db)
-            XCTAssertEqual(try GitHubLOCDailyRow.fetchCount(db), 2)
         }
     }
 }

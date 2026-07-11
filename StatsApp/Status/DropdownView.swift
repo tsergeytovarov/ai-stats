@@ -38,17 +38,12 @@ struct DropdownView: View {
                 .padding(.bottom, BrandSpacing.islandBottomOffset)
         }
         .frame(width: 400, height: 560)
-        .task { await viewModel.loadLeaderboard() }
     }
 
     @ViewBuilder private var content: some View {
         switch viewModel.section {
-        case .ai:
+        case .expenses:
             DropdownAISection(viewModel: viewModel)
-        case .github:
-            DropdownGitHubSection(viewModel: viewModel)
-        case .leaderboard:
-            DropdownLeaderboardSection(viewModel: viewModel)
         }
     }
 }

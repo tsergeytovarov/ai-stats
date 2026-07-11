@@ -16,10 +16,6 @@ final class AccountTabViewModel: ObservableObject {
     /// Колбэк после успешного GitHub-входа (AppContainer вешает live-пересборку источников). nil в тестах → no-op.
     var onSignedIn: (() async -> Void)?
 
-    /// Колбэк при включении шаринга (или входе в уже шарящий аккаунт): AppContainer
-    /// вешает немедленную backfill-выгрузку снапшотов. nil в тестах → no-op.
-    var onSharingEnabled: (() async -> Void)?
-
     private let api: AiuseAPIClient
     private let auth: GitHubSignInService
     private let secretsStore: SecretsStore
@@ -48,15 +44,13 @@ final class AccountTabViewModel: ObservableObject {
         state = .loading
         do {
             if var profile = try await db.read({ try StatsQueries.loadMyProfile($0) }) {
-                // Серверный sharing — источник правды. Если локальный флаг разошёлся
-                // (профиль создан до включения шаринга, либо шаринг включали на другом
-                // устройстве), он застревал бы, и SnapshotSyncer молча ничего не слал.
-                // Подтягиваем и чиним; если шаринг включился — догоняем выгрузку.
+                // Серверный sharing — источник правды. Держим локальный флаг в
+                // синхроне с сервером, если он разошёлся (профиль создан на другом
+                // устройстве и т.п.).
                 if let serverSharing = (try? await api.getMyProfile())?.sharingEnabled,
                    serverSharing != profile.sharingEnabled {
                     profile.sharingEnabled = serverSharing
                     try? await db.write { try StatsQueries.saveMyProfile($0, profile) }
-                    if serverSharing { await onSharingEnabled?() }
                 }
                 state = .created(profile)
             } else {
@@ -165,24 +159,10 @@ final class AccountTabViewModel: ObservableObject {
                 }
             }
             await onSignedIn?()
-            // Вошли в аккаунт, где шаринг уже включён — догоняем выгрузку истории.
-            if resolvedSharing { await onSharingEnabled?() }
         } catch AuthError.cancelled {
             // молча — юзер сам закрыл окно входа
         } catch {
             errorMessage = "Не удалось войти: \(error.localizedDescription)"
-        }
-    }
-
-    /// Тогл публичного глобального лидерборда (push-only в фазе 1).
-    func toggleGlobalOptIn(_ enabled: Bool) async {
-        guard case .created = state else { return }
-        isWorking = true
-        defer { isWorking = false }
-        do {
-            _ = try await api.patchProfile(globalOptIn: enabled)
-        } catch {
-            errorMessage = "Не удалось переключить публичный лидерборд: \(error.localizedDescription)"
         }
     }
 
@@ -209,24 +189,6 @@ final class AccountTabViewModel: ObservableObject {
         }
     }
 
-    func toggleSharing(_ enabled: Bool) async {
-        guard case let .created(profile) = state else { return }
-        isWorking = true
-        defer { isWorking = false }
-        do {
-            _ = try await api.patchProfile(sharingEnabled: enabled)
-            var updated = profile
-            updated.sharingEnabled = enabled
-            try await db.write { try StatsQueries.saveMyProfile($0, updated) }
-            state = .created(updated)
-            // Включили шаринг — сразу заливаем накопленную историю, не дожидаясь
-            // периодического ccusage-тика (иначе на борде висел бы 0 до 15 минут).
-            if enabled { await onSharingEnabled?() }
-        } catch {
-            errorMessage = "Не удалось переключить шаринг: \(error.localizedDescription)"
-        }
-    }
-
     func updateName(_ newName: String) async {
         guard case let .created(profile) = state else { return }
         isWorking = true
@@ -239,21 +201,6 @@ final class AccountTabViewModel: ObservableObject {
             state = .created(updated)
         } catch {
             errorMessage = "Не удалось обновить имя: \(error.localizedDescription)"
-        }
-    }
-
-    func regenerateFriendCode() async {
-        guard case let .created(profile) = state else { return }
-        isWorking = true
-        defer { isWorking = false }
-        do {
-            let resp = try await api.regenerateFriendCode()
-            var updated = profile
-            updated.friendCode = resp.friendCode
-            try await db.write { try StatsQueries.saveMyProfile($0, updated) }
-            state = .created(updated)
-        } catch {
-            errorMessage = "Не удалось сгенерировать новый код: \(error.localizedDescription)"
         }
     }
 

@@ -16,9 +16,6 @@ final class AppContainer {
     let githubLoginBox: GithubLoginBox
     let authService: AuthService
     let aiuseAPI: AiuseAPIClient
-    let snapshotSyncer: SnapshotSyncer
-    let friendsPullSyncer: FriendsPullSyncer
-    let leaderboardPullSyncer: LeaderboardPullSyncer
 
     init() throws {
         let (cfg, wasCreated) = try ConfigLoader.loadOrCreate()
@@ -75,51 +72,12 @@ final class AppContainer {
             api: api,
             webAuth: ASWebAuthenticator()
         )
-        let syncer = SnapshotSyncer(db: dbPool, api: api)
-        self.snapshotSyncer = syncer
 
-        let dbPoolRefForSyncers = dbPool
-        let hasAccountCheck: () -> Bool = {
-            (try? dbPoolRefForSyncers.read { try StatsQueries.loadMyProfile($0) }) ?? nil != nil
-        }
-        let friendsPull = FriendsPullSyncer(db: dbPool, api: api, hasAccount: hasAccountCheck)
-        let lbPull = LeaderboardPullSyncer(db: dbPool, api: api, hasAccount: hasAccountCheck)
-        self.friendsPullSyncer = friendsPull
-        self.leaderboardPullSyncer = lbPull
-
-        // demo_mode=true → передаём nil syncers в координатор, чтобы он не дёргал
-        // aiuse-сервер и не затирал seed-данные leaderboard'а. Сами FriendsPullSyncer/
-        // LeaderboardPullSyncer/SnapshotSyncer существуют в container'е (через них
-        // ViewModel может make-call'ы по запросу пользователя), но из автоматического
-        // sync-тика они исключены.
-        let coordinator: SyncCoordinator
-        if cfg.demoMode {
-            AppLogger.sync.info("demo_mode=true — aiuse syncs отключены (snapshot/friends/leaderboard)")
-            coordinator = SyncCoordinator(
-                db: dbPool,
-                snapshotSyncer: nil,
-                friendsPullSyncer: nil,
-                leaderboardPullSyncer: nil
-            )
-        } else {
-            coordinator = SyncCoordinator(
-                db: dbPool,
-                snapshotSyncer: syncer,
-                friendsPullSyncer: friendsPull,
-                leaderboardPullSyncer: lbPull
-            )
-        }
+        let coordinator = SyncCoordinator(db: dbPool)
         self.syncCoordinator = coordinator
-        let dbPoolRef = dbPool
-        // githubEnabled теперь определяется runtime-токеном (из Keychain), а не полем конфига.
-        let githubEnabledNow = !ghBox.value.isEmpty && !ghLoginBox.value.isEmpty
         self.dropdownViewModel = DropdownViewModel(
             db: dbPool,
-            syncCoordinator: coordinator,
-            api: api,
-            hasAccount: { (try? dbPoolRef.read { try StatsQueries.loadMyProfile($0) }) ?? nil != nil },
-            githubEnabled: githubEnabledNow,
-            demoMode: cfg.demoMode
+            syncCoordinator: coordinator
         )
     }
 
@@ -176,50 +134,14 @@ final class AppContainer {
             db: dbPool
         )
         vm.onSignedIn = { [weak self] in await self?.refreshSourcesAfterSignIn() }
-        vm.onSharingEnabled = { [weak self] in await self?.runSnapshotBackfillNow() }
         return vm
     }
 
-    /// Немедленная выгрузка снапшотов с backfill всей истории — вызывается при
-    /// включении шаринга и входе в шарящий аккаунт, чтобы не ждать периодического
-    /// ccusage-тика (раньше toggleSharing только PATCH'ил флаг, и снапшоты висели
-    /// неотправленными до следующего тика — до 15 минут, а история вообще не уходила).
-    func runSnapshotBackfillNow() async {
-        do {
-            _ = try await snapshotSyncer.runOnce(backfill: true)
-        } catch {
-            AppLogger.aiuse.error("snapshot backfill failed: \(error.localizedDescription, privacy: .private)")
-        }
-    }
-
-    /// Пересобирает fetcher-источники из актуальных box'ов (токен/логин обновлены
-    /// после OAuth) и перезапускает периодический sync. GitHub-источник дёргаем сразу.
+    /// Пересобирает fetcher-источники и перезапускает периодический sync после OAuth.
     func refreshSourcesAfterSignIn() async {
         let sources = buildFetchers()
-        for (name, fetchers) in sources where name == "github" {
-            try? await syncCoordinator.runOnce(source: name, fetchers: fetchers)
-        }
         let interval = TimeInterval(config.syncIntervalMinutes * 60)
         syncCoordinator.startTimer(interval: interval, sources: sources)
-    }
-
-    /// Создаёт fresh FriendsTabViewModel — для каждого открытия окна настроек.
-    func makeFriendsTabViewModel() -> FriendsTabViewModel {
-        let dbPoolRef = dbPool
-        return FriendsTabViewModel(
-            api: aiuseAPI,
-            db: dbPool,
-            hasAccount: { (try? dbPoolRef.read { try StatsQueries.loadMyProfile($0) }) ?? nil != nil }
-        )
-    }
-
-    /// Создаёт fresh BlockedTabViewModel.
-    func makeBlockedTabViewModel() -> BlockedTabViewModel {
-        let dbPoolRef = dbPool
-        return BlockedTabViewModel(
-            api: aiuseAPI,
-            hasAccount: { (try? dbPoolRef.read { try StatsQueries.loadMyProfile($0) }) ?? nil != nil }
-        )
     }
 
     func buildFetchers() -> [(name: String, fetchers: [any Fetcher])] {
@@ -229,12 +151,6 @@ final class AppContainer {
         }
         sources.append(("ccusage", ccFetchers))
         sources.append(("claude-cowork", [ClaudeCoworkFetcher()]))
-        // Токен и логин берём из Keychain-бэкенных box'ов, не из конфига.
-        let token = githubTokenBox.value
-        let login = githubLoginBox.value
-        if !token.isEmpty && !login.isEmpty {
-            sources.append(("github", [GitHubFetcher(token: token, login: login)]))
-        }
         return sources
     }
 
