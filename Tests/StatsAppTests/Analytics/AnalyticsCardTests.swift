@@ -148,6 +148,34 @@ final class AnalyticsCardTests: XCTestCase {
         XCTAssertEqual(top.last?.model, "claude-opus-4-8")
     }
 
+    /// Регрессия: токены (SourceSummary и topModelsByTokens) считаются БЕЗ кэша —
+    /// той же методологией, что и главный экран «Расходы» (input_tokens_no_cache).
+    /// Раньше кэш суммировался в токены и раздувал «Топ моделей» на порядки
+    /// относительно вкладки «Расходы».
+    func test_tokens_exclude_cache() throws {
+        let dbq = try migratedQueue()
+        try dbq.write { db in
+            var row = AnalyticsTurnRow(
+                id: nil, source: "claude-code", ts: "2026-07-01T10:00:00Z-0",
+                day: "2026-07-01", session: "claude-code-0", project: "/p",
+                model: "claude-opus-4-8", origin: "human",
+                promptHead: "вопрос", promptChars: 6,
+                nRequests: 1, inputTokens: 1_000, outputTokens: 500,
+                costUsd: 10.0, expSavedUsd: 0
+            )
+            row.cacheRead = 1_000_000
+            row.cacheCreate5m = 200_000
+            row.cacheCreate1h = 50_000
+            try row.insert(db)
+        }
+        let rows = try dbq.read { db in try AnalyticsTurnRow.fetchAll(db) }
+        let card = try dbq.read { db in try builder().build(in: db) }
+
+        // input+output = 1500, кэш (1.25M) в сумму не входит.
+        XCTAssertEqual(card.sources.first?.tokens, 1_500)
+        XCTAssertEqual(AnalyticsCardBuilder.topModelsByTokens(rows).first?.tokens, 1_500)
+    }
+
     func test_ready_but_no_leaks_when_total_saving_under_dollar() throws {
         let dbq = try migratedQueue()
         try dbq.write { db in

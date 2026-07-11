@@ -46,9 +46,7 @@ struct AnalyticsCardBuilder {
         for source in ["codex", "claude-code"] {
             let srcRows = rows.filter { $0.source == source }
             guard !srcRows.isEmpty else { continue }
-            let tokens = srcRows.reduce(Int64(0)) {
-                $0 + $1.inputTokens + $1.cacheRead + $1.cacheCreate5m + $1.cacheCreate1h + $1.outputTokens
-            }
+            let tokens = srcRows.reduce(Int64(0)) { $0 + Self.rowTokens($1) }
             let cost = srcRows.reduce(0.0) { $0 + $1.costUsd }
             let exp = srcRows.reduce(0.0) { $0 + $1.expSavedUsd }
             sources.append(AnalyticsCard.SourceSummary(
@@ -81,9 +79,11 @@ struct AnalyticsCardBuilder {
                              topLeakTitle: leaks.first?.title, advisorComputedAt: computedAt)
     }
 
-    /// Токены хода (с кэшем) — та же метрика «использования», что и в SourceSummary.
+    /// Токены хода без кэша (input+output) — та же методология, что на главном
+    /// экране «Расходы» (`input_tokens_no_cache`). `inputTokens` здесь уже без
+    /// кэша: парсеры (Claude/Codex) кладут cache_read/cache_creation отдельно.
     private static func rowTokens(_ r: AnalyticsTurnRow) -> Int64 {
-        r.inputTokens + r.cacheRead + r.cacheCreate5m + r.cacheCreate1h + r.outputTokens
+        r.inputTokens + r.outputTokens
     }
 
     /// Топ моделей по суммарным токенам за окно, убыв. (tie-break — имя), ≤6.

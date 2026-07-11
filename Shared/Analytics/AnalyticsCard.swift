@@ -16,7 +16,7 @@ struct AnalyticsCard: Equatable {
     struct SourceSummary: Equatable {
         var source: String            // "codex" | "claude-code"
         var displayName: String       // "Codex" | "Claude Code"
-        var tokens: Int64             // input+cache_read+cc5m+cc1h+output (с кэшем!)
+        var tokens: Int64             // input+output, без кэша — как на главном экране «Расходы»
         var costUsd: Double
         var expSavedUsd: Double
         /// «% объёма» в долларах: Σexp_saved/Σcost_usd × 100. nil при costUsd == 0.
@@ -30,7 +30,7 @@ struct AnalyticsCard: Equatable {
     /// Модель в топе по использованию (токенам за окно).
     struct ModelUsage: Equatable {
         var model: String
-        var tokens: Int64             // input+cache_read+cc5m+cc1h+output (с кэшем)
+        var tokens: Int64             // input+output, без кэша
     }
 
     /// Кластер-утечка (топ-3 по экономии).
