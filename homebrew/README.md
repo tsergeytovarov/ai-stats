@@ -12,10 +12,10 @@
 
 2. **Сделать GitHub Release.**
    ```bash
-   gh release create v0.2.0 \
-       --title "v0.2.0" \
+   gh release create v1.0.0 \
+       --title "v1.0.0" \
        --notes-from-tag \
-       build/burn-0.2.0.dmg
+       build/burn-1.0.0.dmg
    ```
 
 3. **Обновить Cask formula.**

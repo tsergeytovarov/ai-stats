@@ -53,6 +53,23 @@ def codex_guide() -> list[tuple[str, str]]:
         return []
 
 
+_CONFIRM = {"да", "ага", "угу", "ок", "окей", "нет", "готово", "ясно", "понял",
+            "поняла", "спс", "спасибо", "yes", "no", "ok", "okay", "yep", "y", "n"}
+
+
+def is_filler(head: str) -> bool:
+    """Подтверждение/реплика внутри сессии — не утечка (нельзя свитчить модель)."""
+    s = head.strip().lower()
+    if not s:
+        return True
+    if s.startswith("<"):
+        return False
+    if not any(ch.isalpha() for ch in s):
+        return True
+    words = [w for w in "".join(ch if ch.isalpha() else " " for ch in s).split() if w]
+    return bool(words) and all(w in _CONFIRM for w in words)
+
+
 def norm_prefix(head: str) -> str:
     """Ключ кластера: нормализованное начало промпта.
 
@@ -83,6 +100,8 @@ def main():
         if not t.ts:
             continue
         tier = e2.heur_tier(t.model, t.n_tool_calls, t.n_edits, t.output_tokens, t.prompt_chars)
+        if is_filler(t.prompt_head):
+            tier = None   # подтверждение — не утечка, exp 0
         cf = None
         if tier in (1, 2):
             cf = e2.cost(e2.TIER_MODELS[t.source][tier], t.input_tokens, t.output_tokens,

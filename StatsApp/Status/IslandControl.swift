@@ -88,18 +88,20 @@ struct FloatingIsland: View {
 
     var body: some View {
         HStack(spacing: 2) {
-            CategoryPill(title: NSLocalizedString("section.ai", comment: ""),
-                         isActive: section == .ai) { section = .ai }
-            CategoryPill(title: NSLocalizedString("section.github", comment: ""),
-                         isActive: section == .github) { section = .github }
-            CategoryPill(title: NSLocalizedString("section.friends", comment: ""),
-                         isActive: section == .leaderboard) { section = .leaderboard }
+            CategoryPill(title: NSLocalizedString("section.expenses", comment: ""),
+                         isActive: section == .expenses) { section = .expenses }
+            CategoryPill(title: NSLocalizedString("section.analytics", comment: ""),
+                         isActive: section == .analytics) { section = .analytics }
 
-            Rectangle().fill(Color.white.opacity(0.18))
-                .frame(width: 0.5, height: 18)
-                .padding(.horizontal, 4)
+            // Переключатель периода — только у «Расходов». У «Аналитики» окно
+            // фиксировано (последние 30 дней), период-сегмент скрыт (спека 2.1).
+            if section == .expenses {
+                Rectangle().fill(Color.white.opacity(0.18))
+                    .frame(width: 0.5, height: 18)
+                    .padding(.horizontal, 4)
 
-            PeriodSegment(selection: $period)
+                PeriodSegment(selection: $period)
+            }
         }
         .padding(4)
         .background(

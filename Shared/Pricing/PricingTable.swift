@@ -26,6 +26,14 @@ enum PricingTable {
     static let fableRate  = ModelRate(inputPerM: 10.00, outputPerM: 50.00, cacheReadPerM: 1.00, cacheCreatePerM: 12.50, cacheCreate1hPerM: 20.00)
     static let mythosRate = ModelRate(inputPerM: 10.00, outputPerM: 50.00, cacheReadPerM: 1.00, cacheCreatePerM: 12.50, cacheCreate1hPerM: 20.00)
 
+    // OpenAI — gpt-5.x family (cache-write у OpenAI не тарифицируется отдельно → 0).
+    // Ставки gpt-5.6-*/spark — ДОПУЩЕНИЯ: публичного прайса нет, берём по позиционированию
+    // модели (sol=frontier→5.5, terra=everyday→5.4, luna/spark=fast&cheap→mini). Сверить
+    // при появлении публичного прайса. Нулевая ставка занижала бы статистику на сотни $/мес.
+    static let gpt55Rate     = ModelRate(inputPerM: 5.00, outputPerM: 30.00, cacheReadPerM: 0.50,  cacheCreatePerM: 0.00, cacheCreate1hPerM: 0.00)
+    static let gpt54Rate     = ModelRate(inputPerM: 2.50, outputPerM: 15.00, cacheReadPerM: 0.25,  cacheCreatePerM: 0.00, cacheCreate1hPerM: 0.00)
+    static let gpt54MiniRate = ModelRate(inputPerM: 0.75, outputPerM: 4.50,  cacheReadPerM: 0.075, cacheCreatePerM: 0.00, cacheCreate1hPerM: 0.00)
+
     /// Точное совпадение по имени модели → ставка.
     static let rates: [String: ModelRate] = [
         // Anthropic — Claude 4.x family
@@ -42,9 +50,14 @@ enum PricingTable {
         "claude-mythos-5":           mythosRate,
 
         // OpenAI — gpt-5.x family (cache-write у OpenAI не тарифицируется отдельно → 0)
-        "gpt-5.5":                   ModelRate(inputPerM: 5.00, outputPerM: 30.00, cacheReadPerM: 0.50,  cacheCreatePerM: 0.00, cacheCreate1hPerM: 0.00),
-        "gpt-5.4":                   ModelRate(inputPerM: 2.50, outputPerM: 15.00, cacheReadPerM: 0.25,  cacheCreatePerM: 0.00, cacheCreate1hPerM: 0.00),
-        "gpt-5.4-mini":              ModelRate(inputPerM: 0.75, outputPerM: 4.50,  cacheReadPerM: 0.075, cacheCreatePerM: 0.00, cacheCreate1hPerM: 0.00),
+        "gpt-5.5":                   gpt55Rate,
+        "gpt-5.4":                   gpt54Rate,
+        "gpt-5.4-mini":              gpt54MiniRate,
+        // gpt-5.6-* / spark — ставки-допущения (см. комментарий у констант выше)
+        "gpt-5.6-sol":               gpt55Rate,      // frontier ⇒ как gpt-5.5
+        "gpt-5.6-terra":             gpt54Rate,      // everyday  ⇒ как gpt-5.4
+        "gpt-5.6-luna":              gpt54MiniRate,  // fast&cheap ⇒ как gpt-5.4-mini
+        "gpt-5.3-codex-spark":       gpt54MiniRate,  // ultra-fast, subscription-only ⇒ как mini
         // codex-auto-review — внутренний лейбл фичи Codex, не публичный SKU; ставка не верифицирована.
         "codex-auto-review":         ModelRate(inputPerM: 5.00, outputPerM: 15.00, cacheReadPerM: 0.63,  cacheCreatePerM: 0.00, cacheCreate1hPerM: 0.00),
     ]
@@ -73,6 +86,9 @@ enum PricingTable {
         if model.hasPrefix("claude-haiku-")  { return ("haiku", haikuRate) }
         if model.hasPrefix("claude-fable-")  { return ("fable", fableRate) }
         if model.hasPrefix("claude-mythos-") { return ("mythos", mythosRate) }
+        // Новая gpt-5.6-* без точного совпадения — консервативно на ставку gpt-5.5
+        // (frontier-tier), чтобы новая модель не обнулила статистику. Ставка-допущение.
+        if model.hasPrefix("gpt-5.6-")       { return ("gpt-5.6", gpt55Rate) }
         return nil
     }
 

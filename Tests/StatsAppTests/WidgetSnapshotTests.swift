@@ -2,13 +2,15 @@ import XCTest
 @testable import StatsApp
 
 final class WidgetSnapshotTests: XCTestCase {
-    func test_decode_legacy_json_without_new_fields_uses_defaults() throws {
-        // JSON в старом формате — без aiCostPrev, leaderboard, myFriendCode.
+    func test_decode_legacy_json_missing_schemaVersion_treatedAsV1() throws {
+        // Снапшот старого app'а: без schemaVersion, с полями github/leaderboard.
+        // Лишние ключи игнорируются, отсутствующий schemaVersion → 1 (legacy).
         let json = """
         {
             "generatedAt": "2026-05-23T12:00:00Z",
             "githubEnabled": true,
-            "day":   { "aiCost": 10.0, "aiTokens": 100, "commits": 1, "uniqueRepos": 1, "topModels": [] },
+            "myFriendCode": "abc123",
+            "day":   { "aiCost": 10.0, "aiTokens": 100, "commits": 1, "uniqueRepos": 1, "topModels": [], "leaderboard": null },
             "week":  { "aiCost": 50.0, "aiTokens": 500, "commits": 5, "uniqueRepos": 2, "topModels": [] },
             "month": { "aiCost": 200.0, "aiTokens": 2000, "commits": 20, "uniqueRepos": 3, "topModels": [] }
         }
@@ -18,33 +20,21 @@ final class WidgetSnapshotTests: XCTestCase {
         decoder.dateDecodingStrategy = .iso8601
         let snapshot = try decoder.decode(WidgetSnapshot.self, from: json)
 
+        XCTAssertEqual(snapshot.schemaVersion, 1)
         XCTAssertEqual(snapshot.day.aiCost, 10.0)
-        XCTAssertEqual(snapshot.day.aiCostPrev, 0.0)
-        XCTAssertNil(snapshot.day.leaderboard)
-        XCTAssertNil(snapshot.myFriendCode)
+        XCTAssertEqual(snapshot.day.aiCostPrev, 0.0)  // decodeIfPresent → 0
     }
 
-    func test_roundtrip_with_full_leaderboard_slice() throws {
-        let me = WidgetSnapshot.LeaderboardSlice.Entry(
-            rank: 42, previousRank: 50, friendCode: "ME00000001", displayName: "Я", tokensTotal: 200, isMe: true
-        )
-        let lb = WidgetSnapshot.LeaderboardSlice(
-            entries: [
-                .init(rank: 1, previousRank: 11, friendCode: "FR00000001", displayName: "Серёжа", tokensTotal: 12_400, isMe: false),
-                .init(rank: 2, previousRank: 5,  friendCode: "FR00000002", displayName: "Вася",    tokensTotal: 9_800,  isMe: false),
-            ],
-            meBelow: me
-        )
+    func test_roundtrip_preserves_ai_fields_and_schemaVersion() throws {
         let slice = WidgetSnapshot.PeriodSlice(
-            aiCost: 250.0, aiCostPrev: 222.40,
-            aiTokens: 12_400_000, commits: 5, uniqueRepos: 2,
-            topModels: [], leaderboard: lb
+            aiCost: 250.0, aiCostPrev: 222.40, aiTokens: 12_400_000,
+            topModels: [
+                WidgetSnapshot.ModelEntry(model: "claude-opus-4-8", source: "claude", costUsd: 200, inputTokens: 10, outputTokens: 20)
+            ]
         )
         let snapshot = WidgetSnapshot(
             generatedAt: Date(timeIntervalSince1970: 1_716_336_000),
-            day: slice, week: slice, month: slice,
-            githubEnabled: true,
-            myFriendCode: "abc123"
+            day: slice, week: slice, month: slice
         )
 
         let encoder = JSONEncoder()
@@ -56,75 +46,53 @@ final class WidgetSnapshotTests: XCTestCase {
         let decoded = try decoder.decode(WidgetSnapshot.self, from: data)
 
         XCTAssertEqual(decoded, snapshot)
-        XCTAssertEqual(decoded.day.leaderboard?.meBelow?.rank, 42)
-        XCTAssertEqual(decoded.myFriendCode, "abc123")
+        XCTAssertEqual(decoded.schemaVersion, 2)
+        XCTAssertEqual(decoded.day.aiCostPrev, 222.40, accuracy: 0.001)
+        XCTAssertEqual(decoded.day.topModels.first?.model, "claude-opus-4-8")
     }
 
-    func test_decode_explicit_null_for_optional_fields_uses_defaults() throws {
-        // decodeIfPresent трактует explicit `null` так же, как отсутствие ключа.
-        // Фиксируем это поведение тестом, чтобы будущее изменение схемы не сломало контракт.
+    func test_decode_v2_json_without_prevCost_defaultsToZero() throws {
         let json = """
         {
+            "schemaVersion": 2,
             "generatedAt": "2026-05-23T12:00:00Z",
-            "githubEnabled": true,
-            "myFriendCode": null,
-            "day":   { "aiCost": 10.0, "aiCostPrev": null, "aiTokens": 100, "commits": 1, "uniqueRepos": 1, "topModels": [], "leaderboard": null },
-            "week":  { "aiCost": 50.0, "aiTokens": 500, "commits": 5, "uniqueRepos": 2, "topModels": [] },
-            "month": { "aiCost": 200.0, "aiTokens": 2000, "commits": 20, "uniqueRepos": 3, "topModels": [] }
+            "day":   { "aiCost": 5.0, "aiTokens": 50, "topModels": [] },
+            "week":  { "aiCost": 5.0, "aiTokens": 50, "topModels": [] },
+            "month": { "aiCost": 5.0, "aiTokens": 50, "topModels": [] }
         }
         """.data(using: .utf8)!
-
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         let snapshot = try decoder.decode(WidgetSnapshot.self, from: json)
-
+        XCTAssertEqual(snapshot.schemaVersion, 2)
         XCTAssertEqual(snapshot.day.aiCostPrev, 0)
-        XCTAssertNil(snapshot.day.leaderboard)
-        XCTAssertNil(snapshot.myFriendCode)
+        // Аддитивные поля советника отсутствуют → nil.
+        XCTAssertNil(snapshot.advisorComputedAt)
+        XCTAssertNil(snapshot.leakUsdPerMonth)
+        XCTAssertNil(snapshot.topLeakTitle)
     }
 
-    func test_decode_legacy_entry_without_friendCode_defaultsToEmpty() throws {
-        // Snapshot'ы до widget-avatars не писали friend_code в entries.
-        // Декодер должен дефолтить в пустую строку — widget просто не покажет
-        // аватарку (fallback на градиент), но не упадёт.
-        let json = """
-        {
-            "generatedAt": "2026-05-23T12:00:00Z",
-            "githubEnabled": true,
-            "day": {
-                "aiCost": 10.0, "aiTokens": 100, "commits": 0, "uniqueRepos": 0, "topModels": [],
-                "leaderboard": {
-                    "entries": [
-                        {"rank": 1, "displayName": "Серёжа", "tokensTotal": 12400, "isMe": false}
-                    ]
-                }
-            },
-            "week":  { "aiCost": 0, "aiTokens": 0, "commits": 0, "uniqueRepos": 0, "topModels": [] },
-            "month": { "aiCost": 0, "aiTokens": 0, "commits": 0, "uniqueRepos": 0, "topModels": [] }
-        }
-        """.data(using: .utf8)!
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let snapshot = try decoder.decode(WidgetSnapshot.self, from: json)
-        XCTAssertEqual(snapshot.day.leaderboard?.entries.first?.friendCode, "")
-        XCTAssertEqual(snapshot.day.leaderboard?.entries.first?.displayName, "Серёжа")
-    }
+    func test_roundtrip_preserves_advisor_fields() throws {
+        let slice = WidgetSnapshot.PeriodSlice(aiCost: 1, aiCostPrev: 0, aiTokens: 1, topModels: [])
+        let computedAt = Date(timeIntervalSince1970: 1_752_235_200)  // 2025-07-11T12:00:00Z
+        let snapshot = WidgetSnapshot(
+            generatedAt: computedAt,
+            day: slice, week: slice, month: slice,
+            advisorComputedAt: computedAt,
+            leakUsdPerMonth: 168.0,
+            topLeakTitle: "Фоновые уведомления"
+        )
 
-    func test_decode_legacy_json_with_partial_period_slice() throws {
-        // PeriodSlice без leaderboard и aiCostPrev — должны дефолтиться.
-        let json = """
-        {
-            "generatedAt": "2026-05-23T12:00:00Z",
-            "githubEnabled": false,
-            "day":   { "aiCost": 5.0, "aiTokens": 50, "commits": 0, "uniqueRepos": 0, "topModels": [] },
-            "week":  { "aiCost": 5.0, "aiTokens": 50, "commits": 0, "uniqueRepos": 0, "topModels": [] },
-            "month": { "aiCost": 5.0, "aiTokens": 50, "commits": 0, "uniqueRepos": 0, "topModels": [] }
-        }
-        """.data(using: .utf8)!
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(snapshot)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        let snapshot = try decoder.decode(WidgetSnapshot.self, from: json)
-        XCTAssertEqual(snapshot.day.aiCostPrev, 0)
-        XCTAssertNil(snapshot.day.leaderboard)
+        let decoded = try decoder.decode(WidgetSnapshot.self, from: data)
+
+        XCTAssertEqual(decoded, snapshot)
+        XCTAssertEqual(decoded.advisorComputedAt, computedAt)
+        XCTAssertEqual(decoded.leakUsdPerMonth ?? -1, 168.0, accuracy: 0.001)
+        XCTAssertEqual(decoded.topLeakTitle, "Фоновые уведомления")
     }
 }

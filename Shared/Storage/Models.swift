@@ -39,61 +39,6 @@ struct AIUsageRow: Codable, FetchableRecord, PersistableRecord, Equatable {
     }
 }
 
-struct GitHubRow: Codable, FetchableRecord, PersistableRecord, Equatable {
-    static let databaseTableName = "github_activity"
-
-    var id: Int64?
-    var day: String
-    var repo: String
-    var commits: Int64
-    var updatedAt: String
-
-    enum Columns {
-        static let id = Column("id")
-        static let day = Column("day")
-        static let repo = Column("repo")
-        static let commits = Column("commits")
-        static let updatedAt = Column("updated_at")
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case day
-        case repo
-        case commits
-        case updatedAt = "updated_at"
-    }
-}
-
-struct GitHubLOCDailyRow: Codable, FetchableRecord, PersistableRecord, Equatable {
-    static let databaseTableName = "github_loc_daily"
-
-    var id: Int64?
-    var day: String
-    var repo: String
-    var additions: Int64
-    var deletions: Int64
-    var updatedAt: String
-
-    enum Columns {
-        static let id = Column("id")
-        static let day = Column("day")
-        static let repo = Column("repo")
-        static let additions = Column("additions")
-        static let deletions = Column("deletions")
-        static let updatedAt = Column("updated_at")
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case id
-        case day
-        case repo
-        case additions
-        case deletions
-        case updatedAt = "updated_at"
-    }
-}
-
 struct AIUsageModelRow: Codable, FetchableRecord, PersistableRecord, Equatable {
     static let databaseTableName = "ai_usage_model"
 
@@ -191,83 +136,155 @@ struct MyProfileRow: Codable, FetchableRecord, PersistableRecord, Equatable {
     }
 }
 
-/// Кэш профиля друга — имя/аватарка/sharing для оффлайн-рендера.
-struct FriendProfileRow: Codable, FetchableRecord, PersistableRecord, Equatable {
-    static let databaseTableName = "friend_profiles"
+// MARK: - Analytics (миграция v9)
 
-    var friendCode: String
-    var displayName: String
-    var sharingEnabled: Bool
-    var avatarBlob: Data?
-    var avatarMime: String?
-    var avatarEtag: String?
-    var lastFetchedAt: Double
+/// Один «ход» агента (Claude Code / Codex) — user-запрос + все ответы модели до
+/// следующего запроса. Хранится вся история; окно 30 дней накладывается запросом.
+/// `id: Int64?` — AUTOINCREMENT PK; upsert идёт по UNIQUE(source, session, ts).
+struct AnalyticsTurnRow: Codable, FetchableRecord, PersistableRecord, Equatable {
+    static let databaseTableName = "analytics_turns"
+
+    var id: Int64?
+    var source: String
+    var ts: String
+    var day: String
+    var session: String
+    var project: String
+    var model: String
+    var effort: String = ""
+    var origin: String
+    var promptHead: String = ""
+    var promptChars: Int64 = 0
+    var nRequests: Int64 = 0
+    var nToolCalls: Int64 = 0
+    var nEdits: Int64 = 0
+    var inputTokens: Int64 = 0
+    var cacheRead: Int64 = 0
+    var cacheCreate5m: Int64 = 0
+    var cacheCreate1h: Int64 = 0
+    var outputTokens: Int64 = 0
+    var costUsd: Double = 0
+    var heurTier: Int?
+    var cfModel: String?
+    var cfUsd: Double?
+    var expSavedUsd: Double = 0
 
     enum Columns {
-        static let friendCode = Column("friend_code")
-        static let displayName = Column("display_name")
-        static let sharingEnabled = Column("sharing_enabled")
-        static let avatarBlob = Column("avatar_blob")
-        static let avatarMime = Column("avatar_mime")
-        static let avatarEtag = Column("avatar_etag")
-        static let lastFetchedAt = Column("last_fetched_at")
+        static let id = Column("id")
+        static let source = Column("source")
+        static let ts = Column("ts")
+        static let day = Column("day")
+        static let session = Column("session")
+        static let project = Column("project")
+        static let model = Column("model")
+        static let effort = Column("effort")
+        static let origin = Column("origin")
+        static let promptHead = Column("prompt_head")
+        static let promptChars = Column("prompt_chars")
+        static let nRequests = Column("n_requests")
+        static let nToolCalls = Column("n_tool_calls")
+        static let nEdits = Column("n_edits")
+        static let inputTokens = Column("input_tokens")
+        static let cacheRead = Column("cache_read")
+        static let cacheCreate5m = Column("cache_create_5m")
+        static let cacheCreate1h = Column("cache_create_1h")
+        static let outputTokens = Column("output_tokens")
+        static let costUsd = Column("cost_usd")
+        static let heurTier = Column("heur_tier")
+        static let cfModel = Column("cf_model")
+        static let cfUsd = Column("cf_usd")
+        static let expSavedUsd = Column("exp_saved_usd")
     }
 
     enum CodingKeys: String, CodingKey {
-        case friendCode = "friend_code"
-        case displayName = "display_name"
-        case sharingEnabled = "sharing_enabled"
-        case avatarBlob = "avatar_blob"
-        case avatarMime = "avatar_mime"
-        case avatarEtag = "avatar_etag"
-        case lastFetchedAt = "last_fetched_at"
+        case id
+        case source
+        case ts
+        case day
+        case session
+        case project
+        case model
+        case effort
+        case origin
+        case promptHead = "prompt_head"
+        case promptChars = "prompt_chars"
+        case nRequests = "n_requests"
+        case nToolCalls = "n_tool_calls"
+        case nEdits = "n_edits"
+        case inputTokens = "input_tokens"
+        case cacheRead = "cache_read"
+        case cacheCreate5m = "cache_create_5m"
+        case cacheCreate1h = "cache_create_1h"
+        case outputTokens = "output_tokens"
+        case costUsd = "cost_usd"
+        case heurTier = "heur_tier"
+        case cfModel = "cf_model"
+        case cfUsd = "cf_usd"
+        case expSavedUsd = "exp_saved_usd"
     }
 }
 
-/// Кэш ответов /api/leaderboard за каждый period. payload_json = encoded LeaderboardResponse.
-struct LeaderboardCacheRow: Codable, FetchableRecord, PersistableRecord, Equatable {
-    static let databaseTableName = "leaderboard_cache"
+/// Файловый гейт инкрементального ингеста: перечитываем файл целиком, только если
+/// изменились mtime/size (см. спеку 5.1 — оффсетное дочитывание запрещено).
+struct AnalyticsIngestStateRow: Codable, FetchableRecord, PersistableRecord, Equatable {
+    static let databaseTableName = "analytics_ingest_state"
 
-    var period: String
-    var fetchedAt: Double
-    var payloadJson: String
+    var path: String
+    var mtime: Double?
+    var size: Int64?
 
     enum Columns {
-        static let period = Column("period")
-        static let fetchedAt = Column("fetched_at")
-        static let payloadJson = Column("payload_json")
+        static let path = Column("path")
+        static let mtime = Column("mtime")
+        static let size = Column("size")
     }
 
     enum CodingKeys: String, CodingKey {
-        case period
-        case fetchedAt = "fetched_at"
-        case payloadJson = "payload_json"
+        case path
+        case mtime
+        case size
     }
 }
 
-/// Snapshot ожидающий отправки на сервер. hour_bucket = unix seconds (UTC).
-struct PendingSnapshotRow: Codable, FetchableRecord, PersistableRecord, Equatable {
-    static let databaseTableName = "pending_snapshots"
+/// Ключ-значение аналитики: pricing_version (триггер in-place пересчёта), last_ingest_at.
+struct AnalyticsMetaRow: Codable, FetchableRecord, PersistableRecord, Equatable {
+    static let databaseTableName = "analytics_meta"
 
-    var hourBucket: Int64
-    var tokensInput: Int64
-    var tokensOutput: Int64
-    var attempts: Int = 0
-    var lastError: String?
+    var key: String
+    var value: String?
 
     enum Columns {
-        static let hourBucket = Column("hour_bucket")
-        static let tokensInput = Column("tokens_input")
-        static let tokensOutput = Column("tokens_output")
-        static let attempts = Column("attempts")
-        static let lastError = Column("last_error")
+        static let key = Column("key")
+        static let value = Column("value")
     }
 
     enum CodingKeys: String, CodingKey {
-        case hourBucket = "hour_bucket"
-        case tokensInput = "tokens_input"
-        case tokensOutput = "tokens_output"
-        case attempts
-        case lastError = "last_error"
+        case key
+        case value
     }
 }
+
+/// Наблюдение лимита Codex (primary 5h / secondary week). Upsert по UNIQUE(path, ts, window).
+struct AnalyticsRateLimitRow: Codable, FetchableRecord, PersistableRecord, Equatable {
+    static let databaseTableName = "analytics_rate_limits"
+
+    var path: String
+    var ts: String
+    var window: String
+    var usedPercent: Double?
+
+    enum Columns {
+        static let path = Column("path")
+        static let ts = Column("ts")
+        static let window = Column("window")
+        static let usedPercent = Column("used_percent")
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case path
+        case ts
+        case window
+        case usedPercent = "used_percent"
+    }
+}
+

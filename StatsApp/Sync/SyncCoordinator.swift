@@ -11,9 +11,6 @@ import os.log
 final class SyncCoordinator {
     private let db: any DatabaseWriter
     private let now: () -> Date
-    private let snapshotSyncer: SnapshotSyncer?
-    private let friendsPullSyncer: FriendsPullSyncer?
-    private let leaderboardPullSyncer: LeaderboardPullSyncer?
     /// Тесты прокидывают свой NotificationCenter + имя, чтобы шлать synthetic wake.
     /// В проде nil — берётся NSWorkspace.shared.notificationCenter в installWakeObserverIfNeeded().
     private let testWakeCenter: NotificationCenter?
@@ -26,20 +23,22 @@ final class SyncCoordinator {
     private var configuredInterval: TimeInterval = 0
     private(set) var lastSyncAt: [String: Date] = [:]
 
+    /// Инъектируемый ингест аналитики. Гейт «не чаще раза в час» —
+    /// через `analytics_meta.last_ingest_at`. nil — ингест не сконфигурирован.
+    private let analyticsIngest: (() async throws -> Void)?
+    /// Минимальный интервал между ингестами аналитики (спека 5.1: не чаще раза в час).
+    private static let analyticsIngestInterval: TimeInterval = 3600
+
     init(db: any DatabaseWriter,
-         snapshotSyncer: SnapshotSyncer? = nil,
-         friendsPullSyncer: FriendsPullSyncer? = nil,
-         leaderboardPullSyncer: LeaderboardPullSyncer? = nil,
          testWakeCenter: NotificationCenter? = nil,
          testWakeName: Notification.Name? = nil,
-         now: @escaping () -> Date = Date.init) {
+         now: @escaping () -> Date = Date.init,
+         analyticsIngest: (() async throws -> Void)? = nil) {
         self.db = db
-        self.snapshotSyncer = snapshotSyncer
-        self.friendsPullSyncer = friendsPullSyncer
-        self.leaderboardPullSyncer = leaderboardPullSyncer
         self.testWakeCenter = testWakeCenter
         self.testWakeName = testWakeName
         self.now = now
+        self.analyticsIngest = analyticsIngest
     }
 
     deinit {
@@ -88,6 +87,50 @@ final class SyncCoordinator {
     func runAllSources() async {
         for (name, fetchers) in configuredSources {
             try? await runOnce(source: name, fetchers: fetchers)
+        }
+        await maybeRunAnalyticsIngest()
+    }
+
+    /// Ингест аналитики с гейтом «не чаще раза в час» (спека 5.1). Метка времени —
+    /// `analytics_meta.last_ingest_at`. После успешного ингеста пересчитывает и
+    /// пишет снапшот виджета (поля советника, C9). Возвращает true, если ингест
+    /// выполнен (иначе — скип по гейту / ингест не сконфигурирован).
+    /// `force` — обойти часовой гейт (используется на старте приложения: ингест
+    /// всегда прогоняет пересчёт вердиктов по хранимым полям, а смена версии
+    /// расчёта иначе не подхватилась бы при перезапуске в пределах часа).
+    @discardableResult
+    func maybeRunAnalyticsIngest(force: Bool = false) async -> Bool {
+        guard let analyticsIngest else { return false }
+        let nowDate = now()
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime]
+        do {
+            if !force {
+                let lastValue = try await db.read { db in
+                    try AnalyticsMetaRow
+                        .filter(AnalyticsMetaRow.Columns.key == "last_ingest_at")
+                        .fetchOne(db)?.value
+                }
+                if let lastValue, let last = iso.date(from: lastValue),
+                   nowDate.timeIntervalSince(last) < Self.analyticsIngestInterval {
+                    return false  // <1ч с прошлого ингеста — скип (только для тика).
+                }
+            }
+
+            try await analyticsIngest()
+
+            try await db.write { db in
+                try AnalyticsMetaRow(key: "last_ingest_at", value: iso.string(from: nowDate))
+                    .insert(db, onConflict: .replace)
+            }
+            // Пересчёт снапшота с полями советника (C9) — виджет обновляется без
+            // открытия вкладки «Аналитика».
+            try? buildAndWriteWidgetSnapshot()
+            WidgetCenter.shared.reloadAllTimelines()
+            return true
+        } catch {
+            AppLogger.sync.error("analytics ingest failed: \(error.localizedDescription, privacy: .private)")
+            return false
         }
     }
 
@@ -146,32 +189,9 @@ final class SyncCoordinator {
         lastSyncAt[source] = now()
         try? buildAndWriteWidgetSnapshot()
         WidgetCenter.shared.reloadAllTimelines()
-
-        // После ccusage-sync пушим snapshot'ы на aiuse-сервер, потом тянем
-        // обновлённый список друзей и лидерборд. Ошибки не ронят общий тик.
-        if source == "ccusage" {
-            if let syncer = snapshotSyncer {
-                do { _ = try await syncer.runOnce() }
-                catch {
-                    AppLogger.aiuse.error("Snapshot sync failed: \(error.localizedDescription, privacy: .private)")
-                }
-            }
-            if let pullSyncer = friendsPullSyncer {
-                do { _ = try await pullSyncer.runOnce() }
-                catch {
-                    AppLogger.aiuse.error("Friends pull failed: \(error.localizedDescription, privacy: .private)")
-                }
-            }
-            if let lbSyncer = leaderboardPullSyncer {
-                do { _ = try await lbSyncer.runOnce() }
-                catch {
-                    AppLogger.aiuse.error("Leaderboard pull failed: \(error.localizedDescription, privacy: .private)")
-                }
-            }
-        }
     }
 
-    /// Считает текущие totals за Day/Week/Month, prev-cost для дельт, и leaderboard slice.
+    /// Считает текущие totals за Day/Week/Month + prev-cost для дельт.
     /// Чистая функция: не пишет на диск.
     internal func buildSnapshot() throws -> WidgetSnapshot {
         let nowDate = now()
@@ -182,33 +202,38 @@ final class SyncCoordinator {
         let weekPrev = DateUtils.previousPeriodDays(endingAt: nowDate, lookback: Period.week.lookbackDays)
         let monthPrev = DateUtils.previousPeriodDays(endingAt: nowDate, lookback: Period.month.lookbackDays)
 
-        struct BuildResult {
-            let day: WidgetSnapshot.PeriodSlice
-            let week: WidgetSnapshot.PeriodSlice
-            let month: WidgetSnapshot.PeriodSlice
-            let myFriendCode: String?
-        }
-
-        let result: BuildResult = try db.read { db in
-            let myCode = try StatsQueries.loadMyProfile(db)?.friendCode
-            return BuildResult(
-                day: try Self.makeSlice(in: db, days: dayDays, prevDays: dayPrev, leaderboardPeriod: "day", myFriendCode: myCode),
-                week: try Self.makeSlice(in: db, days: weekDays, prevDays: weekPrev, leaderboardPeriod: "week", myFriendCode: myCode),
-                month: try Self.makeSlice(in: db, days: monthDays, prevDays: monthPrev, leaderboardPeriod: "month", myFriendCode: myCode),
-                myFriendCode: myCode
+        let (day, week, month, card): (WidgetSnapshot.PeriodSlice, WidgetSnapshot.PeriodSlice, WidgetSnapshot.PeriodSlice, AnalyticsCard) = try db.read { db in
+            (
+                try Self.makeSlice(in: db, days: dayDays, prevDays: dayPrev),
+                try Self.makeSlice(in: db, days: weekDays, prevDays: weekPrev),
+                try Self.makeSlice(in: db, days: monthDays, prevDays: monthPrev),
+                try AnalyticsCardBuilder(now: now).build(in: db)
             )
         }
 
-        let anyCommits = result.day.commits + result.week.commits + result.month.commits
-        let anyRepos = max(result.day.uniqueRepos, result.week.uniqueRepos, result.month.uniqueRepos)
+        // Поля советника — только для собранной карточки (.ready). В режимах
+        // «нет данных»/«мало данных» остаются nil → строка Large скрыта (спека 2.3).
+        let advisorComputedAt: Date?
+        let leakUsdPerMonth: Double?
+        let topLeakTitle: String?
+        if card.state == .ready {
+            advisorComputedAt = card.advisorComputedAt
+            leakUsdPerMonth = card.totalExpSavedUsd
+            topLeakTitle = card.topLeakTitle
+        } else {
+            advisorComputedAt = nil
+            leakUsdPerMonth = nil
+            topLeakTitle = nil
+        }
 
         return WidgetSnapshot(
             generatedAt: nowDate,
-            day: result.day,
-            week: result.week,
-            month: result.month,
-            githubEnabled: anyCommits > 0 || anyRepos > 0,
-            myFriendCode: result.myFriendCode
+            day: day,
+            week: week,
+            month: month,
+            advisorComputedAt: advisorComputedAt,
+            leakUsdPerMonth: leakUsdPerMonth,
+            topLeakTitle: topLeakTitle
         )
     }
 
@@ -216,73 +241,21 @@ final class SyncCoordinator {
     private func buildAndWriteWidgetSnapshot() throws {
         let snapshot = try buildSnapshot()
         try WidgetSnapshotIO.write(snapshot)
-        try? syncAvatarsToWidgetContainer(snapshot: snapshot)
-    }
-
-    /// Копирует blob'ы из my_profile/friend_profiles в widget sandbox для всех
-    /// friend_code, упомянутых в snapshot.leaderboard. Widget сам читает blob'ы
-    /// по имени файла. Тащить blob'ы внутрь snapshot.json нерационально —
-    /// 50KB×8 = ~400KB JSON на каждый timeline reload.
-    private func syncAvatarsToWidgetContainer(snapshot: WidgetSnapshot) throws {
-        // Собираем уникальные friend_code из всех периодов
-        var codes: Set<String> = []
-        for period in [snapshot.day, snapshot.week, snapshot.month] {
-            guard let lb = period.leaderboard else { continue }
-            for e in lb.entries where !e.friendCode.isEmpty { codes.insert(e.friendCode) }
-            if let me = lb.meBelow, !me.friendCode.isEmpty { codes.insert(me.friendCode) }
-        }
-        guard !codes.isEmpty else {
-            WidgetSnapshotIO.pruneAvatars(keep: [])
-            return
-        }
-
-        // Загружаем blob'ы за один read и пишем в widget container
-        struct AvatarBlob { let code: String; let data: Data }
-        let blobs: [AvatarBlob] = try db.read { db in
-            var result: [AvatarBlob] = []
-            // friend_profiles
-            let friends = try FriendProfileRow
-                .filter(codes.contains(FriendProfileRow.Columns.friendCode))
-                .fetchAll(db)
-            for row in friends {
-                if let blob = row.avatarBlob {
-                    result.append(AvatarBlob(code: row.friendCode, data: blob))
-                }
-            }
-            // my_profile отдельно — лежит в другой таблице
-            if let me = try StatsQueries.loadMyProfile(db),
-               codes.contains(me.friendCode),
-               let blob = me.avatarBlob {
-                result.append(AvatarBlob(code: me.friendCode, data: blob))
-            }
-            return result
-        }
-
-        for b in blobs {
-            try? WidgetSnapshotIO.writeAvatar(friendCode: b.code, data: b.data)
-        }
-        WidgetSnapshotIO.pruneAvatars(keep: codes)
     }
 
     private static func makeSlice(
         in db: GRDB.Database,
         days: [String],
-        prevDays: [String],
-        leaderboardPeriod: String,
-        myFriendCode: String?
+        prevDays: [String]
     ) throws -> WidgetSnapshot.PeriodSlice {
         let totals = try StatsQueries.aiTotals(in: db, days: days)
         let totalsPrev = try StatsQueries.aiTotals(in: db, days: prevDays)
-        let gh = try StatsQueries.githubTotals(in: db, days: days)
         let models = try StatsQueries.topModels(in: db, days: days, limit: 4)
-        let lb = try Self.makeLeaderboardSlice(in: db, period: leaderboardPeriod, myFriendCode: myFriendCode)
 
         return WidgetSnapshot.PeriodSlice(
             aiCost: totals.totalCost,
             aiCostPrev: totalsPrev.totalCost,
             aiTokens: totals.totalInputTokens + totals.totalOutputTokens,
-            commits: gh.totalCommits,
-            uniqueRepos: gh.uniqueRepos,
             topModels: models.map {
                 WidgetSnapshot.ModelEntry(
                     model: $0.model,
@@ -291,53 +264,8 @@ final class SyncCoordinator {
                     inputTokens: $0.inputTokens,
                     outputTokens: $0.outputTokens
                 )
-            },
-            leaderboard: lb
+            }
         )
-    }
-
-    /// Парсит leaderboard_cache.payload_json в LeaderboardSlice: top-8 entries + meBelow если я ниже.
-    private static func makeLeaderboardSlice(
-        in db: GRDB.Database, period: String, myFriendCode: String?
-    ) throws -> WidgetSnapshot.LeaderboardSlice? {
-        guard let row = try StatsQueries.loadLeaderboardCache(db, period: period) else { return nil }
-        guard let data = row.payloadJson.data(using: .utf8) else { return nil }
-        let decoder = JSONDecoder()
-        let resp: LeaderboardResponse
-        do {
-            resp = try decoder.decode(LeaderboardResponse.self, from: data)
-        } catch {
-            AppLogger.widget.error(
-                "Leaderboard decode failed [\(period, privacy: .public)]: \(error.localizedDescription, privacy: .private)"
-            )
-            return nil
-        }
-
-        func mapEntry(_ e: LeaderboardEntry) -> WidgetSnapshot.LeaderboardSlice.Entry {
-            WidgetSnapshot.LeaderboardSlice.Entry(
-                rank: e.rank,
-                previousRank: e.previousRank,
-                friendCode: e.friendCode,
-                displayName: e.displayName,
-                tokensTotal: e.tokensTotal,
-                isMe: e.isMe
-            )
-        }
-
-        let topEntries = Array(resp.entries.prefix(8))
-        let top8 = topEntries.map(mapEntry)
-
-        let meBelow: WidgetSnapshot.LeaderboardSlice.Entry?
-        if let myCode = myFriendCode,
-           !topEntries.contains(where: { $0.friendCode == myCode }),
-           let mine = resp.entries.first(where: { $0.friendCode == myCode })
-        {
-            meBelow = mapEntry(mine)
-        } else {
-            meBelow = nil
-        }
-
-        return WidgetSnapshot.LeaderboardSlice(entries: Array(top8), meBelow: meBelow)
     }
 
     private func syncWindowStart(source: String) throws -> Date {
@@ -353,9 +281,6 @@ final class SyncCoordinator {
             case .aiUsage(let payload):
                 for row in payload.dayRows { try NeverDecreaseUpserter.upsertAIUsage(row, in: db) }
                 for row in payload.modelRows { try NeverDecreaseUpserter.upsertAIUsageModel(row, in: db) }
-            case .github(let payload):
-                for row in payload.dailyCommits { try NeverDecreaseUpserter.upsertGitHub(row, in: db) }
-                for row in payload.dailyLOC { try NeverDecreaseUpserter.upsertGitHubLOCDaily(row, in: db) }
             }
         }
     }

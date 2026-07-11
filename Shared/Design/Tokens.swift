@@ -40,10 +40,6 @@ enum TextColor {
     static let muted = Color.white.opacity(0.5)
     /// pink lighter для AI crumb
     static let crumbAI = Color(red: 255/255, green: 143/255, blue: 184/255).opacity(0.9)
-    /// cyan для GitHub crumb
-    static let crumbGitHub = BrandColor.cyanLight.opacity(0.9)
-    /// нейтрал для Друзей
-    static let crumbFriends = Color.white.opacity(0.7)
 }
 
 /// Font tokens — все system, SF Pro Display для display.*, SF Pro Text для остального.

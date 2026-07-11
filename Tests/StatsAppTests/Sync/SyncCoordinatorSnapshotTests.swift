@@ -36,90 +36,91 @@ final class SyncCoordinatorSnapshotTests: XCTestCase {
         XCTAssertEqual(snapshot.day.aiCostPrev, 222.40, accuracy: 0.001)
     }
 
-    /// Если в leaderboard_cache есть payload — top-N попадает в slice; если меня нет в топе, я в meBelow.
-    func test_snapshot_day_slice_contains_leaderboard_top8_and_meBelow() async throws {
+    /// Snapshot всегда пишется с актуальной версией схемы.
+    func test_snapshot_uses_current_schema_version() async throws {
         let dbq = try DatabaseQueue()
         try Database.migrate(dbq)
 
+        let now = Date(timeIntervalSince1970: 1_779_873_600)
+        let coordinator = await SyncCoordinator(db: dbq, now: { now })
+        let snapshot = try await coordinator.buildSnapshot()
+
+        XCTAssertEqual(snapshot.schemaVersion, 2)
+    }
+
+    // MARK: - Поля советника (C9, спека 2.3)
+
+    private let advisorNow = ISO8601DateFormatter().date(from: "2026-07-11T12:00:00Z")!
+
+    private func seedAnalyticsTurns(_ dbq: DatabaseQueue, count: Int, exp: Double,
+                                    promptHead: String) async throws {
         try await dbq.write { db in
-            // Свой профиль — нужен для myFriendCode и meBelow.
-            try StatsQueries.saveMyProfile(db, MyProfileRow(
-                friendCode: "me123", displayName: "Я", avatarPath: nil, sharingEnabled: true, serverUserId: 1
-            ))
-            // Лидерборд: 10 человек, я — 9-й.
-            let payload = """
-            {
-              "period": "day",
-              "as_of": "2026-05-23T12:00:00Z",
-              "entries": [
-                {"friend_code":"u1","display_name":"A","rank":1,"previous_rank":2,"tokens_total":1000,"is_me":false},
-                {"friend_code":"u2","display_name":"B","rank":2,"previous_rank":1,"tokens_total":900, "is_me":false},
-                {"friend_code":"u3","display_name":"C","rank":3,"previous_rank":null,"tokens_total":800,"is_me":false},
-                {"friend_code":"u4","display_name":"D","rank":4,"previous_rank":4,"tokens_total":700, "is_me":false},
-                {"friend_code":"u5","display_name":"E","rank":5,"previous_rank":3,"tokens_total":600, "is_me":false},
-                {"friend_code":"u6","display_name":"F","rank":6,"previous_rank":6,"tokens_total":500, "is_me":false},
-                {"friend_code":"u7","display_name":"G","rank":7,"previous_rank":8,"tokens_total":400, "is_me":false},
-                {"friend_code":"u8","display_name":"H","rank":8,"previous_rank":7,"tokens_total":300, "is_me":false},
-                {"friend_code":"me123","display_name":"Я","rank":9,"previous_rank":12,"tokens_total":200,"is_me":true},
-                {"friend_code":"u10","display_name":"J","rank":10,"previous_rank":null,"tokens_total":100,"is_me":false}
-              ]
+            for i in 0..<count {
+                var row = AnalyticsTurnRow(
+                    id: nil, source: "codex", ts: "2026-07-05T10:00:00Z-\(i)",
+                    day: "2026-07-05", session: "s\(i)", project: "/p", model: "gpt-5.5",
+                    origin: "human", promptHead: promptHead, promptChars: 20,
+                    nRequests: 1, inputTokens: 1000, outputTokens: 0,
+                    costUsd: 5.0, expSavedUsd: exp
+                )
+                try row.insert(db)
             }
-            """
-            try StatsQueries.saveLeaderboardCache(db, period: "day", payloadJson: payload)
         }
-
-        let now = Date(timeIntervalSince1970: 1_779_873_600)
-        let coordinator = await SyncCoordinator(db: dbq, now: { now })
-        let snapshot = try await coordinator.buildSnapshot()
-
-        XCTAssertEqual(snapshot.myFriendCode, "me123")
-        let lb = snapshot.day.leaderboard
-        XCTAssertNotNil(lb)
-        XCTAssertEqual(lb!.entries.count, 8)
-        XCTAssertEqual(lb!.entries.first?.rank, 1)
-        XCTAssertEqual(lb!.entries.last?.rank, 8)
-        // Я — 9-й, в топ-8 не попал, должен быть в meBelow.
-        XCTAssertNotNil(lb!.meBelow)
-        XCTAssertEqual(lb!.meBelow?.rank, 9)
-        XCTAssertEqual(lb!.meBelow?.isMe, true)
     }
 
-    /// Если меня нет в кэше вообще — meBelow = nil.
-    func test_snapshot_leaderboard_meBelow_nil_when_me_absent() async throws {
+    /// Нет ходов → карточка .noData → поля советника nil (строка Large скрыта).
+    func test_snapshot_advisor_nil_when_no_data() async throws {
         let dbq = try DatabaseQueue()
         try Database.migrate(dbq)
+        let coordinator = await SyncCoordinator(db: dbq, now: { self.advisorNow })
 
-        try await dbq.write { db in
-            try StatsQueries.saveMyProfile(db, MyProfileRow(
-                friendCode: "ghost", displayName: "?", avatarPath: nil, sharingEnabled: true, serverUserId: 1
-            ))
-            let payload = """
-            {"period":"day","as_of":"2026-05-23T12:00:00Z","entries":[
-              {"friend_code":"u1","display_name":"A","rank":1,"previous_rank":null,"tokens_total":1000,"is_me":false}
-            ]}
-            """
-            try StatsQueries.saveLeaderboardCache(db, period: "day", payloadJson: payload)
-        }
-
-        let now = Date(timeIntervalSince1970: 1_779_873_600)
-        let coordinator = await SyncCoordinator(db: dbq, now: { now })
         let snapshot = try await coordinator.buildSnapshot()
 
-        let lb = snapshot.day.leaderboard!
-        XCTAssertEqual(lb.entries.count, 1)
-        XCTAssertNil(lb.meBelow)
+        XCTAssertNil(snapshot.advisorComputedAt)
+        XCTAssertNil(snapshot.leakUsdPerMonth)
+        XCTAssertNil(snapshot.topLeakTitle)
     }
 
-    /// Если кэша лидерборда нет — leaderboard = nil.
-    func test_snapshot_leaderboard_nil_when_no_cache() async throws {
+    /// <50 ходов → .tooFewData → поля советника nil (строка скрыта, не «утечек нет»).
+    func test_snapshot_advisor_nil_when_too_few_data() async throws {
         let dbq = try DatabaseQueue()
         try Database.migrate(dbq)
+        try await seedAnalyticsTurns(dbq, count: 10, exp: 0.5, promptHead: "ты — рерайтер роль x")
+        let coordinator = await SyncCoordinator(db: dbq, now: { self.advisorNow })
 
-        let now = Date(timeIntervalSince1970: 1_779_873_600)
-        let coordinator = await SyncCoordinator(db: dbq, now: { now })
         let snapshot = try await coordinator.buildSnapshot()
 
-        XCTAssertNil(snapshot.day.leaderboard)
-        XCTAssertNil(snapshot.myFriendCode)
+        XCTAssertNil(snapshot.advisorComputedAt)
+        XCTAssertNil(snapshot.leakUsdPerMonth)
+        XCTAssertNil(snapshot.topLeakTitle)
+    }
+
+    /// ≥50 ходов + кластер-утечка → поля заполнены (строка «Утекает ≈$X/мес · title»).
+    func test_snapshot_advisor_set_when_ready_with_leak() async throws {
+        let dbq = try DatabaseQueue()
+        try Database.migrate(dbq)
+        try await seedAnalyticsTurns(dbq, count: 60, exp: 0.5, promptHead: "ты — рерайтер роль x")
+        let coordinator = await SyncCoordinator(db: dbq, now: { self.advisorNow })
+
+        let snapshot = try await coordinator.buildSnapshot()
+
+        XCTAssertNotNil(snapshot.advisorComputedAt)
+        XCTAssertEqual(snapshot.leakUsdPerMonth ?? -1, 30.0, accuracy: 1e-9)  // 60 × 0.5
+        XCTAssertEqual(snapshot.topLeakTitle, "Регулярная роль: Рерайтер роль x")
+    }
+
+    /// ≥50 ходов, но Σexp ≤ $1 → computedAt задан, title nil (строка «Утечек не видно»).
+    func test_snapshot_advisor_ready_no_leaks_has_computedAt_but_nil_title() async throws {
+        let dbq = try DatabaseQueue()
+        try Database.migrate(dbq)
+        try await seedAnalyticsTurns(dbq, count: 50, exp: 0.001, promptHead: "короткий вопрос")
+        let coordinator = await SyncCoordinator(db: dbq, now: { self.advisorNow })
+
+        let snapshot = try await coordinator.buildSnapshot()
+
+        XCTAssertNotNil(snapshot.advisorComputedAt)
+        XCTAssertNil(snapshot.topLeakTitle)
+        let leakCents = Int(((snapshot.leakUsdPerMonth ?? 0) * 100).rounded())
+        XCTAssertLessThanOrEqual(leakCents, 100)
     }
 }

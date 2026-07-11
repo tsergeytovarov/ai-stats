@@ -59,31 +59,18 @@ final class AiuseAPIClientTests: XCTestCase {
         }
     }
 
-    func testSendSnapshots_putsBearerAndBody() async throws {
+    func testGetMyProfile_putsBearer() async throws {
         MockURLProtocol.responder = { _ in
             let resp = HTTPURLResponse(
-                url: URL(string: "https://test.local/api/snapshots")!,
+                url: URL(string: "https://test.local/api/profiles/me")!,
                 statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
-            return (resp, Data(#"{"accepted":1}"#.utf8))
+            let json = #"{"friend_code":"XK7P3M9Q2A","display_name":"Я","sharing_enabled":true,"global_opt_in":false,"created_at":"2026-05-24T10:00:00Z"}"#
+            return (resp, Data(json.utf8))
         }
-        let result = try await client.sendSnapshots([
-            SnapshotItem(hourBucket: "2026-05-23T00:00:00Z", tokensInput: 100, tokensOutput: 200)
-        ])
-        XCTAssertEqual(result.accepted, 1)
+        let result = try await client.getMyProfile()
+        XCTAssertEqual(result.friendCode, "XK7P3M9Q2A")
         XCTAssertEqual(MockURLProtocol.lastRequest?.value(forHTTPHeaderField: "Authorization"),
                        "Bearer test-secret")
-    }
-
-    func testRegenerateFriendCode_returnsNewCode() async throws {
-        MockURLProtocol.responder = { _ in
-            let resp = HTTPURLResponse(
-                url: URL(string: "https://test.local/api/profiles/me/regenerate-friend-code")!,
-                statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
-            return (resp, Data(#"{"friend_code":"NEW1234567","friendships_dropped":3}"#.utf8))
-        }
-        let result = try await client.regenerateFriendCode()
-        XCTAssertEqual(result.friendCode, "NEW1234567")
-        XCTAssertEqual(result.friendshipsDropped, 3)
     }
 
     func testDeleteAccount_sendsDelete() async throws {
@@ -107,7 +94,7 @@ final class AiuseAPIClientTests: XCTestCase {
             session: session
         )
         do {
-            _ = try await clientNoSecret.sendSnapshots([])
+            _ = try await clientNoSecret.getMyProfile()
             XCTFail("expected missingSecret")
         } catch AiuseAPIError.missingSecret {
             // OK
@@ -116,187 +103,20 @@ final class AiuseAPIClientTests: XCTestCase {
         }
     }
 
-    // MARK: - leaderboard previous_rank
-
-    func testGetLeaderboard_decodes_previousRank_when_present() async throws {
-        MockURLProtocol.responder = { _ in
-            let resp = HTTPURLResponse(
-                url: URL(string: "https://test.local/api/leaderboard?period=week")!,
-                statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
-            let json = """
-            {
-              "period": "week",
-              "as_of": "2024-05-22T12:00:00Z",
-              "entries": [
-                {"friend_code":"AAA","display_name":"Сергей","rank":1,"previous_rank":3,"tokens_total":12000,"is_me":false},
-                {"friend_code":"BBB","display_name":"Я","rank":2,"previous_rank":null,"tokens_total":8000,"is_me":true}
-              ]
-            }
-            """
-            return (resp, json.data(using: .utf8)!)
-        }
-        let resp = try await client.getLeaderboard(period: "week")
-        XCTAssertEqual(resp.entries[0].previousRank, 3)
-        XCTAssertNil(resp.entries[1].previousRank)
-    }
-
-    func testGetLeaderboard_decodes_previousRank_as_nil_when_field_missing() async throws {
-        MockURLProtocol.responder = { _ in
-            let resp = HTTPURLResponse(
-                url: URL(string: "https://test.local/api/leaderboard?period=day")!,
-                statusCode: 200, httpVersion: "HTTP/1.1", headerFields: nil)!
-            // Без previous_rank — старый формат бэкенда, до раскатки.
-            let json = """
-            {
-              "period": "day",
-              "as_of": "2024-05-22T12:00:00Z",
-              "entries": [
-                {"friend_code":"AAA","display_name":"Сергей","rank":1,"tokens_total":100,"is_me":false}
-              ]
-            }
-            """
-            return (resp, json.data(using: .utf8)!)
-        }
-        let resp = try await client.getLeaderboard(period: "day")
-        XCTAssertNil(resp.entries[0].previousRank)
-    }
-
-    // MARK: - getAvatar: MIME + size caps
-
-    /// Хелпер: HTTPURLResponse для /avatars с заданным mime и опц. Content-Length.
-    private func avatarResponse(mime: String, contentLength: Int? = nil, status: Int = 200) -> HTTPURLResponse {
-        var headers: [String: String] = ["Content-Type": mime, "ETag": "W/\"abc\""]
-        if let contentLength {
-            headers["Content-Length"] = String(contentLength)
-        }
-        return HTTPURLResponse(
-            url: URL(string: "https://test.local/api/avatars/XK7P3M9Q2A")!,
-            statusCode: status, httpVersion: "HTTP/1.1", headerFields: headers
-        )!
-    }
-
-    func testGetAvatar_acceptsImagePNG() async throws {
-        let body = Data(repeating: 0x42, count: 100)
-        MockURLProtocol.responder = { _ in
-            return (self.avatarResponse(mime: "image/png", contentLength: body.count), body)
-        }
-        let result = try await client.getAvatar(friendCode: "XK7P3M9Q2A")
-        XCTAssertEqual(result?.data, body)
-        XCTAssertEqual(result?.mime, "image/png")
-    }
-
-    func testGetAvatar_acceptsImageJPEG() async throws {
-        let body = Data(repeating: 0x55, count: 100)
-        MockURLProtocol.responder = { _ in
-            return (self.avatarResponse(mime: "image/jpeg", contentLength: body.count), body)
-        }
-        let result = try await client.getAvatar(friendCode: "XK7P3M9Q2A")
-        XCTAssertEqual(result?.mime, "image/jpeg")
-    }
-
-    func testGetAvatar_stripsCharsetSuffixFromMime() async throws {
-        let body = Data(repeating: 0x42, count: 50)
-        MockURLProtocol.responder = { _ in
-            return (self.avatarResponse(mime: "image/png; charset=binary"), body)
-        }
-        let result = try await client.getAvatar(friendCode: "XK7P3M9Q2A")
-        XCTAssertEqual(result?.mime, "image/png", "charset-довесок отрезается, в стораджа MIME без него")
-    }
-
-    func testGetAvatar_rejectsHtmlMime() async {
-        MockURLProtocol.responder = { _ in
-            return (self.avatarResponse(mime: "text/html"), Data("<script>".utf8))
-        }
-        do {
-            _ = try await client.getAvatar(friendCode: "XK7P3M9Q2A")
-            XCTFail("ожидали avatarBadMime")
-        } catch AiuseAPIError.avatarBadMime(let mime) {
-            XCTAssertEqual(mime, "text/html")
-        } catch {
-            XCTFail("неожиданная ошибка: \(error)")
-        }
-    }
-
-    func testGetAvatar_rejectsImageSvgXml() async {
-        // SVG может содержать JS / external refs — отдельный класс уязвимостей, не пускаем.
-        MockURLProtocol.responder = { _ in
-            return (self.avatarResponse(mime: "image/svg+xml"), Data("<svg/>".utf8))
-        }
-        do {
-            _ = try await client.getAvatar(friendCode: "XK7P3M9Q2A")
-            XCTFail("ожидали avatarBadMime")
-        } catch AiuseAPIError.avatarBadMime {
-            // OK
-        } catch {
-            XCTFail("неожиданная ошибка: \(error)")
-        }
-    }
-
-    func testGetAvatar_rejectsViaContentLengthPrecheck() async {
-        // Сервер заявляет в Content-Length, что ответ огромный → отваливаемся ДО чтения тела.
-        MockURLProtocol.responder = { _ in
-            let big = 600 * 1024  // > 512 KB кап
-            return (self.avatarResponse(mime: "image/png", contentLength: big), Data())
-        }
-        do {
-            _ = try await client.getAvatar(friendCode: "XK7P3M9Q2A")
-            XCTFail("ожидали avatarTooLarge")
-        } catch AiuseAPIError.avatarTooLarge(let bytes) {
-            XCTAssertGreaterThan(bytes, 512 * 1024)
-        } catch {
-            XCTFail("неожиданная ошибка: \(error)")
-        }
-    }
-
-    func testGetAvatar_rejectsViaStreamCap() async {
-        // Сервер врёт в Content-Length (или его нет), но реально шлёт > 512 KB.
-        // Streaming-cap режет на лету.
-        let bigBody = Data(repeating: 0xAA, count: 600 * 1024)
-        MockURLProtocol.responder = { _ in
-            // Намеренно без Content-Length чтобы выйти на streaming-чтение.
-            return (self.avatarResponse(mime: "image/png", contentLength: nil), bigBody)
-        }
-        do {
-            _ = try await client.getAvatar(friendCode: "XK7P3M9Q2A")
-            XCTFail("ожидали avatarTooLarge")
-        } catch AiuseAPIError.avatarTooLarge {
-            // OK
-        } catch {
-            XCTFail("неожиданная ошибка: \(error)")
-        }
-    }
-
-    func testGetAvatar_passes304Through() async throws {
-        MockURLProtocol.responder = { _ in
-            // 304 — нет тела, MIME-чек не должен сработать.
-            return (self.avatarResponse(mime: "", status: 304), Data())
-        }
-        let result = try await client.getAvatar(friendCode: "XK7P3M9Q2A", ifNoneMatch: "W/\"abc\"")
-        XCTAssertNil(result, "304 → nil")
-    }
-
-    func testGetAvatar_passes404Through() async throws {
-        MockURLProtocol.responder = { _ in
-            return (self.avatarResponse(mime: "", status: 404), Data())
-        }
-        let result = try await client.getAvatar(friendCode: "XK7P3M9Q2A")
-        XCTAssertNil(result, "404 → nil")
-    }
-
     // MARK: - request: response size cap
 
     func testRequest_rejectsHugeJSONViaContentLength() async {
         // Сервер заявляет о 2 MB → отваливаемся ДО чтения тела.
         MockURLProtocol.responder = { _ in
             let resp = HTTPURLResponse(
-                url: URL(string: "https://test.local/api/friends")!,
+                url: URL(string: "https://test.local/api/profiles/me")!,
                 statusCode: 200, httpVersion: "HTTP/1.1",
                 headerFields: ["Content-Type": "application/json", "Content-Length": String(2 * 1024 * 1024)]
             )!
             return (resp, Data())
         }
         do {
-            _ = try await client.listFriends()
+            _ = try await client.getMyProfile()
             XCTFail("ожидали responseTooLarge")
         } catch AiuseAPIError.responseTooLarge(let bytes) {
             XCTAssertGreaterThan(bytes, 1024 * 1024)
@@ -310,14 +130,14 @@ final class AiuseAPIClientTests: XCTestCase {
         let bigBody = Data(repeating: 0x7B, count: 1_200_000) // 1.2 MB
         MockURLProtocol.responder = { _ in
             let resp = HTTPURLResponse(
-                url: URL(string: "https://test.local/api/friends")!,
+                url: URL(string: "https://test.local/api/profiles/me")!,
                 statusCode: 200, httpVersion: "HTTP/1.1",
                 headerFields: ["Content-Type": "application/json"]
             )!
             return (resp, bigBody)
         }
         do {
-            _ = try await client.listFriends()
+            _ = try await client.getMyProfile()
             XCTFail("ожидали responseTooLarge")
         } catch AiuseAPIError.responseTooLarge {
             // OK
@@ -330,50 +150,15 @@ final class AiuseAPIClientTests: XCTestCase {
         // Регрессионный — на маленьких ответах ничего не сломалось после refactor'а на bytes(for:).
         MockURLProtocol.responder = { _ in
             let resp = HTTPURLResponse(
-                url: URL(string: "https://test.local/api/friends")!,
+                url: URL(string: "https://test.local/api/profiles/me")!,
                 statusCode: 200, httpVersion: "HTTP/1.1",
                 headerFields: ["Content-Type": "application/json"]
             )!
-            return (resp, Data(#"{"friends":[]}"#.utf8))
+            let json = #"{"friend_code":"XK7P3M9Q2A","display_name":"Я","sharing_enabled":true,"global_opt_in":false,"created_at":"2026-05-24T10:00:00Z"}"#
+            return (resp, Data(json.utf8))
         }
-        let friends = try await client.listFriends()
-        XCTAssertEqual(friends.count, 0)
-    }
-
-    // MARK: - removeFriend: dual-send block (#14)
-
-    func testRemoveFriend_sendsBlockInBothQueryAndBody() async throws {
-        MockURLProtocol.responder = { _ in
-            let resp = HTTPURLResponse(
-                url: URL(string: "https://test.local/api/friends/XK7P3M9Q2A?block=true")!,
-                statusCode: 204, httpVersion: "HTTP/1.1", headerFields: nil)!
-            return (resp, Data())
-        }
-        try await client.removeFriend(friendCode: "XK7P3M9Q2A", block: true)
-
-        let req = MockURLProtocol.lastRequest
-        XCTAssertEqual(req?.httpMethod, "DELETE")
-        // Query param должен быть в URL — устойчивость к CDN/proxy которые DELETE body strip'ают.
-        XCTAssertEqual(req?.url?.query, "block=true")
-        XCTAssertEqual(req?.url?.path, "/api/friends/XK7P3M9Q2A")
-
-        // Body тоже должен присутствовать — backward-compat с сервером, который
-        // ещё не научился читать query.
-        let body = try XCTUnwrap(MockURLProtocol.lastBody)
-        let decoded = try JSONDecoder().decode([String: Bool].self, from: body)
-        XCTAssertEqual(decoded["block"], true)
-    }
-
-    func testRemoveFriend_blockFalseAlsoSentInQuery() async throws {
-        MockURLProtocol.responder = { _ in
-            let resp = HTTPURLResponse(
-                url: URL(string: "https://test.local/api/friends/XK7P3M9Q2A?block=false")!,
-                statusCode: 204, httpVersion: "HTTP/1.1", headerFields: nil)!
-            return (resp, Data())
-        }
-        try await client.removeFriend(friendCode: "XK7P3M9Q2A", block: false)
-
-        XCTAssertEqual(MockURLProtocol.lastRequest?.url?.query, "block=false")
+        let profile = try await client.getMyProfile()
+        XCTAssertEqual(profile.displayName, "Я")
     }
 
     // MARK: - auth: exchange

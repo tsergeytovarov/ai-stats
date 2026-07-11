@@ -7,12 +7,27 @@ struct StatsEntry: TimelineEntry {
     let aiCost: Double
     let aiCostPrev: Double
     let aiTokens: Int64
-    let commits: Int64
-    let uniqueRepos: Int
     let topModels: [WidgetSnapshot.ModelEntry]
-    let githubEnabled: Bool
-    let leaderboard: WidgetSnapshot.LeaderboardSlice?
-    let myFriendCode: String?
+    /// true — снапшота нет/не читается, показываем плейсхолдер «Открой Burn».
+    let isPlaceholder: Bool
+    // Поля советника (спека 2.3), глобальные — одинаковые для всех периодов.
+    let advisorComputedAt: Date?
+    let leakUsdPerMonth: Double?
+    let topLeakTitle: String?
+
+    /// Строка советника Large-виджета (спека 2.3). nil — строка скрыта.
+    /// - расчёта не было (`advisorComputedAt == nil`) / «мало данных» (поля nil) → nil;
+    /// - утечка ≤ $1.00 (сравнение в центах) → «Утечек не видно…»;
+    /// - иначе → «Утекает ≈$X/мес · {topLeakTitle}» (без хвоста, если title nil).
+    var advisorLine: String? {
+        guard advisorComputedAt != nil, let leak = leakUsdPerMonth else { return nil }
+        if Int((leak * 100).rounded()) <= 100 {
+            return "Утечек не видно: модели подобраны по задачам."
+        }
+        var line = "Утекает ≈\(MoneyFormatter.widget(leak))/мес"
+        if let topLeakTitle { line += " · \(topLeakTitle)" }
+        return line
+    }
 }
 
 struct StatsTimelineProvider: AppIntentTimelineProvider {
@@ -20,7 +35,7 @@ struct StatsTimelineProvider: AppIntentTimelineProvider {
     typealias Entry = StatsEntry
 
     func placeholder(in context: Context) -> StatsEntry {
-        emptyEntry(period: .day, date: Date(), githubEnabled: true)
+        emptyEntry(period: .day, date: Date(), isPlaceholder: false)
     }
 
     func snapshot(for configuration: PeriodConfigurationIntent, in context: Context) async -> StatsEntry {
@@ -35,7 +50,7 @@ struct StatsTimelineProvider: AppIntentTimelineProvider {
 
     private func makeEntry(period: Period) -> StatsEntry {
         guard let snapshot = WidgetSnapshotIO.read() else {
-            return emptyEntry(period: period, date: Date(), githubEnabled: false)
+            return emptyEntry(period: period, date: Date(), isPlaceholder: true)
         }
         let slice: WidgetSnapshot.PeriodSlice
         switch period {
@@ -49,23 +64,20 @@ struct StatsTimelineProvider: AppIntentTimelineProvider {
             aiCost: slice.aiCost,
             aiCostPrev: slice.aiCostPrev,
             aiTokens: slice.aiTokens,
-            commits: slice.commits,
-            uniqueRepos: slice.uniqueRepos,
             topModels: slice.topModels,
-            githubEnabled: snapshot.githubEnabled,
-            leaderboard: slice.leaderboard,
-            myFriendCode: snapshot.myFriendCode
+            isPlaceholder: false,
+            advisorComputedAt: snapshot.advisorComputedAt,
+            leakUsdPerMonth: snapshot.leakUsdPerMonth,
+            topLeakTitle: snapshot.topLeakTitle
         )
     }
 
-    private func emptyEntry(period: Period, date: Date, githubEnabled: Bool) -> StatsEntry {
+    private func emptyEntry(period: Period, date: Date, isPlaceholder: Bool) -> StatsEntry {
         StatsEntry(
             date: date, period: period,
-            aiCost: 0, aiCostPrev: 0, aiTokens: 0,
-            commits: 0, uniqueRepos: 0, topModels: [],
-            githubEnabled: githubEnabled,
-            leaderboard: nil,
-            myFriendCode: nil
+            aiCost: 0, aiCostPrev: 0, aiTokens: 0, topModels: [],
+            isPlaceholder: isPlaceholder,
+            advisorComputedAt: nil, leakUsdPerMonth: nil, topLeakTitle: nil
         )
     }
 }

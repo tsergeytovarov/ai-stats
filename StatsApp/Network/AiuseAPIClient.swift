@@ -8,14 +8,6 @@ final class AiuseAPIClient {
     /// сервера, который попытается съесть память клиента.
     static let maxResponseBytes = 1 * 1024 * 1024   // 1 MB
 
-    /// Жёсткий кап на размер аватарки. Сами пикаем при создании профиля максимум
-    /// 200 KB (AccountTabView), поэтому 512 KB на ответ — щедрый запас.
-    static let maxAvatarBytes = 512 * 1024          // 512 KB
-
-    /// MIME allowlist для /avatars. Всё остальное (image/svg+xml, image/webp, etc.)
-    /// отбрасываем — историчecки в ImageIO ловили CVE на парсинг разных форматов.
-    static let allowedAvatarMimes: Set<String> = ["image/png", "image/jpeg"]
-
     private let baseURL: URL
     private let session: URLSession
     private let secretProvider: () -> String?
@@ -79,15 +71,6 @@ final class AiuseAPIClient {
         )
     }
 
-    func regenerateFriendCode() async throws -> RegenerateFriendCodeResponse {
-        return try await request(
-            path: "/profiles/me/regenerate-friend-code",
-            method: "POST",
-            authed: true,
-            decodeAs: RegenerateFriendCodeResponse.self
-        )
-    }
-
     func deleteAccount() async throws {
         _ = try await request(
             path: "/profiles/me",
@@ -119,146 +102,8 @@ final class AiuseAPIClient {
         )
     }
 
-    // MARK: - friends
-
-    func addFriend(friendCode: String) async throws -> FriendDTO {
-        let validated = try FriendCode.validated(friendCode)
-        return try await request(
-            path: "/friends",
-            method: "POST",
-            body: AddFriendRequest(friendCode: validated),
-            authed: true,
-            decodeAs: FriendDTO.self
-        )
-    }
-
-    func listFriends() async throws -> [FriendDTO] {
-        let resp = try await request(
-            path: "/friends",
-            method: "GET",
-            authed: true,
-            decodeAs: FriendsListResponse.self
-        )
-        return resp.friends
-    }
-
-    func removeFriend(friendCode: String, block: Bool = false) async throws {
-        let validated = try FriendCode.validated(friendCode)
-        // `block` дублируется в query И в body. Body — для backward-compat с текущим
-        // сервером, query — для устойчивости к CDN/proxy которые DELETE body выкидывают.
-        // Когда сервер начнёт читать `block` из query, body можно будет убрать.
-        _ = try await request(
-            path: "/friends/\(validated)",
-            method: "DELETE",
-            query: ["block": block ? "true" : "false"],
-            body: RemoveFriendRequest(block: block),
-            authed: true,
-            decodeAs: EmptyResponse.self
-        )
-    }
-
-    // MARK: - leaderboard
-
-    func getLeaderboard(period: String) async throws -> LeaderboardResponse {
-        return try await request(
-            path: "/leaderboard",
-            method: "GET",
-            query: ["period": period],
-            authed: true,
-            decodeAs: LeaderboardResponse.self
-        )
-    }
-
-    // MARK: - blocks
-
-    func listBlocks() async throws -> [BlockDTO] {
-        let resp = try await request(
-            path: "/blocks",
-            method: "GET",
-            authed: true,
-            decodeAs: BlocksListResponse.self
-        )
-        return resp.blocked
-    }
-
-    func unblock(friendCode: String) async throws {
-        let validated = try FriendCode.validated(friendCode)
-        _ = try await request(
-            path: "/blocks/\(validated)",
-            method: "DELETE",
-            authed: true,
-            decodeAs: EmptyResponse.self
-        )
-    }
-
-    // MARK: - avatars
-
-    /// Запрос аватарки. Возвращает (data, mime, etag) — или nil если 304 / 404.
-    /// ifNoneMatch — ETag из предыдущего ответа для conditional GET.
-    ///
-    /// **Безопасность:** ответ ограничен `maxAvatarBytes` (512 KB) и обязан иметь
-    /// `Content-Type` из allowlist `{image/png, image/jpeg}`. Иначе бросает ошибку
-    /// до того, как байты попадут в `NSImage(data:)` — закрывает RCE-вектор через
-    /// malformed image (CVE-классов ImageIO).
-    func getAvatar(friendCode: String, ifNoneMatch: String? = nil) async throws -> (data: Data, mime: String?, etag: String?)? {
-        guard let secret = secretProvider() else { throw AiuseAPIError.missingSecret }
-        // friend_code приходит из server-side data (FriendsPullSyncer), но всё равно валидируем —
-        // defense in depth, чтобы скомпрометированный сервер не смог подсунуть `..` в URL.
-        let validated = try FriendCode.validated(friendCode)
-
-        var url = baseURL
-        url.append(path: "/avatars/\(validated)")
-        var req = URLRequest(url: url)
-        req.httpMethod = "GET"
-        req.setValue("Bearer \(secret)", forHTTPHeaderField: "Authorization")
-        if let ifNoneMatch {
-            req.setValue(ifNoneMatch, forHTTPHeaderField: "If-None-Match")
-        }
-
-        let bytes: URLSession.AsyncBytes
-        let response: URLResponse
-        do {
-            (bytes, response) = try await session.bytes(for: req)
-        } catch {
-            throw AiuseAPIError.transport(error.localizedDescription)
-        }
-
-        guard let http = response as? HTTPURLResponse else {
-            throw AiuseAPIError.unexpected
-        }
-
-        if http.statusCode == 304 || http.statusCode == 404 {
-            return nil
-        }
-        guard (200..<300).contains(http.statusCode) else {
-            throw AiuseAPIError.http(status: http.statusCode, body: "")
-        }
-
-        // MIME-allowlist: режим check-then-read. Чарсет-довески ("image/png; charset=..")
-        // отрезаем — нас интересует только сам тип.
-        let rawMime = http.value(forHTTPHeaderField: "Content-Type") ?? ""
-        let mime = rawMime.split(separator: ";").first.map {
-            String($0).trimmingCharacters(in: .whitespaces).lowercased()
-        } ?? ""
-        guard Self.allowedAvatarMimes.contains(mime) else {
-            throw AiuseAPIError.avatarBadMime(mime: rawMime)
-        }
-
-        // Content-Length precheck (можно отвалиться до чтения тела).
-        if let lenStr = http.value(forHTTPHeaderField: "Content-Length"),
-           let len = Int(lenStr), len > Self.maxAvatarBytes {
-            throw AiuseAPIError.avatarTooLarge(bytes: len)
-        }
-
-        let data = try await Self.readWithCap(bytes, cap: Self.maxAvatarBytes, onOverflow: { count in
-            AiuseAPIError.avatarTooLarge(bytes: count)
-        })
-        let etag = http.value(forHTTPHeaderField: "ETag")
-        return (data, mime, etag)
-    }
-
     /// Streaming-чтение байтов с жёстким капом. При превышении бросает указанную ошибку,
-    /// не дочитывает остаток. Используется и `getAvatar`, и JSON-ом `request`.
+    /// не дочитывает остаток. Используется JSON-декодером `request`.
     private static func readWithCap(
         _ bytes: URLSession.AsyncBytes,
         cap: Int,
@@ -273,19 +118,6 @@ final class AiuseAPIClient {
             }
         }
         return data
-    }
-
-    // MARK: - snapshots
-
-    func sendSnapshots(_ batch: [SnapshotItem]) async throws -> SnapshotsResponse {
-        let body = SnapshotsBatch(snapshots: batch)
-        return try await request(
-            path: "/snapshots",
-            method: "POST",
-            body: body,
-            authed: true,
-            decodeAs: SnapshotsResponse.self
-        )
     }
 
     // MARK: - core

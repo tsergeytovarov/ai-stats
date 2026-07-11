@@ -7,10 +7,6 @@ struct Config: Equatable {
     let ccusageCommand: [String]
     let enabledProviders: [String]
     let aiuseApiBaseURL: String
-    /// Демо-режим для скриншотов: отключает все aiuse-syncs (snapshot push, friends pull,
-    /// leaderboard pull). Sync с aiuse-сервера затирал бы seed-данные из
-    /// `scripts/seed-demo-leaderboard.py`. Default false — обычный workflow не меняется.
-    let demoMode: Bool
 
     var githubEnabled: Bool { !githubToken.isEmpty && !githubLogin.isEmpty }
 
@@ -21,7 +17,6 @@ struct Config: Equatable {
         case ccusageCommand = "ccusage_command"
         case enabledProviders = "enabled_providers"
         case aiuseApiBaseURL = "aiuse_api_base_url"
-        case demoMode = "demo_mode"
     }
 
     static func decode(from data: Data) throws -> Config {
@@ -32,8 +27,7 @@ struct Config: Equatable {
             syncIntervalMinutes: container.syncIntervalMinutes ?? 15,
             ccusageCommand: container.ccusageCommand ?? ["npx", "-y", "ccusage@20"],
             enabledProviders: container.enabledProviders ?? ["claude", "codex"],
-            aiuseApiBaseURL: container.aiuseApiBaseURL.flatMap { $0.isEmpty ? nil : $0 } ?? "https://aiuse.popovs.tech/api",
-            demoMode: container.demoMode ?? false
+            aiuseApiBaseURL: container.aiuseApiBaseURL.flatMap { $0.isEmpty ? nil : $0 } ?? "https://aiuse.popovs.tech/api"
         )
     }
 
@@ -44,7 +38,6 @@ struct Config: Equatable {
         let ccusageCommand: [String]?
         let enabledProviders: [String]?
         let aiuseApiBaseURL: String?
-        let demoMode: Bool?
 
         enum CodingKeys: String, CodingKey {
             case githubToken = "github_token"
@@ -53,7 +46,6 @@ struct Config: Equatable {
             case ccusageCommand = "ccusage_command"
             case enabledProviders = "enabled_providers"
             case aiuseApiBaseURL = "aiuse_api_base_url"
-            case demoMode = "demo_mode"
         }
     }
 

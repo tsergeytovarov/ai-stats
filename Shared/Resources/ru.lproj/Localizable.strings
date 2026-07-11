@@ -4,15 +4,9 @@
 
 "section.ai_usage" = "AI использование";
 "section.top_models" = "Топ моделей";
-"section.github" = "GitHub";
 "section.trend" = "Дневные AI траты • 30 дней";
-"section.trend_additions" = "Добавленные строки • 30 дней";
-"section.top_repos" = "Топ репозиториев";
 
 "label.no_data" = "пока нет данных";
-
-"github.commits_repos %@ %@" = "коммитов: %1$@ в %2$@ репах";
-"github.loc %@ %@" = "+%1$@ / -%2$@ строк";
 
 "footer.last_sync %@" = "Последний sync %@";
 
@@ -47,23 +41,14 @@
 "app.failed_to_start.title" = "Burn не запустилось";
 
 "unit.never" = "никогда";
-"unit.commits" = "коммитов";
-"unit.lines" = "строк";
-"unit.repos_active %d" = "%d репозиторий активен";
-"widget.commits_suffix" = "коммитов";
 
 "delta.vs_yesterday" = "vs вчера";
 "delta.vs_prev_week" = "vs прошлой недели";
 "delta.vs_prev_month" = "vs прошлого месяца";
-"delta.new" = "NEW";
-
-"section.leaderboard" = "Друзья";
-"label.leaderboard.heading" = "Рейтинг по токенам";
 
 "period.short.day" = "Д";
 "period.short.week" = "Н";
 "period.short.month" = "М";
-"section.ai" = "AI";
-"section.friends" = "Друзья";
-"widget.leaderboard.no_account" = "Включи sharing в Настройках, чтобы увидеть лидерборд.";
-"widget.leaderboard.empty" = "Пока никого. Добавь друзей.";
+"section.expenses" = "Расходы";
+"section.analytics" = "Аналитика";
+"widget.placeholder" = "Открой Burn, чтобы обновить данные";

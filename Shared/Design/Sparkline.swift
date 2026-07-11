@@ -3,19 +3,16 @@ import Charts
 
 enum SparklineVariant {
     case ai
-    case github
 
     var strokeColors: [Color] {
         switch self {
         case .ai:     return [BrandColor.pinkLight, BrandColor.pink]
-        case .github: return [BrandColor.cyanLight, BrandColor.cyan]
         }
     }
 
     var fillTopColor: Color {
         switch self {
         case .ai:     return BrandColor.pinkLight.opacity(0.3)
-        case .github: return BrandColor.cyanLight.opacity(0.28)
         }
     }
 }
@@ -45,9 +42,4 @@ struct Sparkline: View {
         .chartYAxis(.hidden)
         .frame(height: 36)
     }
-}
-
-extension Color {
-    /// GitHub contribution heatmap green (#39d353). Оставлено для обратной совместимости.
-    static let githubGreen = Color(red: 0x39 / 255.0, green: 0xd3 / 255.0, blue: 0x53 / 255.0)
 }

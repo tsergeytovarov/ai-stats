@@ -3,68 +3,78 @@ import Foundation
 /// Mini-snapshot всех метрик за каждый период. Пишется app'ом после sync
 /// и читается виджетом из своего sandbox-контейнера.
 struct WidgetSnapshot: Codable, Equatable {
+    /// Версия схемы снапшота. 2 — после выпила GitHub/лидерборда. Снапшоты без
+    /// этого поля (записанные старым app'ом) трактуются как legacy (версия 1).
+    let schemaVersion: Int
     let generatedAt: Date
     let day: PeriodSlice
     let week: PeriodSlice
     let month: PeriodSlice
-    let githubEnabled: Bool
-    let myFriendCode: String?
+
+    // Поля советника (спека 2.3). Глобальные (не по периоду) — одна строка в Large.
+    // Расчёта ещё не было / «мало данных» → все nil → строка Large скрыта.
+    /// Момент последнего успешного расчёта карточки; nil — расчёта не было.
+    let advisorComputedAt: Date?
+    /// Суммарная Σexp_saved по обоим источникам за окно 30 дней (в месяц).
+    let leakUsdPerMonth: Double?
+    /// Заголовок топ-1 кластера; nil — ни один кластер не прошёл фильтр.
+    let topLeakTitle: String?
 
     init(
+        schemaVersion: Int = 2,
         generatedAt: Date,
         day: PeriodSlice,
         week: PeriodSlice,
         month: PeriodSlice,
-        githubEnabled: Bool,
-        myFriendCode: String?
+        advisorComputedAt: Date? = nil,
+        leakUsdPerMonth: Double? = nil,
+        topLeakTitle: String? = nil
     ) {
+        self.schemaVersion = schemaVersion
         self.generatedAt = generatedAt
         self.day = day
         self.week = week
         self.month = month
-        self.githubEnabled = githubEnabled
-        self.myFriendCode = myFriendCode
+        self.advisorComputedAt = advisorComputedAt
+        self.leakUsdPerMonth = leakUsdPerMonth
+        self.topLeakTitle = topLeakTitle
     }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        // Отсутствие ключа → legacy snapshot (версия 1).
+        self.schemaVersion = try c.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
         self.generatedAt = try c.decode(Date.self, forKey: .generatedAt)
         self.day = try c.decode(PeriodSlice.self, forKey: .day)
         self.week = try c.decode(PeriodSlice.self, forKey: .week)
         self.month = try c.decode(PeriodSlice.self, forKey: .month)
-        self.githubEnabled = try c.decode(Bool.self, forKey: .githubEnabled)
-        self.myFriendCode = try c.decodeIfPresent(String.self, forKey: .myFriendCode)
+        // Аддитивные поля советника — decodeIfPresent (старые снапшоты их не имеют).
+        self.advisorComputedAt = try c.decodeIfPresent(Date.self, forKey: .advisorComputedAt)
+        self.leakUsdPerMonth = try c.decodeIfPresent(Double.self, forKey: .leakUsdPerMonth)
+        self.topLeakTitle = try c.decodeIfPresent(String.self, forKey: .topLeakTitle)
     }
 
     private enum CodingKeys: String, CodingKey {
-        case generatedAt, day, week, month, githubEnabled, myFriendCode
+        case schemaVersion, generatedAt, day, week, month
+        case advisorComputedAt, leakUsdPerMonth, topLeakTitle
     }
 
     struct PeriodSlice: Codable, Equatable {
         let aiCost: Double
         let aiCostPrev: Double
         let aiTokens: Int64
-        let commits: Int64
-        let uniqueRepos: Int
         let topModels: [ModelEntry]
-        let leaderboard: LeaderboardSlice?
 
         init(
             aiCost: Double,
             aiCostPrev: Double,
             aiTokens: Int64,
-            commits: Int64,
-            uniqueRepos: Int,
-            topModels: [ModelEntry],
-            leaderboard: LeaderboardSlice?
+            topModels: [ModelEntry]
         ) {
             self.aiCost = aiCost
             self.aiCostPrev = aiCostPrev
             self.aiTokens = aiTokens
-            self.commits = commits
-            self.uniqueRepos = uniqueRepos
             self.topModels = topModels
-            self.leaderboard = leaderboard
         }
 
         init(from decoder: Decoder) throws {
@@ -72,14 +82,11 @@ struct WidgetSnapshot: Codable, Equatable {
             self.aiCost = try c.decode(Double.self, forKey: .aiCost)
             self.aiCostPrev = try c.decodeIfPresent(Double.self, forKey: .aiCostPrev) ?? 0
             self.aiTokens = try c.decode(Int64.self, forKey: .aiTokens)
-            self.commits = try c.decode(Int64.self, forKey: .commits)
-            self.uniqueRepos = try c.decode(Int.self, forKey: .uniqueRepos)
             self.topModels = try c.decode([ModelEntry].self, forKey: .topModels)
-            self.leaderboard = try c.decodeIfPresent(LeaderboardSlice.self, forKey: .leaderboard)
         }
 
         private enum CodingKeys: String, CodingKey {
-            case aiCost, aiCostPrev, aiTokens, commits, uniqueRepos, topModels, leaderboard
+            case aiCost, aiCostPrev, aiTokens, topModels
         }
     }
 
@@ -89,52 +96,6 @@ struct WidgetSnapshot: Codable, Equatable {
         let costUsd: Double
         let inputTokens: Int64
         let outputTokens: Int64
-    }
-
-    struct LeaderboardSlice: Codable, Equatable {
-        let entries: [Entry]      // <= 8
-        let meBelow: Entry?       // nil, если я в top-8 или меня нет вовсе
-
-        struct Entry: Codable, Equatable {
-            let rank: Int
-            let previousRank: Int?
-            let friendCode: String
-            let displayName: String
-            let tokensTotal: Int64
-            let isMe: Bool
-
-            init(
-                rank: Int,
-                previousRank: Int?,
-                friendCode: String,
-                displayName: String,
-                tokensTotal: Int64,
-                isMe: Bool
-            ) {
-                self.rank = rank
-                self.previousRank = previousRank
-                self.friendCode = friendCode
-                self.displayName = displayName
-                self.tokensTotal = tokensTotal
-                self.isMe = isMe
-            }
-
-            init(from decoder: Decoder) throws {
-                let c = try decoder.container(keyedBy: CodingKeys.self)
-                self.rank = try c.decode(Int.self, forKey: .rank)
-                self.previousRank = try c.decodeIfPresent(Int.self, forKey: .previousRank)
-                // Старые snapshot'ы (до widget-avatars) friend_code не писали —
-                // тогда строка просто без аватарки.
-                self.friendCode = try c.decodeIfPresent(String.self, forKey: .friendCode) ?? ""
-                self.displayName = try c.decode(String.self, forKey: .displayName)
-                self.tokensTotal = try c.decode(Int64.self, forKey: .tokensTotal)
-                self.isMe = try c.decode(Bool.self, forKey: .isMe)
-            }
-
-            private enum CodingKeys: String, CodingKey {
-                case rank, previousRank, friendCode, displayName, tokensTotal, isMe
-            }
-        }
     }
 }
 
@@ -168,48 +129,5 @@ enum WidgetSnapshotIO {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return try? decoder.decode(WidgetSnapshot.self, from: data)
-    }
-
-    // MARK: - avatars
-
-    /// `<widget-sandbox>/Library/Application Support/ai-stats/avatars/`.
-    /// Раздельные write/read URL по той же причине что и для snapshot: app
-    /// (не sandboxed) пишет в widget sandbox по абсолютному пути, виджет
-    /// читает через свой applicationSupportDirectory.
-    static var avatarsWriteDir: URL {
-        writeURL.deletingLastPathComponent().appendingPathComponent("avatars", isDirectory: true)
-    }
-
-    static var avatarsReadDir: URL {
-        readURL.deletingLastPathComponent().appendingPathComponent("avatars", isDirectory: true)
-    }
-
-    /// Записывает blob в `avatars/<friend_code>.bin`. Атомарно. Создаёт директорию.
-    static func writeAvatar(friendCode: String, data: Data) throws {
-        let dir = avatarsWriteDir
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let url = dir.appendingPathComponent("\(friendCode).bin")
-        try data.write(to: url, options: .atomic)
-    }
-
-    /// Читает blob по friend_code из widget sandbox. nil — если файла нет.
-    static func readAvatar(friendCode: String) -> Data? {
-        guard !friendCode.isEmpty else { return nil }
-        let url = avatarsReadDir.appendingPathComponent("\(friendCode).bin")
-        return try? Data(contentsOf: url)
-    }
-
-    /// Удаляет аватарки, кодов которых нет в `keep`. Тихо игнорирует ошибки —
-    /// это housekeeping, не критично.
-    static func pruneAvatars(keep: Set<String>) {
-        let fm = FileManager.default
-        let dir = avatarsWriteDir
-        guard let names = try? fm.contentsOfDirectory(atPath: dir.path) else { return }
-        for name in names where name.hasSuffix(".bin") {
-            let code = String(name.dropLast(4))
-            if !keep.contains(code) {
-                try? fm.removeItem(at: dir.appendingPathComponent(name))
-            }
-        }
     }
 }

@@ -1,13 +1,11 @@
 import SwiftUI
 
 enum CrumbCategory: Equatable {
-    case ai, github, friends
+    case ai
 
     var color: Color {
         switch self {
         case .ai: return TextColor.crumbAI
-        case .github: return TextColor.crumbGitHub
-        case .friends: return TextColor.crumbFriends
         }
     }
 }

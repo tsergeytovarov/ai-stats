@@ -7,12 +7,10 @@ struct AccountTabView: View {
     @State private var newName: String = ""
     @State private var pickedAvatar: Data? = nil
     @State private var pickedAvatarMime: String? = nil
-    @State private var showRegenerateConfirm = false
     @State private var showDeleteConfirm = false
     @State private var editingName: String = ""
     @State private var isEditingName: Bool = false
     @State private var includePrivateRepos = false
-    @State private var globalOptInLocal = false
 
     var body: some View {
         ScrollView {
@@ -39,7 +37,7 @@ struct AccountTabView: View {
     @ViewBuilder
     private var notCreatedView: some View {
         Text("Создать аккаунт").font(.title2).bold()
-        Text("Без аккаунта недоступен лидерборд и виджет с лидербордом. Локальная статистика работает как и раньше.")
+        Text("Аккаунт нужен для входа через GitHub. Локальная статистика расходов работает и без него.")
             .foregroundStyle(.secondary).font(.callout)
 
         Button {
@@ -139,52 +137,7 @@ struct AccountTabView: View {
 
         Divider()
 
-        Text("Твой код для друзей").font(.headline)
-        HStack {
-            Text(FriendCode.formatted(profile.friendCode))
-                .font(.system(.title3, design: .monospaced))
-            Spacer()
-            Button("Копировать") {
-                NSPasteboard.general.clearContents()
-                NSPasteboard.general.setString(FriendCode.formatted(profile.friendCode), forType: .string)
-            }
-        }
-
-        Divider()
-
-        Toggle("Шарить статистику", isOn: Binding(
-            get: { profile.sharingEnabled },
-            set: { newVal in Task { await viewModel.toggleSharing(newVal) } }
-        ))
-        Text("Если выключено: ты не отправляешь свои данные и не видишь чужие.")
-            .font(.caption).foregroundStyle(.secondary)
-
-        Toggle("Показывать в публичном лидерборде", isOn: Binding(
-            get: { globalOptInLocal },
-            set: { newValue in
-                globalOptInLocal = newValue
-                Task { await viewModel.toggleGlobalOptIn(newValue) }
-            }
-        ))
-        .help("Твой handle, аватар и цифры станут видны публично на сайте")
-
-        Divider()
-
         Text("Опасная зона").font(.headline).foregroundStyle(.red)
-        Button("Сгенерировать новый код") {
-            showRegenerateConfirm = true
-        }
-        .confirmationDialog(
-            "Новый код заменит текущий. Все друзья будут удалены — им придётся добавить тебя заново. Твоя история использования сохранится.",
-            isPresented: $showRegenerateConfirm,
-            titleVisibility: .visible
-        ) {
-            Button("Сгенерировать", role: .destructive) {
-                Task { await viewModel.regenerateFriendCode() }
-            }
-            Button("Отмена", role: .cancel) {}
-        }
-
         Button("Удалить аккаунт") {
             showDeleteConfirm = true
         }

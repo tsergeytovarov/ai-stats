@@ -46,16 +46,3 @@ struct HeroNumber: View {
         )
     }
 }
-
-/// "28 коммитов" — число + единица рядом.
-struct HeroNumberWithUnit: View {
-    let number: String
-    let unit: String   // "коммитов", "репозиториев" — локализовано на месте использования
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            HeroNumber(number, font: .system(size: 56, weight: .bold).monospacedDigit(), variant: .cyan)
-            Text(unit).font(BrandFont.unitL).foregroundStyle(BrandColor.cyanLight.opacity(0.85))
-        }
-    }
-}
