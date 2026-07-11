@@ -154,6 +154,44 @@ final class PricingTableTests: XCTestCase {
         XCTAssertEqual(c, 0.5, accuracy: 0.0001)
     }
 
+    // MARK: - gpt-5.6-* и spark (ставки-допущения, спека §4)
+
+    func test_gpt56_sol_input_5_output_30() {
+        let inp = PricingTable.cost(model: "gpt-5.6-sol", inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheCreateTokens: 0)
+        let out = PricingTable.cost(model: "gpt-5.6-sol", inputTokens: 0, outputTokens: 1_000_000, cacheReadTokens: 0, cacheCreateTokens: 0)
+        XCTAssertEqual(inp, 5.0, accuracy: 0.0001)
+        XCTAssertEqual(out, 30.0, accuracy: 0.0001)
+    }
+
+    func test_gpt56_terra_input_2_5_output_15() {
+        let inp = PricingTable.cost(model: "gpt-5.6-terra", inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheCreateTokens: 0)
+        let out = PricingTable.cost(model: "gpt-5.6-terra", inputTokens: 0, outputTokens: 1_000_000, cacheReadTokens: 0, cacheCreateTokens: 0)
+        XCTAssertEqual(inp, 2.5, accuracy: 0.0001)
+        XCTAssertEqual(out, 15.0, accuracy: 0.0001)
+    }
+
+    func test_gpt56_luna_input_0_75_output_4_5() {
+        let inp = PricingTable.cost(model: "gpt-5.6-luna", inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheCreateTokens: 0)
+        let out = PricingTable.cost(model: "gpt-5.6-luna", inputTokens: 0, outputTokens: 1_000_000, cacheReadTokens: 0, cacheCreateTokens: 0)
+        XCTAssertEqual(inp, 0.75, accuracy: 0.0001)
+        XCTAssertEqual(out, 4.5, accuracy: 0.0001)
+    }
+
+    func test_gpt53_codex_spark_input_0_75_output_4_5() {
+        let inp = PricingTable.cost(model: "gpt-5.3-codex-spark", inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheCreateTokens: 0)
+        let out = PricingTable.cost(model: "gpt-5.3-codex-spark", inputTokens: 0, outputTokens: 1_000_000, cacheReadTokens: 0, cacheCreateTokens: 0)
+        XCTAssertEqual(inp, 0.75, accuracy: 0.0001)
+        XCTAssertEqual(out, 4.5, accuracy: 0.0001)
+    }
+
+    /// Неизвестная gpt-5.6-* модель падает на ставку gpt-5.5 (консервативно сверху), а не в ноль.
+    func test_unknown_gpt56_variant_uses_gpt55_rate() {
+        let inp = PricingTable.cost(model: "gpt-5.6-nova", inputTokens: 1_000_000, outputTokens: 0, cacheReadTokens: 0, cacheCreateTokens: 0)
+        let out = PricingTable.cost(model: "gpt-5.6-nova", inputTokens: 0, outputTokens: 1_000_000, cacheReadTokens: 0, cacheCreateTokens: 0)
+        XCTAssertEqual(inp, 5.0, accuracy: 0.0001)
+        XCTAssertEqual(out, 30.0, accuracy: 0.0001)
+    }
+
     // MARK: - Совсем неизвестная модель → ноль (без ложной уверенности)
 
     func test_unknown_model_returns_zero() {
