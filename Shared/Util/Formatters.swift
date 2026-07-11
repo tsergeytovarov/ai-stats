@@ -14,14 +14,6 @@ struct CostDeltaContent: Equatable {
     let direction: DeltaDirection
 }
 
-struct RankDeltaContent: Equatable {
-    enum Kind: Equatable {
-        case change(magnitude: Int, direction: DeltaDirection)
-        case new
-    }
-    let kind: Kind
-}
-
 // MARK: - helpers (shared between sections and widgets)
 
 enum DropdownFormat {
@@ -30,19 +22,6 @@ enum DropdownFormat {
         if value >= 1_000_000 { return String(format: "%.1fM", value / 1_000_000) }
         if value >= 1_000 { return String(format: "%.0fk", value / 1_000) }
         return "\(count)"
-    }
-
-    static func loc(_ count: Int64) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .decimal
-        formatter.groupingSeparator = ","
-        return formatter.string(from: NSNumber(value: count)) ?? "\(count)"
-    }
-
-    /// "owner/name" → "name"
-    static func repoShortName(_ full: String) -> String {
-        guard let slash = full.firstIndex(of: "/") else { return full }
-        return String(full[full.index(after: slash)...])
     }
 
     static func formatCostDelta(current: Double, previous: Double, period: Period) -> CostDeltaContent? {
@@ -84,15 +63,5 @@ enum DropdownFormat {
             .prefix(2)
         guard !version.isEmpty else { return family }
         return "\(family) \(version.joined(separator: "."))"
-    }
-
-    static func formatRankDelta(current: Int, previous: Int?) -> RankDeltaContent? {
-        guard let previous else {
-            return RankDeltaContent(kind: .new)
-        }
-        let diff = previous - current   // подъём в рейтинге = current уменьшился = diff положительный
-        guard diff != 0 else { return nil }
-        let direction: DeltaDirection = diff > 0 ? .up : .down
-        return RankDeltaContent(kind: .change(magnitude: abs(diff), direction: direction))
     }
 }
