@@ -39,6 +39,7 @@ struct DropdownAnalyticsSection: View {
             VStack(alignment: .leading, spacing: 14) {
                 header(card)
                 ForEach(card.sources, id: \.source) { sourceBlock($0) }
+                topModels(card)
                 leaks(card)
                 guide()
             }
@@ -57,6 +58,45 @@ struct DropdownAnalyticsSection: View {
             Text("\(Self.dayMonth(card.rangeStart)) — \(Self.dayMonth(card.rangeEnd))")
                 .font(BrandFont.caption)
                 .foregroundStyle(TextColor.muted)
+        }
+    }
+
+    // MARK: - Топ моделей по токенам (за 30 дней)
+
+    @ViewBuilder
+    private func topModels(_ card: AnalyticsCard) -> some View {
+        if !card.topModelsByTokens.isEmpty {
+            let maxTok = Double(card.topModelsByTokens.first?.tokens ?? 1)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("ТОП МОДЕЛЕЙ ПО ТОКЕНАМ")
+                    .font(BrandFont.lbl).tracking(1.2).textCase(.uppercase)
+                    .foregroundStyle(BrandColor.cyanLight.opacity(0.7))
+                ForEach(Array(card.topModelsByTokens.enumerated()), id: \.element.model) { i, m in
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text("\(i + 1).")
+                                .font(BrandFont.caption).monospacedDigit()
+                                .foregroundStyle(TextColor.muted)
+                            Text(m.model)
+                                .font(BrandFont.caption)
+                                .foregroundStyle(TextColor.primary)
+                                .lineLimit(1).truncationMode(.middle)
+                            Spacer(minLength: 8)
+                            Text(AnalyticsFormat.tokens(m.tokens))
+                                .font(BrandFont.caption).monospacedDigit()
+                                .foregroundStyle(TextColor.secondary)
+                        }
+                        GeometryReader { geo in
+                            Capsule()
+                                .fill(LinearGradient(
+                                    colors: [BrandColor.pink, BrandColor.pinkLight],
+                                    startPoint: .leading, endPoint: .trailing))
+                                .frame(width: max(4, geo.size.width * CGFloat(Double(m.tokens) / max(maxTok, 1))))
+                        }
+                        .frame(height: 5)
+                    }
+                }
+            }
         }
     }
 

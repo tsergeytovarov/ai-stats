@@ -115,6 +115,37 @@ final class AnalyticsCardTests: XCTestCase {
         XCTAssertEqual(bg.source, "claude-code")
         XCTAssertEqual(bg.title, "Фоновые уведомления")
         XCTAssertEqual(bg.adviceText, "Фоновые уведомления обрабатывай дешёвой моделью")
+
+        // Топ моделей по ТОКЕНАМ (не деньгам): gpt-5.5 = 40×1000, opus = 10×1000.
+        XCTAssertEqual(card.topModelsByTokens.count, 2)
+        XCTAssertEqual(card.topModelsByTokens[0].model, "gpt-5.5")
+        XCTAssertEqual(card.topModelsByTokens[0].tokens, 40_000)
+        XCTAssertEqual(card.topModelsByTokens[1].model, "claude-opus-4-8")
+        XCTAssertEqual(card.topModelsByTokens[1].tokens, 10_000)
+    }
+
+    func test_top_models_by_tokens_ranks_by_tokens_not_cost() throws {
+        let dbq = try migratedQueue()
+        try dbq.write { db in
+            // haiku: много токенов, копеечная стоимость
+            for i in 0..<5 {
+                try insertTurn(db, source: "claude-code", seq: i, promptHead: "q\(i)",
+                               model: "claude-haiku-4-5", cost: 0.01, exp: 0, tokens: 100_000)
+            }
+            // opus: мало токенов, дорого
+            for i in 5..<10 {
+                try insertTurn(db, source: "claude-code", seq: i, promptHead: "q\(i)",
+                               model: "claude-opus-4-8", cost: 50.0, exp: 0, tokens: 1_000)
+            }
+        }
+        let top = try dbq.read { db in
+            AnalyticsCardBuilder.topModelsByTokens(
+                try AnalyticsTurnRow.fetchAll(db))
+        }
+        // По токенам haiku (500k) > opus (5k) — хотя по деньгам наоборот.
+        XCTAssertEqual(top.first?.model, "claude-haiku-4-5")
+        XCTAssertEqual(top.first?.tokens, 500_000)
+        XCTAssertEqual(top.last?.model, "claude-opus-4-8")
     }
 
     func test_ready_but_no_leaks_when_total_saving_under_dollar() throws {

@@ -28,7 +28,7 @@ struct AnalyticsCardBuilder {
 
         guard !rows.isEmpty else {
             return AnalyticsCard(state: .noData, rangeStart: windowStart, rangeEnd: nowDate,
-                                 sources: [], leaks: [], totalExpSavedUsd: 0,
+                                 sources: [], topModelsByTokens: [], leaks: [], totalExpSavedUsd: 0,
                                  topLeakTitle: nil, advisorComputedAt: computedAt)
         }
 
@@ -64,18 +64,35 @@ struct AnalyticsCardBuilder {
         }
 
         let totalExp = rows.reduce(0.0) { $0 + $1.expSavedUsd }
+        let topModels = Self.topModelsByTokens(rows)
 
         // Мало данных — карточка не собирается, поля советника пустые.
         if rows.count < Self.minTurnsForCard {
             return AnalyticsCard(state: .tooFewData, rangeStart: windowStart, rangeEnd: nowDate,
-                                 sources: sources, leaks: [], totalExpSavedUsd: totalExp,
+                                 sources: sources, topModelsByTokens: topModels, leaks: [],
+                                 totalExpSavedUsd: totalExp,
                                  topLeakTitle: nil, advisorComputedAt: computedAt)
         }
 
         let leaks = buildLeaks(rows)
         return AnalyticsCard(state: .ready, rangeStart: windowStart, rangeEnd: nowDate,
-                             sources: sources, leaks: leaks, totalExpSavedUsd: totalExp,
+                             sources: sources, topModelsByTokens: topModels, leaks: leaks,
+                             totalExpSavedUsd: totalExp,
                              topLeakTitle: leaks.first?.title, advisorComputedAt: computedAt)
+    }
+
+    /// Токены хода (с кэшем) — та же метрика «использования», что и в SourceSummary.
+    private static func rowTokens(_ r: AnalyticsTurnRow) -> Int64 {
+        r.inputTokens + r.cacheRead + r.cacheCreate5m + r.cacheCreate1h + r.outputTokens
+    }
+
+    /// Топ моделей по суммарным токенам за окно, убыв. (tie-break — имя), ≤6.
+    static func topModelsByTokens(_ rows: [AnalyticsTurnRow], limit: Int = 6) -> [AnalyticsCard.ModelUsage] {
+        Dictionary(grouping: rows, by: \.model)
+            .map { AnalyticsCard.ModelUsage(model: $0.key, tokens: $0.value.reduce(Int64(0)) { $0 + rowTokens($1) }) }
+            .sorted { $0.tokens != $1.tokens ? $0.tokens > $1.tokens : $0.model < $1.model }
+            .prefix(limit)
+            .map { $0 }
     }
 
     // MARK: - Кластеры утечек

@@ -27,6 +27,12 @@ struct AnalyticsCard: Equatable {
         var monthLimitPct: Double?
     }
 
+    /// Модель в топе по использованию (токенам за окно).
+    struct ModelUsage: Equatable {
+        var model: String
+        var tokens: Int64             // input+cache_read+cc5m+cc1h+output (с кэшем)
+    }
+
     /// Кластер-утечка (топ-3 по экономии).
     struct LeakCluster: Equatable {
         var source: String            // "codex" | "claude-code"
@@ -42,6 +48,8 @@ struct AnalyticsCard: Equatable {
     var rangeStart: Date
     var rangeEnd: Date
     var sources: [SourceSummary]
+    /// Топ моделей по токенам за окно (не по деньгам!), убыв., ≤6.
+    var topModelsByTokens: [ModelUsage]
     var leaks: [LeakCluster]
     /// Σexp_saved по обоим источникам (для leakUsdPerMonth виджета).
     var totalExpSavedUsd: Double
