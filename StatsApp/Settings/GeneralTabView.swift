@@ -46,6 +46,9 @@ struct GeneralTabView: View {
                 }
             }
 
+            Divider()
+            OpenCodeCookieSection()
+
             Spacer()
             Text("Burn \(version)").font(.caption).foregroundStyle(.secondary)
         }
