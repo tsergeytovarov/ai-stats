@@ -110,9 +110,14 @@ final class StatusItemController: NSObject {
 
     func refreshTitle() async {
         let cost = await viewModel.todayCost()
+        // Координатор пишет свежие снапшоты в БД каждый тик независимо от
+        // того, открыт ли попап — loadLimits() здесь обязателен, иначе кольца
+        // показывают снимок на момент старта приложения и оживают только
+        // после первого открытия попапа, то есть уже не тогда, когда нужны
+        // (находка 1 финального ревью). Чтение локальное и дешёвое — тот же
+        // паттерн, что и todayCost() выше.
+        await viewModel.loadLimits()
         let formatted = String(format: "$%.2f", cost)
-        // limits читаем из той же вью-модели, что и попап (DropdownViewModel.limits) —
-        // она обновляется через loadLimits(), отдельного опроса тут нет.
         updateCapsule(priceText: formatted, limits: viewModel.limits)
     }
 

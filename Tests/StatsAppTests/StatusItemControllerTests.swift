@@ -1,7 +1,38 @@
 import XCTest
+import GRDB
 @testable import StatsApp
 
 final class StatusItemControllerTests: XCTestCase {
+    // MARK: - refreshTitle
+
+    // refreshTitle() крутится по таймеру раз в 30 секунд, а viewModel.limits
+    // раньше наполнялся только из loadLimits(), вызываемого на старте и при
+    // открытии попапа — кольца в меню-баре замерзали на снимке на момент
+    // запуска и оживали только когда попап уже открыт (находка 1 финального
+    // ревью). refreshTitle обязан дочитывать лимиты сам.
+    @MainActor
+    func test_refreshTitle_reloads_limits_written_after_viewModel_was_created() async throws {
+        let dbq = try DatabaseQueue()
+        try Database.migrate(dbq)
+        let repo = LimitsRepository(db: dbq)
+        let coordinator = SyncCoordinator(db: dbq)
+        let vm = DropdownViewModel(db: dbq, syncCoordinator: coordinator, limitsRepository: repo)
+        let controller = StatusItemController(viewModel: vm, onRefresh: {}, onOpenSettings: {}, onQuit: {})
+
+        // Симулирует тик координатора, случившийся пока меню-бар уже виден,
+        // но попап ещё ни разу не открывали — loadLimits() тогда не звался.
+        try await repo.record(
+            ProviderLimits(provider: .codex,
+                          windows: [LimitWindow(windowMinutes: 10_080, usedPercent: 42, resetsAt: nil)],
+                          status: .ok, fetchedAt: Date(), error: nil),
+            now: Date())
+        XCTAssertTrue(vm.limits.isEmpty)
+
+        await controller.refreshTitle()
+
+        XCTAssertEqual(vm.limits[.codex]?.windows.first?.usedPercent, 42)
+    }
+
     // MARK: - capsuleWidth
 
     func test_capsuleWidth_returnsPositive_forEmptyText() {
