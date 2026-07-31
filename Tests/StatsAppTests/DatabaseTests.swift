@@ -8,7 +8,7 @@ final class DatabaseTests: XCTestCase {
         try Database.migrate(dbq)
         try dbq.read { db in
             let tables = try String.fetchAll(db, sql: "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
-            XCTAssertEqual(Set(tables), ["ai_usage", "ai_usage_model", "analytics_ingest_state", "analytics_meta", "analytics_rate_limits", "analytics_turns", "friend_profiles", "github_activity", "github_loc_daily", "grdb_migrations", "leaderboard_cache", "my_profile", "pending_snapshots", "sync_state"])
+            XCTAssertEqual(Set(tables), ["ai_usage", "ai_usage_model", "analytics_ingest_state", "analytics_meta", "analytics_rate_limits", "analytics_turns", "friend_profiles", "github_activity", "github_loc_daily", "grdb_migrations", "leaderboard_cache", "limit_fetch_state", "limit_snapshots", "my_profile", "pending_snapshots", "sync_state"])
 
             let indexes = try String.fetchAll(db, sql: "SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL ORDER BY name")
             XCTAssertTrue(indexes.contains("idx_ai_usage_day"))

@@ -12,6 +12,7 @@ struct SettingsView: View {
     let onExport: () -> Void
     let onImport: () -> Void
     let onRefreshNow: () -> Void
+    let onOpenCodeCookieChecked: (ProviderLimits) async -> Void
 
     // AccountTab dependency
     @StateObject var accountViewModel: AccountTabViewModel
@@ -26,7 +27,8 @@ struct SettingsView: View {
                 onOpenConfig: onOpenConfig,
                 onExport: onExport,
                 onImport: onImport,
-                onRefreshNow: onRefreshNow
+                onRefreshNow: onRefreshNow,
+                onOpenCodeCookieChecked: onOpenCodeCookieChecked
             )
             .tabItem { Label("Общие", systemImage: "gear") }
 

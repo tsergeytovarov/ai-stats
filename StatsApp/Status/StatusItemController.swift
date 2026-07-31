@@ -30,32 +30,59 @@ final class StatusItemController: NSObject {
     // bar button даёт неверные размеры до полного first-layout. Capsule рос в
     // 3 стадии при кликах. Сейчас считаем ширину сами — детерминированно,
     // никакой зависимости от SwiftUI layout pass'а.
-    private static let emberSize: CGFloat = 12
-    private static let interItemSpacing: CGFloat = 4
-    private static let horizontalPadding: CGFloat = 8 * 2  // лево + право
+    // nonisolated — используются из nonisolated static func capsuleWidth(for:showsRings:)
+    // ниже; сами по себе неизменяемые константы, actor isolation им не нужна.
+    nonisolated private static let emberSize: CGFloat = 12
+    nonisolated private static let interItemSpacing: CGFloat = 4
+    nonisolated private static let horizontalPadding: CGFloat = 8 * 2  // лево + право
 
-    /// Считает ширину capsule под priceText. Использует NSString.size(...)
-    /// с тем же шрифтом что MenuBarCapsuleView (11pt semibold monospaced digit).
+    // Геометрия колец берётся из LimitRingLayout — того же места, откуда её берёт
+    // вёрстка. Дублировать эти числа здесь нельзя: когда они жили в двух местах,
+    // они разъехались, и правый край последнего кольца ушёл под обрезку.
+    nonisolated private static var ringsWidth: CGFloat { LimitRingLayout.totalWidth }
+
+    /// Считает ширину capsule под priceText (+ кольца лимитов, если показаны).
+    /// Использует NSString.size(...) с тем же шрифтом что MenuBarCapsuleView
+    /// (11pt semibold monospaced digit).
     /// nonisolated — pure-функция, не трогает actor state, тестируется без MainActor.
-    nonisolated static func capsuleWidth(for priceText: String) -> CGFloat {
+    /// showsRings по умолчанию false — старые вызовы (и тесты капсулы без лимитов)
+    /// продолжают считать ширину так же, как до задачи 8.
+    ///
+    /// Внешний HStack(spacing: 4) в MenuBarCapsuleView — это 2 дочерних вью без
+    /// колец (Ember, Text) и 3 с кольцами (Ember, Text, HStack колец): 1 разрыв
+    /// spacing превращается в 2. Без второго interItemSpacing правый край
+    /// последнего кольца съезжал под обрезку NSStatusItem на 4pt — это нашли
+    /// в ревью до слияния.
+    nonisolated static func capsuleWidth(for priceText: String, showsRings: Bool = false) -> CGFloat {
         let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
         let textWidth = (priceText as NSString)
             .size(withAttributes: [.font: font])
             .width
-        return ceil(emberSize + interItemSpacing + textWidth + horizontalPadding)
+        var width = emberSize + interItemSpacing + textWidth + horizontalPadding
+        if showsRings {
+            width += interItemSpacing + ringsWidth
+        }
+        return ceil(width)
     }
 
     func install() {
         // Стартуем сразу с правильной шириной — никаких 3-стадийных мерцаний.
         let initialPrice = "$0.00"
-        let initialWidth = Self.capsuleWidth(for: initialPrice)
+        // Источник лимитов — тот же, что у попапа (DropdownViewModel.limits),
+        // второй путь загрузки не заводим. На старте он обычно ещё пуст —
+        // до первого loadLimits() кольца просто не покажутся.
+        let initialLimits = viewModel.limits
+        let showsRings = MenuBarCapsuleView.showsRings(for: initialLimits)
+        let initialWidth = Self.capsuleWidth(for: initialPrice, showsRings: showsRings)
         let item = NSStatusBar.system.statusItem(withLength: initialWidth)
         if let button = item.button {
             button.title = ""
             button.target = self
             button.action = #selector(togglePopover(_:))
 
-            let hosting = NSHostingView(rootView: MenuBarCapsuleView(priceText: initialPrice))
+            let hosting = NSHostingView(
+                rootView: MenuBarCapsuleView(priceText: initialPrice, limits: initialLimits)
+            )
             hosting.frame = NSRect(x: 0, y: 0, width: initialWidth, height: NSStatusBar.system.thickness)
             button.addSubview(hosting)
             self.capsuleHosting = hosting
@@ -74,16 +101,24 @@ final class StatusItemController: NSObject {
 
     func refreshTitle() async {
         let cost = await viewModel.todayCost()
+        // Координатор пишет свежие снапшоты в БД каждый тик независимо от
+        // того, открыт ли попап — loadLimits() здесь обязателен, иначе кольца
+        // показывают снимок на момент старта приложения и оживают только
+        // после первого открытия попапа, то есть уже не тогда, когда нужны
+        // (находка 1 финального ревью). Чтение локальное и дешёвое — тот же
+        // паттерн, что и todayCost() выше.
+        await viewModel.loadLimits()
         let formatted = String(format: "$%.2f", cost)
-        updateCapsule(priceText: formatted)
+        updateCapsule(priceText: formatted, limits: viewModel.limits)
     }
 
-    private func updateCapsule(priceText: String) {
+    private func updateCapsule(priceText: String, limits: [LimitProvider: ProviderLimits]) {
         guard let hosting = capsuleHosting else { return }
         // Обновляем SwiftUI rootView (diff'ит содержимое, view state сохраняется)
-        // и пересчитываем ширину детерминированно из priceText.
-        hosting.rootView = MenuBarCapsuleView(priceText: priceText)
-        let width = Self.capsuleWidth(for: priceText)
+        // и пересчитываем ширину детерминированно из priceText + наличия колец.
+        let showsRings = MenuBarCapsuleView.showsRings(for: limits)
+        hosting.rootView = MenuBarCapsuleView(priceText: priceText, limits: limits)
+        let width = Self.capsuleWidth(for: priceText, showsRings: showsRings)
         hosting.frame = NSRect(x: 0, y: 0, width: width, height: NSStatusBar.system.thickness)
         statusItem?.length = width
         statusItem?.button?.title = ""
@@ -126,6 +161,7 @@ final class StatusItemController: NSObject {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             Task { @MainActor in
                 await viewModel.reload()
+                await viewModel.loadLimits()
                 await refreshTitle()
             }
         }
