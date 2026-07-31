@@ -19,6 +19,35 @@ final class ClaudeUsageParserTests: XCTestCase {
         XCTAssertNotNil(windows[0].resetsAt)
     }
 
+    // Живой ответ эндпоинта отдаёт время сброса с дробными секундами — снято
+    // 2026-07-31 с рабочего токена. Дефолтный ISO8601DateFormatter такое не
+    // разбирает, и resetsAt молча становился nil: строка «сброс через N» у
+    // Claude не показывалась никогда, а выбор окна для кольца сваливался
+    // в запасную ветку «самое короткое по длительности».
+    func test_parses_reset_time_with_fractional_seconds() throws {
+        let data = Data(#"""
+        {"five_hour":{"utilization":31,"resets_at":"2026-07-31T18:30:00.602320+00:00"},
+         "seven_day":{"utilization":14,"resets_at":"2026-08-06T06:00:00.602340+00:00"}}
+        """#.utf8)
+
+        let windows = ClaudeUsageParser.parse(data).sorted { $0.windowMinutes < $1.windowMinutes }
+        XCTAssertEqual(windows.count, 2)
+
+        let fiveHour = try XCTUnwrap(windows[0].resetsAt)
+        XCTAssertEqual(fiveHour.timeIntervalSince1970, 1_785_522_600, accuracy: 1)
+
+        let sevenDay = try XCTUnwrap(windows[1].resetsAt)
+        XCTAssertEqual(sevenDay.timeIntervalSince1970, 1_785_996_000, accuracy: 1)
+    }
+
+    // Форма без дробей обязана продолжать работать — эндпоинт недокументирован,
+    // формат может отличаться между окнами или поменяться обратно.
+    func test_still_parses_reset_time_without_fractional_seconds() throws {
+        let data = Data(#"{"five_hour":{"utilization":10,"resets_at":"2026-07-31T15:30:00Z"}}"#.utf8)
+        let reset = try XCTUnwrap(ClaudeUsageParser.parse(data).first?.resetsAt)
+        XCTAssertEqual(reset.timeIntervalSince1970, 1_785_511_800, accuracy: 1)
+    }
+
     func test_skips_window_without_utilization() {
         let data = Data(#"{"five_hour":{"resets_at":"2026-07-31T15:30:00Z"},"seven_day":null}"#.utf8)
         XCTAssertTrue(ClaudeUsageParser.parse(data).isEmpty)

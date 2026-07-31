@@ -11,15 +11,30 @@ enum ClaudeUsageParser {
         ("seven_day", 10080),
     ]
 
+    /// Живой эндпоинт отдаёт время сброса с дробными секундами
+    /// (`2026-07-31T18:30:00.602320+00:00`), а дефолтный ISO8601DateFormatter
+    /// такое не разбирает и молча возвращает nil. Эндпоинт недокументирован,
+    /// поэтому не выбираем формат, а пробуем оба: сперва с дробной частью,
+    /// потом без. Форматтеры статические — парсер зовётся на каждое окно.
+    private static let isoWithFractionalSeconds: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let isoPlain = ISO8601DateFormatter()
+
+    private static func parseResetTime(_ raw: String) -> Date? {
+        isoWithFractionalSeconds.date(from: raw) ?? isoPlain.date(from: raw)
+    }
+
     static func parse(_ data: Data) -> [LimitWindow] {
         guard let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
         else { return [] }
         return windowMinutes.compactMap { entry in
             guard let raw = root[entry.key] as? [String: Any],
                   let pct = (raw["utilization"] as? NSNumber)?.doubleValue else { return nil }
-            let reset = (raw["resets_at"] as? String).flatMap {
-                ISO8601DateFormatter().date(from: $0)
-            }
+            let reset = (raw["resets_at"] as? String).flatMap(parseResetTime)
             return LimitWindow(windowMinutes: entry.minutes,
                                usedPercent: min(max(pct, 0), 100),
                                resetsAt: reset)

@@ -13,6 +13,35 @@ final class OpenCodeUsageParserTests: XCTestCase {
     monthlyUsage:{usagePercent:31,resetInSec:2000000}}
     """
 
+    // Фрагмент РЕАЛЬНОЙ страницы, снят 2026-07-31 с рабочей сессии. Между
+    // ключом и открывающей скобкой стоит обратная ссылка React Flight вида
+    // `$R[33]=` — прежняя фикстура этого не имела и потому пропустила баг:
+    // парсер требовал `{` сразу после двоеточия и на живой странице не находил
+    // ни одного окна, отдавая «не разобрал страницу» при исправной cookie.
+    private let realPage = """
+    rollingUsage:$R[33]={status:"ok",resetInSec:18000,usagePercent:0,limit:{usagePercent:99}},\
+    weeklyUsage:$R[34]={status:"ok",resetInSec:201573,usagePercent:2.5},\
+    monthlyUsage:null,timeMonthlyUsageUpdated:null,reloadError:null
+    """
+
+    func test_parses_real_page_with_react_flight_backreferences() throws {
+        let windows = try XCTUnwrap(OpenCodeUsageParser.parseLimits(realPage, now: now))
+            .sorted { $0.windowMinutes < $1.windowMinutes }
+        XCTAssertEqual(windows.map(\.windowMinutes), [300, 10080])
+        XCTAssertEqual(windows[0].usedPercent, 0)
+        XCTAssertEqual(windows[0].resetsAt, now.addingTimeInterval(18000))
+        XCTAssertEqual(windows[1].usedPercent, 2.5)
+        XCTAssertEqual(windows[1].resetsAt, now.addingTimeInterval(201573))
+    }
+
+    // Вложенный limit:{usagePercent:99} не должен победить внешние 0% и на
+    // реальной форме страницы тоже.
+    func test_real_page_ignores_nested_usage_percent() throws {
+        let windows = try XCTUnwrap(OpenCodeUsageParser.parseLimits(realPage, now: now))
+        let rolling = try XCTUnwrap(windows.first { $0.windowMinutes == 300 })
+        XCTAssertEqual(rolling.usedPercent, 0)
+    }
+
     func test_parses_three_windows() throws {
         let windows = try XCTUnwrap(OpenCodeUsageParser.parseLimits(page, now: now))
             .sorted { $0.windowMinutes < $1.windowMinutes }
