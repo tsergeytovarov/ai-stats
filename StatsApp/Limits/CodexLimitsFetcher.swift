@@ -69,7 +69,16 @@ final class CodexLimitsFetcher: LimitsFetching {
         var initialized = false
         while Date() < deadline {
             let chunk = stdout.fileHandleForReading.availableData
-            if chunk.isEmpty { continue }
+            if chunk.isEmpty {
+                // availableData блокируется, пока писатель жив, но после
+                // закрытия stdout (процесс завершился) возвращает пустоту
+                // МГНОВЕННО — без этой проверки цикл крутит read()+Date() до
+                // истечения всего rpcTimeout, занимая поток кооперативного
+                // пула busy-wait'ом (находка 8 финального ревью).
+                if !process.isRunning { break }
+                usleep(20_000)
+                continue
+            }
             buffer.append(chunk)
             while let nl = buffer.firstIndex(of: 0x0A) {
                 let lineData = buffer[..<nl]
