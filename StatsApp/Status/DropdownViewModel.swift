@@ -33,6 +33,7 @@ enum DropdownSection: String, CaseIterable, Identifiable {
 final class DropdownViewModel: ObservableObject {
     private let db: any DatabaseReader
     private weak var syncCoordinator: SyncCoordinator?
+    private let limitsRepository: LimitsRepository?
 
     @Published var period: Period = .day {
         didSet {
@@ -57,11 +58,15 @@ final class DropdownViewModel: ObservableObject {
     @Published var analyticsCard: AnalyticsCard?
     /// Шпаргалка моделей (Codex live + Claude static). Композируется в UI отдельно от карточки.
     @Published var modelGuide: ModelGuide?
+    /// Последнее известное состояние лимитов. Пусто — опроса ещё не было.
+    @Published private(set) var limits: [LimitProvider: ProviderLimits] = [:]
 
     init(db: any DatabaseReader,
-         syncCoordinator: SyncCoordinator) {
+         syncCoordinator: SyncCoordinator,
+         limitsRepository: LimitsRepository? = nil) {
         self.db = db
         self.syncCoordinator = syncCoordinator
+        self.limitsRepository = limitsRepository
     }
 
     /// Async-обёртка над reloadSync. Сохранена для существующих call site'ов
@@ -119,6 +124,38 @@ final class DropdownViewModel: ObservableObject {
         } catch {
             AppLogger.sync.error("loadAnalytics failed: \(error.localizedDescription, privacy: .private)")
         }
+    }
+
+    /// Читает последнее состояние лимитов из базы. Опрос делает LimitsCoordinator —
+    /// вью-модель только показывает то, что уже записано.
+    ///
+    /// При ошибке чтения показанное НЕ затирается: одно упавшее чтение не значит,
+    /// что данных нет, а «нет данных» поверх живых цифр — враньё на экране.
+    /// Тот же паттерн, что у loadAnalytics рядом.
+    func loadLimits() async {
+        guard let limitsRepository else { return }
+        do {
+            limits = try await limitsRepository.latest()
+        } catch {
+            AppLogger.sync.error("loadLimits failed: \(error.localizedDescription, privacy: .private)")
+        }
+    }
+
+    /// Разовая проверка cookie из настроек («Проверить») идёт мимо
+    /// LimitsCoordinator и раньше нигде не сохраняла результат: попап до
+    /// следующего тика координатора продолжал показывать старое состояние,
+    /// хотя человек только что увидел «работает» (находка 12 финального
+    /// ревью). persist() — тот же метод, что использует координатор, так что
+    /// throttled уходит в saveState, а не в record().
+    func recordManualCheck(_ limits: ProviderLimits) async {
+        guard let limitsRepository else { return }
+        do {
+            try await limitsRepository.persist(limits, now: Date())
+        } catch {
+            AppLogger.sync.error(
+                "recordManualCheck failed: \(error.localizedDescription, privacy: .private)")
+        }
+        await loadLimits()
     }
 
     func todayCost() async -> Double {

@@ -80,10 +80,23 @@ final class AppContainer {
             db: dbPool,
             analyticsIngest: { try await ingestor.ingest() }
         )
+
+        // Опрос лимитов — свой актор со своими расписаниями на провайдера
+        // (Codex раз в 5 минут, OpenCode раз в 15, Claude раз в час с уважением
+        // к Retry-After из 429). SyncCoordinator просто дёргает тик.
+        // Репозиторий один на всё приложение: координатор им пишет, вью-модель
+        // им же читает — второй инстанс тут не нужен.
+        let limitsRepository = LimitsRepository(db: dbPool)
+        let limitsCoordinator = LimitsCoordinator(
+            fetchers: [CodexLimitsFetcher(), ClaudeLimitsFetcher(), OpenCodeLimitsFetcher()],
+            repository: limitsRepository)
+        coordinator.limitsTick = { await limitsCoordinator.tick() }
+
         self.syncCoordinator = coordinator
         self.dropdownViewModel = DropdownViewModel(
             db: dbPool,
-            syncCoordinator: coordinator
+            syncCoordinator: coordinator,
+            limitsRepository: limitsRepository
         )
     }
 
@@ -169,9 +182,15 @@ final class AppContainer {
         // Ингест аналитики при старте — безусловно (force), чтобы смена версии
         // расчёта вердиктов подхватилась даже при перезапуске в пределах часа.
         await syncCoordinator.maybeRunAnalyticsIngest(force: true)
+        // Лимиты — тоже сразу на старте, а не через 15 минут до первого тика
+        // общего таймера синка (находка 3 финального ревью): первый tick()
+        // координатора сам восстанавливает lastAttempt/retryAfter из БД раньше,
+        // чем решает, кого опрашивать, так что ещё не истёкший 429 не долбится.
+        await syncCoordinator.limitsTick?()
         let interval = TimeInterval(config.syncIntervalMinutes * 60)
         syncCoordinator.startTimer(interval: interval, sources: sources)
         await dropdownViewModel.reload()
+        await dropdownViewModel.loadLimits()
     }
 
     func showFirstLaunchAlertIfNeeded() {

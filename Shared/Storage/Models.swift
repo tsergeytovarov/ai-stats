@@ -288,3 +288,68 @@ struct AnalyticsRateLimitRow: Codable, FetchableRecord, PersistableRecord, Equat
     }
 }
 
+/// Наблюдение лимита провайдера. Пишется только при изменении пары
+/// (used_percent, resets_at) — см. LimitsRepository.
+struct LimitSnapshotRow: Codable, FetchableRecord, MutablePersistableRecord, Equatable {
+    static let databaseTableName = "limit_snapshots"
+
+    var id: Int64?
+    var provider: String
+    var windowMinutes: Int
+    var usedPercent: Double
+    var resetsAt: Int64?
+    var observedAt: Int64
+
+    mutating func didInsert(_ inserted: InsertionSuccess) {
+        id = inserted.rowID
+    }
+
+    enum Columns {
+        static let id = Column("id")
+        static let provider = Column("provider")
+        static let windowMinutes = Column("window_minutes")
+        static let usedPercent = Column("used_percent")
+        static let resetsAt = Column("resets_at")
+        static let observedAt = Column("observed_at")
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case provider
+        case windowMinutes = "window_minutes"
+        case usedPercent = "used_percent"
+        case resetsAt = "resets_at"
+        case observedAt = "observed_at"
+    }
+}
+
+/// Статус последнего опроса провайдера. Upsert по provider.
+struct LimitFetchStateRow: Codable, FetchableRecord, PersistableRecord, Equatable {
+    static let databaseTableName = "limit_fetch_state"
+
+    var provider: String
+    var lastAttemptAt: Int64?
+    var lastSuccessAt: Int64?
+    var status: String
+    var error: String?
+    var retryAfterAt: Int64?
+
+    enum Columns {
+        static let provider = Column("provider")
+        static let lastAttemptAt = Column("last_attempt_at")
+        static let lastSuccessAt = Column("last_success_at")
+        static let status = Column("status")
+        static let error = Column("error")
+        static let retryAfterAt = Column("retry_after_at")
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case provider
+        case lastAttemptAt = "last_attempt_at"
+        case lastSuccessAt = "last_success_at"
+        case status
+        case error
+        case retryAfterAt = "retry_after_at"
+    }
+}
+

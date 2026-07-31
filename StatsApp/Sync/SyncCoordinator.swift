@@ -29,6 +29,9 @@ final class SyncCoordinator {
     /// Минимальный интервал между ингестами аналитики (спека 5.1: не чаще раза в час).
     private static let analyticsIngestInterval: TimeInterval = 3600
 
+    /// Тик опроса лимитов. Опционален: в тестах синка лимиты не нужны.
+    var limitsTick: (@Sendable () async -> Void)?
+
     init(db: any DatabaseWriter,
          testWakeCenter: NotificationCenter? = nil,
          testWakeName: Notification.Name? = nil,
@@ -89,6 +92,9 @@ final class SyncCoordinator {
             try? await runOnce(source: name, fetchers: fetchers)
         }
         await maybeRunAnalyticsIngest()
+        // Лимиты со своим расписанием внутри координатора — тут просто дёргаем
+        // тик, а он сам решает, кому пора.
+        await limitsTick?()
     }
 
     /// Ингест аналитики с гейтом «не чаще раза в час» (спека 5.1). Метка времени —
