@@ -2042,8 +2042,13 @@ actor LimitsCoordinator {
                 // Пока Retry-After не истёк, провайдера не трогаем вообще.
                 let until = limits.retryAfter ?? moment.addingTimeInterval(3600)
                 retryAfter[fetcher.provider] = until
-                try? await repository.saveState(provider: fetcher.provider, status: .throttled,
-                                                error: limits.error, retryAfter: until, now: moment)
+                do {
+                    try await repository.saveState(provider: fetcher.provider, status: .throttled,
+                                                   error: limits.error, retryAfter: until, now: moment)
+                } catch {
+                    AppLogger.sync.error(
+                        "limits saveState failed: \(error.localizedDescription, privacy: .private)")
+                }
                 continue
             }
             retryAfter[fetcher.provider] = nil
@@ -2055,7 +2060,12 @@ actor LimitsCoordinator {
                     "limits record failed: \(error.localizedDescription, privacy: .private)")
             }
         }
-        try? await repository.pruneOldSnapshots(now: moment)
+        do {
+            try await repository.pruneOldSnapshots(now: moment)
+        } catch {
+            AppLogger.sync.error(
+                "limits prune failed: \(error.localizedDescription, privacy: .private)")
+        }
     }
 
     private func shouldPoll(_ provider: LimitProvider, at moment: Date) -> Bool {
