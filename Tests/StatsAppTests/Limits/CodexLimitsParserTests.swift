@@ -114,4 +114,30 @@ final class CodexLimitsFetcherTests: XCTestCase {
             XCTAssertFalse(limits.windows.isEmpty)
         }
     }
+
+    // Официальный установщик codex кладёт бинарь в ~/.local/bin — без этого пути
+    // живой RPC был бы мёртвым кодом почти у всех пользователей.
+    func test_locate_codex_finds_binary_in_home_local_bin() throws {
+        let home = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appending(path: "codex-home-\(UUID().uuidString)")
+        let binDir = home.appending(path: ".local/bin")
+        try FileManager.default.createDirectory(at: binDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+
+        let binary = binDir.appending(path: "codex")
+        try Data().write(to: binary)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
+
+        let found = CodexLimitsFetcher.locateCodex(home: home.path)
+        XCTAssertEqual(found, binary)
+    }
+
+    func test_locate_codex_returns_nil_when_nowhere_found() throws {
+        let home = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appending(path: "codex-home-empty-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+
+        XCTAssertNil(CodexLimitsFetcher.locateCodex(home: home.path))
+    }
 }

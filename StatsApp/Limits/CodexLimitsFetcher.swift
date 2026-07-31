@@ -87,11 +87,18 @@ final class CodexLimitsFetcher: LimitsFetching {
         return nil
     }
 
-    /// Ищем codex в системных дир'ах. Home-writable пути исключены намеренно:
-    /// подложенный туда бинарь мы бы запустили сами (та же логика, что в
-    /// CcusageFetcher.extraSearchPaths).
-    static func locateCodex(fileManager: FileManager = .default) -> URL? {
-        let candidates = ["/opt/homebrew/bin/codex", "/usr/local/bin/codex", "/usr/bin/codex"]
+    /// Ищем codex в системных дир'ах и в ~/.local/bin.
+    ///
+    /// Домашний путь тут включён сознательно, в отличие от
+    /// CcusageFetcher.extraSearchPaths: ~/.local/bin — штатное место официального
+    /// установщика codex, и без него живой RPC оказывается мёртвым кодом почти
+    /// у всех. Размен принят явно: тот, кто может писать в домашнюю папку,
+    /// уже правит shell-профиль и конфиги агентов, так что подложенный сюда
+    /// бинарь не расширяет его возможности.
+    static func locateCodex(fileManager: FileManager = .default,
+                            home: String = NSHomeDirectory()) -> URL? {
+        let candidates = ["/opt/homebrew/bin/codex", "/usr/local/bin/codex", "/usr/bin/codex",
+                          "\(home)/.local/bin/codex"]
         return candidates.map(URL.init(fileURLWithPath:))
             .first { fileManager.isExecutableFile(atPath: $0.path) }
     }
