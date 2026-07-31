@@ -1033,7 +1033,7 @@ final class StubURLProtocol: URLProtocol {
 
     override func startLoading() {
         guard let handler = Self.handler else {
-            client?.didFailWithError(URLError(.badServerResponse))
+            client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
             return
         }
         let (response, data) = handler(request)
@@ -1095,7 +1095,8 @@ final class ClaudeLimitsFetcherTests: XCTestCase {
 
     func test_401_is_unauthorized() async {
         StubURLProtocol.handler = { _ in (self.response(401), Data()) }
-        XCTAssertEqual(await fetcher(keychainValue: blob).fetch().status, .unauthorized)
+        let limits = await fetcher(keychainValue: blob).fetch()
+        XCTAssertEqual(limits.status, .unauthorized)
     }
 
     func test_429_sets_retry_after_and_reports_throttled() async {
@@ -1532,7 +1533,8 @@ final class OpenCodeLimitsFetcherTests: XCTestCase {
 
     func test_no_workspace_is_unauthorized() async {
         StubURLProtocol.handler = { request in self.ok(request.url!, "пусто") }
-        XCTAssertEqual(await fetcher(cookie: "Fe26.2**abc").fetch().status, .unauthorized)
+        let limits = await fetcher(cookie: "Fe26.2**abc").fetch()
+        XCTAssertEqual(limits.status, .unauthorized)
     }
 
     // Вёрстка поменялась: воркспейс нашёлся, а usage не разобрался.
@@ -1542,7 +1544,8 @@ final class OpenCodeLimitsFetcherTests: XCTestCase {
                 ? self.ok(request.url!, #"{id:"wrk_ABC"}"#)
                 : self.ok(request.url!, "<html>редизайн</html>")
         }
-        XCTAssertEqual(await fetcher(cookie: "Fe26.2**abc").fetch().status, .unavailable)
+        let limits = await fetcher(cookie: "Fe26.2**abc").fetch()
+        XCTAssertEqual(limits.status, .unavailable)
     }
 }
 ```
