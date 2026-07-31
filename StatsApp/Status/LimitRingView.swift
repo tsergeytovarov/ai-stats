@@ -30,7 +30,7 @@ struct LimitRingView: View {
                             style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                 Circle()
-                    .stroke(LimitRingPalette.contourColor, lineWidth: 0.5)
+                    .stroke(LimitRingPalette.contourColor, lineWidth: LimitRingLayout.contourWidth)
             } else {
                 Circle()
                     .stroke(Color.secondary.opacity(0.5),

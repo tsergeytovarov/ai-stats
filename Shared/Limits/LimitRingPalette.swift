@@ -14,11 +14,28 @@ enum LimitRingPalette {
     static let claudeOrange = Color(red: 232/255, green: 135/255, blue: 95/255)
     static let openCodeWhite = Color.white
 
+    /// Трек и контур подстраиваются под тему меню-бара, а не берутся одной
+    /// константой: на светлом фоне белое кольцо OpenCode тонет, и проверка
+    /// глазами это подтвердила. Цвета самих провайдеров при этом постоянные —
+    /// подкручиваем только то, что их обрамляет.
+    private static func adaptive(dark: NSColor, light: NSColor) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua ? dark : light
+        })
+    }
+
     /// Нейтральный трек вместо «свой цвет с прозрачностью»: белое кольцо с белым
-    /// треком в светлой теме меню-бара сливается с фоном.
-    static let trackColor = Color.primary.opacity(0.15)
-    /// Тонкий контур держит форму белого кольца на светлом фоне. На тёмном не виден.
-    static let contourColor = Color.black.opacity(0.25)
+    /// треком слилось бы с фоном. Основа у трека разная по темам — на тёмном
+    /// меню-баре светлая, на светлом тёмная, иначе незаполненная часть кольца
+    /// не читается ни в одной из них.
+    static let trackColor = adaptive(dark: .white.withAlphaComponent(0.18),
+                                     light: .black.withAlphaComponent(0.28))
+
+    /// Контур держит форму кольца. На тёмном фоне почти не виден, на светлом —
+    /// единственное, что отделяет белое кольцо OpenCode от меню-бара, поэтому
+    /// там он вдвое плотнее.
+    static let contourColor = adaptive(dark: .black.withAlphaComponent(0.25),
+                                       light: .black.withAlphaComponent(0.55))
 
     static func color(for provider: LimitProvider) -> Color {
         switch provider {
