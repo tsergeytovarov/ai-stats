@@ -80,6 +80,15 @@ final class AppContainer {
             db: dbPool,
             analyticsIngest: { try await ingestor.ingest() }
         )
+
+        // Опрос лимитов — свой актор со своими расписаниями на провайдера
+        // (Codex раз в 5 минут, OpenCode раз в 15, Claude раз в час с уважением
+        // к Retry-After из 429). SyncCoordinator просто дёргает тик.
+        let limitsCoordinator = LimitsCoordinator(
+            fetchers: [CodexLimitsFetcher(), ClaudeLimitsFetcher(), OpenCodeLimitsFetcher()],
+            repository: LimitsRepository(db: dbPool))
+        coordinator.limitsTick = { await limitsCoordinator.tick() }
+
         self.syncCoordinator = coordinator
         self.dropdownViewModel = DropdownViewModel(
             db: dbPool,
