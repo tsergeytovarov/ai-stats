@@ -38,11 +38,31 @@ enum LimitFormat {
         return "сброс через \(minutes)м"
     }
 
-    static func fetchedAt(_ date: Date?) -> String {
+    /// status по умолчанию .ok — существующие вызовы (например, заголовок вне
+    /// контекста провайдера) продолжают получать обычную подпись без пометки.
+    /// Для не-ok статусов подпись отличается визуально: спека §9 требует, чтобы
+    /// stale/throttled не выглядели как свежие данные (находка 5 финального
+    /// ревью — раньше подпись была одинаковой при любом статусе).
+    static func fetchedAt(_ date: Date?, status: LimitStatus = .ok) -> String {
         guard let date else { return "нет данных" }
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
-        return "данные на \(formatter.string(from: date))"
+        let time = formatter.string(from: date)
+        return status == .ok ? "данные на \(time)" : "данные на \(time), несвежие"
+    }
+
+    /// Время следующей попытки при throttled — отдельно от resetsIn: это не
+    /// время сброса окна лимита, а Retry-After эндпоинта (спека §9, находка 6
+    /// финального ревью — latest() раньше вообще не отдавал retryAfter).
+    static func retryAfterText(_ date: Date?, now: Date) -> String? {
+        guard let date else { return nil }
+        let seconds = Int(date.timeIntervalSince(now))
+        guard seconds > 0 else { return nil }
+
+        let hours = seconds / 3_600
+        let minutes = (seconds % 3_600) / 60
+        if hours > 0 { return "следующая попытка через \(hours)ч \(minutes)м" }
+        return "следующая попытка через \(minutes)м"
     }
 
     /// Строка действия для состояний, где без человека не обойтись. Для

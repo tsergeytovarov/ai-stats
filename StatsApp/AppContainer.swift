@@ -182,6 +182,11 @@ final class AppContainer {
         // Ингест аналитики при старте — безусловно (force), чтобы смена версии
         // расчёта вердиктов подхватилась даже при перезапуске в пределах часа.
         await syncCoordinator.maybeRunAnalyticsIngest(force: true)
+        // Лимиты — тоже сразу на старте, а не через 15 минут до первого тика
+        // общего таймера синка (находка 3 финального ревью): первый tick()
+        // координатора сам восстанавливает lastAttempt/retryAfter из БД раньше,
+        // чем решает, кого опрашивать, так что ещё не истёкший 429 не долбится.
+        await syncCoordinator.limitsTick?()
         let interval = TimeInterval(config.syncIntervalMinutes * 60)
         syncCoordinator.startTimer(interval: interval, sources: sources)
         await dropdownViewModel.reload()

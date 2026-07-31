@@ -44,4 +44,28 @@ final class LimitFormatTests: XCTestCase {
         XCTAssertEqual(LimitFormat.fetchedAt(nil), "нет данных")
         XCTAssertTrue(LimitFormat.fetchedAt(now).hasPrefix("данные на "))
     }
+
+    // Спека §9: подпись «данные на HH:MM» должна становиться приглушённой/
+    // отличимой, когда статус не ok — иначе stale в интерфейсе неотличим от
+    // свежих данных (находка 5 финального ревью).
+    func test_fetched_at_label_marks_non_ok_status_visibly() {
+        let okLabel = LimitFormat.fetchedAt(now, status: .ok)
+        let staleLabel = LimitFormat.fetchedAt(now, status: .stale)
+        let throttledLabel = LimitFormat.fetchedAt(now, status: .throttled)
+        XCTAssertTrue(okLabel.hasPrefix("данные на "))
+        XCTAssertNotEqual(okLabel, staleLabel)
+        XCTAssertNotEqual(okLabel, throttledLabel)
+    }
+
+    // 429: показываем прошлые цифры и время следующей попытки (спека §9,
+    // находка 6 финального ревью — latest() раньше не отдавал retryAfter вообще).
+    func test_retry_after_text() {
+        XCTAssertEqual(LimitFormat.retryAfterText(now.addingTimeInterval(90 * 60), now: now),
+                       "следующая попытка через 1ч 30м")
+        XCTAssertEqual(LimitFormat.retryAfterText(now.addingTimeInterval(40 * 60), now: now),
+                       "следующая попытка через 40м")
+        XCTAssertNil(LimitFormat.retryAfterText(nil, now: now))
+        // Время уже прошло — нет смысла врать про «следующую попытку».
+        XCTAssertNil(LimitFormat.retryAfterText(now.addingTimeInterval(-60), now: now))
+    }
 }

@@ -72,6 +72,21 @@ final class LimitsRepository {
         }
     }
 
+    /// Кладёт результат опроса туда, куда положено: throttled — в saveState
+    /// (не трогая историю и lastSuccessAt), остальное — в record(). Общая точка
+    /// для координатора и разового опроса из настроек (проверка cookie
+    /// OpenCode) — раньше эта развилка была продублирована в координаторе,
+    /// и разовая проверка вообще никуда не писала результат.
+    func persist(_ limits: ProviderLimits, now: Date) async throws {
+        if limits.status == .throttled {
+            let until = limits.retryAfter ?? now.addingTimeInterval(3600)
+            try await saveState(provider: limits.provider, status: .throttled,
+                                error: limits.error, retryAfter: until, now: now)
+        } else {
+            try await record(limits, now: now)
+        }
+    }
+
     /// Последнее известное состояние по каждому провайдеру: цифры из истории,
     /// статус — из состояния опроса.
     func latest() async throws -> [LimitProvider: ProviderLimits] {
@@ -109,10 +124,23 @@ final class LimitsRepository {
                     windows: windows,
                     status: state.flatMap { LimitStatus(rawValue: $0.status) } ?? .stale,
                     fetchedAt: state?.lastSuccessAt.map { Date(timeIntervalSince1970: TimeInterval($0)) },
-                    error: state?.error)
+                    error: state?.error,
+                    // retry_after_at писался с самого начала, но никто его не
+                    // перечитывал — попап не мог показать «следующая попытка
+                    // через …» для throttled (находка 6 финального ревью).
+                    retryAfter: state?.retryAfterAt.map { Date(timeIntervalSince1970: TimeInterval($0)) })
             }
             return result
         }
+    }
+
+    /// Все состояния опроса разом — нужно координатору при старте, чтобы
+    /// восстановить lastAttempt/retryAfter из прошлого запуска. Без этого
+    /// retry_after_at и last_attempt_at писались, но никогда не перечитывались,
+    /// и координатор после рестарта долбился в ещё закрытое окно троттлинга
+    /// (находка 2 финального ревью).
+    func fetchStates() async throws -> [LimitFetchStateRow] {
+        try await db.read { db in try LimitFetchStateRow.fetchAll(db) }
     }
 
     /// Убрать историю старше периода хранения — снапшоты копятся вечно иначе.

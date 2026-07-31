@@ -125,6 +125,39 @@ final class LimitsRepositoryTests: XCTestCase {
         XCTAssertEqual(state[0].lastAttemptAt, 1_300)
     }
 
+    // latest() обязан дочитывать retry_after_at — без этого попап не может
+    // показать «следующая попытка через …» для throttled (см. финальный ревью).
+    func test_latest_includes_retry_after_for_throttled_provider() async throws {
+        let db = try makeDB()
+        let repo = LimitsRepository(db: db)
+
+        try await repo.saveState(provider: .claude, status: .throttled, error: "429",
+                                 retryAfter: Date(timeIntervalSince1970: 5_000),
+                                 now: Date(timeIntervalSince1970: 1_000))
+
+        let latest = try await repo.latest()
+        let claude = try XCTUnwrap(latest[.claude])
+        XCTAssertEqual(claude.retryAfter, Date(timeIntervalSince1970: 5_000))
+    }
+
+    // Координатору после перезапуска нужен способ прочитать все состояния разом,
+    // чтобы восстановить lastAttempt/retryAfter — без чтения он не узнает,
+    // что окно троттлинга ещё не истекло.
+    func test_fetch_states_returns_all_persisted_rows() async throws {
+        let db = try makeDB()
+        let repo = LimitsRepository(db: db)
+
+        try await repo.saveState(provider: .claude, status: .throttled, error: "429",
+                                 retryAfter: Date(timeIntervalSince1970: 5_000),
+                                 now: Date(timeIntervalSince1970: 1_000))
+
+        let states = try await repo.fetchStates()
+        XCTAssertEqual(states.count, 1)
+        XCTAssertEqual(states[0].provider, "claude")
+        XCTAssertEqual(states[0].retryAfterAt, 5_000)
+        XCTAssertEqual(states[0].lastAttemptAt, 1_000)
+    }
+
     func test_prune_drops_snapshots_older_than_retention() async throws {
         let db = try makeDB()
         let repo = LimitsRepository(db: db, retentionDays: 60)

@@ -26,9 +26,12 @@ struct DropdownLimitsSection: View {
                 Text(provider.displayTitle)
                     .font(BrandFont.body)
                 Spacer()
-                Text(LimitFormat.fetchedAt(limits?.fetchedAt))
+                Text(LimitFormat.fetchedAt(limits?.fetchedAt, status: limits?.status ?? .ok))
                     .font(BrandFont.caption)
-                    .foregroundStyle(TextColor.muted)
+                    // ok — обычный приглушённый лейбл; stale/throttled — заметно
+                    // приглушённее, чтобы не сливаться со свежими данными
+                    // (спека §9, находка 5 финального ревью).
+                    .foregroundStyle((limits?.status ?? .ok) == .ok ? TextColor.secondary : TextColor.muted)
             }
 
             if let action = limits.flatMap({ LimitFormat.actionText(for: provider, status: $0.status) }) {
@@ -41,6 +44,15 @@ struct DropdownLimitsSection: View {
                 }
             } else {
                 Text("нет данных")
+                    .font(BrandFont.caption)
+                    .foregroundStyle(TextColor.muted)
+            }
+
+            // 429: прошлые цифры выше уже показаны (если были) — здесь только
+            // время следующей попытки (спека §9, находка 6 финального ревью).
+            if limits?.status == .throttled,
+               let retryText = LimitFormat.retryAfterText(limits?.retryAfter, now: now) {
+                Text(retryText)
                     .font(BrandFont.caption)
                     .foregroundStyle(TextColor.muted)
             }

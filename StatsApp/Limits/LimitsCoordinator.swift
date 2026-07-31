@@ -28,6 +28,9 @@ actor LimitsCoordinator {
 
     private var lastAttempt: [LimitProvider: Date] = [:]
     private var retryAfter: [LimitProvider: Date] = [:]
+    /// Восстановление из БД делается один раз, при первом tick() — не в init(),
+    /// потому что репозиторий async и actor init не может await.
+    private var restored = false
 
     init(fetchers: [any LimitsFetching],
          repository: LimitsRepository,
@@ -42,6 +45,10 @@ actor LimitsCoordinator {
     /// Один проход: опрашиваем тех, кому пора. Ошибки не пробрасываем — тик
     /// вызывается из общего цикла синхронизации и не должен его ронять.
     func tick() async {
+        if !restored {
+            await restoreState()
+            restored = true
+        }
         let moment = now()
         for fetcher in fetchers where shouldPoll(fetcher.provider, at: moment) {
             lastAttempt[fetcher.provider] = moment
@@ -49,24 +56,16 @@ actor LimitsCoordinator {
 
             if limits.status == .throttled {
                 // Пока Retry-After не истёк, провайдера не трогаем вообще.
-                let until = limits.retryAfter ?? moment.addingTimeInterval(3600)
-                retryAfter[fetcher.provider] = until
-                do {
-                    try await repository.saveState(provider: fetcher.provider, status: .throttled,
-                                                   error: limits.error, retryAfter: until, now: moment)
-                } catch {
-                    AppLogger.sync.error(
-                        "limits saveState failed: \(error.localizedDescription, privacy: .private)")
-                }
-                continue
+                retryAfter[fetcher.provider] = limits.retryAfter ?? moment.addingTimeInterval(3600)
+            } else {
+                retryAfter[fetcher.provider] = nil
             }
-            retryAfter[fetcher.provider] = nil
 
             do {
-                try await repository.record(limits, now: moment)
+                try await repository.persist(limits, now: moment)
             } catch {
                 AppLogger.sync.error(
-                    "limits record failed: \(error.localizedDescription, privacy: .private)")
+                    "limits persist failed: \(error.localizedDescription, privacy: .private)")
             }
         }
         do {
@@ -74,6 +73,27 @@ actor LimitsCoordinator {
         } catch {
             AppLogger.sync.error(
                 "limits prune failed: \(error.localizedDescription, privacy: .private)")
+        }
+    }
+
+    /// Восстанавливает lastAttempt/retryAfter из БД после перезапуска —
+    /// без этого координатор на первом тике не знает, что уже опрашивал
+    /// провайдера недавно или что окно троттлинга ещё не истекло, и долбится
+    /// в закрытую дверь (находка 2 финального ревью ветки).
+    private func restoreState() async {
+        do {
+            for state in try await repository.fetchStates() {
+                guard let provider = LimitProvider(rawValue: state.provider) else { continue }
+                if let lastAttemptAt = state.lastAttemptAt {
+                    lastAttempt[provider] = Date(timeIntervalSince1970: TimeInterval(lastAttemptAt))
+                }
+                if let retryAfterAt = state.retryAfterAt {
+                    retryAfter[provider] = Date(timeIntervalSince1970: TimeInterval(retryAfterAt))
+                }
+            }
+        } catch {
+            AppLogger.sync.error(
+                "limits restore failed: \(error.localizedDescription, privacy: .private)")
         }
     }
 

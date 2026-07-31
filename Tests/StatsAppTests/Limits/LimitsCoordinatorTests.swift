@@ -92,6 +92,50 @@ final class LimitsCoordinatorTests: XCTestCase {
         XCTAssertEqual(claude.calls, 2)
     }
 
+    // Перезапуск приложения внутри окна троттлинга: retry_after_at из прошлого
+    // запуска ещё в будущем, значит первый же тик не имеет права опрашивать
+    // claude заново — иначе это долбёжка в заведомо закрытую дверь (находка 2
+    // финального ревью: retry_after_at писался, но никогда не перечитывался).
+    func test_first_tick_after_restart_respects_persisted_retry_after() async throws {
+        let db = try makeDB()
+        let repo = LimitsRepository(db: db)
+        let start = Date(timeIntervalSince1970: 1_000_000)
+
+        // Предыдущий запуск оставил claude throttled с retry_after в будущем
+        // относительно текущего start.
+        try await repo.saveState(provider: .claude, status: .throttled, error: "429",
+                                 retryAfter: start.addingTimeInterval(1_800),
+                                 now: start.addingTimeInterval(-10))
+
+        let claude = FakeLimitsFetcher(provider: .claude, result: ok(.claude, pct: 5))
+        let coordinator = LimitsCoordinator(fetchers: [claude], repository: repo, now: { start })
+
+        await coordinator.tick()
+
+        XCTAssertEqual(claude.calls, 0)
+    }
+
+    // lastAttempt тоже должен восстанавливаться: иначе после перезапуска
+    // приложение опросит всех, даже тех, кого только что опрашивали за минуту
+    // до рестарта — интервал не должен занулиться просто потому что процесс
+    // перезапустился.
+    func test_first_tick_after_restart_respects_persisted_last_attempt() async throws {
+        let db = try makeDB()
+        let repo = LimitsRepository(db: db)
+        let start = Date(timeIntervalSince1970: 1_000_000)
+
+        // Codex опрашивался минуту назад в прошлом запуске — 5-минутный
+        // интервал ещё не истёк.
+        try await repo.record(ok(.codex, pct: 5), now: start.addingTimeInterval(-60))
+
+        let codex = FakeLimitsFetcher(provider: .codex, result: ok(.codex, pct: 10))
+        let coordinator = LimitsCoordinator(fetchers: [codex], repository: repo, now: { start })
+
+        await coordinator.tick()
+
+        XCTAssertEqual(codex.calls, 0)
+    }
+
     func test_tick_writes_snapshots() async throws {
         let db = try makeDB()
         let codex = FakeLimitsFetcher(provider: .codex, result: ok(.codex, pct: 78))
