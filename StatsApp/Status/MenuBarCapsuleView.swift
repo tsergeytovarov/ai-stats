@@ -1,5 +1,26 @@
 import SwiftUI
 
+/// Геометрия ряда колец в капсуле. Единственный источник правды: и вёрстка, и
+/// расчёт ширины NSStatusItem берут числа отсюда. Раньше они были заданы дважды —
+/// здесь и в контроллере — и разъехались: правый край последнего кольца уезжал
+/// под обрезку.
+enum LimitRingLayout {
+    static let diameter: CGFloat = 10
+    static let lineWidth: CGFloat = 2
+    /// Обводка центрируется на контуре круга, то есть половина её толщины
+    /// выходит за номинальный диаметр с каждой стороны. При spacing 3 разрыв
+    /// съедала как раз она, и три кольца слипались в одно пятно.
+    static let spacing: CGFloat = 5
+    static let leadingPadding: CGFloat = 3
+
+    /// Ширина всего ряда колец вместе с отступом от цены.
+    static var totalWidth: CGFloat {
+        let count = CGFloat(LimitProvider.allCases.count)
+        guard count > 0 else { return 0 }
+        return leadingPadding + count * diameter + (count - 1) * spacing
+    }
+}
+
 struct MenuBarCapsuleView: View {
     let priceText: String   // "$1,602.78"
     var limits: [LimitProvider: ProviderLimits] = [:]
@@ -17,12 +38,12 @@ struct MenuBarCapsuleView: View {
                 .font(.system(size: 11, weight: .semibold))
                 .monospacedDigit()
             if showsRings {
-                HStack(spacing: 3) {
+                HStack(spacing: LimitRingLayout.spacing) {
                     ForEach(LimitProvider.allCases, id: \.self) { provider in
                         LimitRingView(provider: provider, limits: limits[provider])
                     }
                 }
-                .padding(.leading, 2)
+                .padding(.leading, LimitRingLayout.leadingPadding)
             }
         }
         .foregroundStyle(.white)

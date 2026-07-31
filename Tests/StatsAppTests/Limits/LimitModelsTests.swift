@@ -30,26 +30,15 @@ final class LimitModelsTests: XCTestCase {
         XCTAssertNil(limits([]).ringWindow)
     }
 
-    // Цвет берётся из худшего окна, а не из того, по которому рисуется заливка:
-    // «5ч на нуле, неделя на 95%» обязано гореть красным.
-    func test_worst_percent_ignores_which_window_fills_the_ring() {
+    // Заливка идёт по ближайшему сбросу, даже когда другое окно куда хуже:
+    // кольцо отвечает на «сколько осталось в ближайшее время», а не «где я
+    // вообще». Про «где вообще» есть полоски всех окон в попапе.
+    func test_ring_window_ignores_a_worse_but_later_window() {
         let five = LimitWindow(windowMinutes: 300, usedPercent: 0,
                                resetsAt: Date(timeIntervalSince1970: 1_785_010_000))
         let week = LimitWindow(windowMinutes: 10080, usedPercent: 95,
                                resetsAt: Date(timeIntervalSince1970: 1_785_900_000))
-        let l = limits([five, week])
-        XCTAssertEqual(l.ringWindow, five)
-        XCTAssertEqual(l.worstPercent, 95)
-        XCTAssertEqual(LimitThresholds.severity(worstPercent: l.worstPercent!), .critical)
-    }
-
-    func test_severity_thresholds() {
-        XCTAssertEqual(LimitThresholds.severity(worstPercent: 0), .calm)
-        XCTAssertEqual(LimitThresholds.severity(worstPercent: 69.9), .calm)
-        XCTAssertEqual(LimitThresholds.severity(worstPercent: 70), .warning)
-        XCTAssertEqual(LimitThresholds.severity(worstPercent: 89.9), .warning)
-        XCTAssertEqual(LimitThresholds.severity(worstPercent: 90), .critical)
-        XCTAssertEqual(LimitThresholds.severity(worstPercent: 100), .critical)
+        XCTAssertEqual(limits([five, week]).ringWindow, five)
     }
 }
 

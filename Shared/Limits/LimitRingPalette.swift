@@ -1,14 +1,18 @@
 import SwiftUI
 
-/// Цвета лимитов. Фирменный цвет провайдера виден только пока всё спокойно; на
-/// порогах он уступает жёлтому и красному — в этот момент важно не «кто», а
-/// «сколько осталось».
+/// Цвета лимитов. У каждого провайдера свой цвет, и он не меняется никогда —
+/// цвет здесь опознавательный знак, а не сигнал тревоги.
+///
+/// Раньше на порогах 70% и 90% цвет уходил в жёлтый и красный. От этого
+/// отказались: три кольца в меню-баре идут подряд без подписей, и цвет — их
+/// единственное отличие. Когда Codex краснел на 96%, ряд превращался в три
+/// одинаковых пятна и переставал читаться. Насколько всё плохо, показывают
+/// заполненность кольца и полоски в попапе.
 enum LimitRingPalette {
     static let codexBlue = Color(red: 59/255, green: 130/255, blue: 246/255)
     /// Фирменный оранжевый Anthropic, осветлённый под тёмную капсулу.
     static let claudeOrange = Color(red: 232/255, green: 135/255, blue: 95/255)
     static let openCodeWhite = Color.white
-    static let warningYellow = Color(red: 255/255, green: 196/255, blue: 61/255)
 
     /// Нейтральный трек вместо «свой цвет с прозрачностью»: белое кольцо с белым
     /// треком в светлой теме меню-бара сливается с фоном.
@@ -16,16 +20,11 @@ enum LimitRingPalette {
     /// Тонкий контур держит форму белого кольца на светлом фоне. На тёмном не виден.
     static let contourColor = Color.black.opacity(0.25)
 
-    static func color(for provider: LimitProvider, severity: LimitSeverity) -> Color {
-        switch severity {
-        case .critical: return BrandColor.danger
-        case .warning:  return warningYellow
-        case .calm:
-            switch provider {
-            case .codex:    return codexBlue
-            case .claude:   return claudeOrange
-            case .opencode: return openCodeWhite
-            }
+    static func color(for provider: LimitProvider) -> Color {
+        switch provider {
+        case .codex:    return codexBlue
+        case .claude:   return claudeOrange
+        case .opencode: return openCodeWhite
         }
     }
 }

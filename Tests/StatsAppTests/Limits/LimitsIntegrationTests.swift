@@ -28,7 +28,7 @@ final class LimitsIntegrationTests: XCTestCase {
     // Полный путь без перезапуска: координатор опрашивает всех трёх, пишет в
     // БД, DropdownViewModel читает через LimitsRepository.latest() и обязана
     // увидеть ровно то, что было опрошено — включая производные свойства
-    // (worstPercent/showsRings), которыми на самом деле пользуется UI.
+    // (ringWindow/showsRings), которыми на самом деле пользуется UI.
     func test_full_path_tick_writes_repository_reads_viewmodel_shows() async throws {
         let dbq = try makeDB()
         let repo = LimitsRepository(db: dbq)
@@ -51,7 +51,7 @@ final class LimitsIntegrationTests: XCTestCase {
         XCTAssertEqual(vm.limits[.opencode]?.windows.first?.usedPercent, 5)
         // То же самое, чем пользуются LimitRingView/MenuBarCapsuleView для
         // заливки кольца и решения, показывать ли кольца вообще.
-        XCTAssertEqual(vm.limits[.codex]?.worstPercent, 42)
+        XCTAssertEqual(vm.limits[.codex]?.ringWindow?.usedPercent, 42)
         XCTAssertTrue(MenuBarCapsuleView.showsRings(for: vm.limits))
     }
 
