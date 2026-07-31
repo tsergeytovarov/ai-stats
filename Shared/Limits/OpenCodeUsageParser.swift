@@ -6,7 +6,11 @@ import Foundation
 /// блока встречаются вложенные объекты с теми же именами полей.
 enum OpenCodeUsageParser {
 
-    private static let authCookieNames: Set<String> = ["auth", "__Host-auth"]
+    // Все имена — в нижнем регистре: filterAuthCookie сравнивает лишь после
+    // .lowercased(), чтобы совпадать с тем, что normalizeCookie уже принимает
+    // "Auth=" регистронезависимо (находка 10 финального ревью — до фикса
+    // "Auth=…" сохранялась, но вырезалась в ноль при каждом запросе).
+    private static let authCookieNames: Set<String> = ["auth", "__host-auth"]
 
     private static let windows: [(key: String, minutes: Int, required: Bool)] = [
         ("rollingUsage", 300, true),
@@ -31,7 +35,7 @@ enum OpenCodeUsageParser {
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { pair in
                 guard let eq = pair.firstIndex(of: "=") else { return false }
-                return authCookieNames.contains(String(pair[..<eq]))
+                return authCookieNames.contains(String(pair[..<eq]).lowercased())
             }
             .joined(separator: "; ")
     }

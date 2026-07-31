@@ -16,3 +16,19 @@ extension ProviderLimits {
                        fetchedAt: nil, error: error, retryAfter: retryAfter)
     }
 }
+
+extension URLSession {
+    /// Сессия для опроса лимитов: без системного cookie-хранилища. Приложение
+    /// не в сэндбоксе, а `.shared` пишет любой Set-Cookie в
+    /// ~/Library/Cookies/*.binarycookies мимо Keychain — cookie opencode.ai
+    /// обязана жить только там (спека §8). Заодно `httpShouldSetCookies` не
+    /// подмешивает системные куки к вручную выставленному заголовку Cookie,
+    /// так что запрос остаётся детерминированным (находка 7 финального
+    /// ревью).
+    static func limitsFetching() -> URLSession {
+        let config = URLSessionConfiguration.ephemeral
+        config.httpShouldSetCookies = false
+        config.httpCookieStorage = nil
+        return URLSession(configuration: config)
+    }
+}

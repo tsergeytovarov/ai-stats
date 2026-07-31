@@ -61,6 +61,16 @@ final class OpenCodeUsageParserTests: XCTestCase {
         XCTAssertEqual(OpenCodeUsageParser.filterAuthCookie(raw),
                        "auth=Fe26.2**abc; __Host-auth=zzz")
     }
+
+    // normalizeCookie принимает "Auth=" регистронезависимо (проверяет через
+    // .lowercased()), но раньше filterAuthCookie сравнивал имя строго — такая
+    // cookie сохранялась и тут же вырезалась в ноль при каждом запросе, вечный
+    // unconfigured при заполненном поле (находка 10 финального ревью).
+    func test_filters_auth_cookie_case_insensitively() {
+        let raw = "Auth=Fe26.2**abc; __Host-Auth=zzz"
+        XCTAssertEqual(OpenCodeUsageParser.filterAuthCookie(raw),
+                       "Auth=Fe26.2**abc; __Host-Auth=zzz")
+    }
 }
 
 final class OpenCodeLimitsFetcherTests: XCTestCase {
@@ -120,5 +130,28 @@ final class OpenCodeLimitsFetcherTests: XCTestCase {
         }
         let limits = await fetcher(cookie: "Fe26.2**abc").fetch()
         XCTAssertEqual(limits.status, .unavailable)
+    }
+
+    // Непонятный HTTP-код — единственный сигнал, по которому можно отличить
+    // протухший захардкоженный workspacesServerID от редизайна страницы.
+    // Generic-сообщение Foundation ("The operation couldn't be completed…")
+    // для этого бесполезно (находка 11 финального ревью).
+    func test_unexpected_status_reports_code_in_error_message() async {
+        StubURLProtocol.handler = { request in
+            (HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!,
+             Data())
+        }
+        let limits = await fetcher(cookie: "Fe26.2**abc").fetch()
+        XCTAssertEqual(limits.status, .stale)
+        XCTAssertEqual(limits.error, "HTTP 500 от opencode.ai")
+    }
+
+    // Секретная cookie не должна оседать в системном cookie storage мимо
+    // Keychain, и вручную выставленный заголовок Cookie не должен
+    // подмешиваться с чужими куками системы (находка 7 финального ревью).
+    func test_default_session_disables_shared_cookie_storage() {
+        let config = URLSession.limitsFetching().configuration
+        XCTAssertFalse(config.httpShouldSetCookies)
+        XCTAssertNil(config.httpCookieStorage)
     }
 }

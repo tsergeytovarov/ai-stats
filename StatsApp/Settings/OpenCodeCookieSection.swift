@@ -81,8 +81,15 @@ struct OpenCodeCookieSection: View {
 
     /// Пустое поле здесь — не «убрать», а «ничего не вводил»: не трогаем
     /// уже сохранённую cookie. Убрать её можно только явной кнопкой ниже.
+    ///
+    /// Проверяем через normalizeCookie, а не через .whitespaces: это та же
+    /// функция, что store.save() применит к значению перед записью — раньше
+    /// здесь был отдельный .whitespaces-трим, и строка из одного перевода
+    /// строки проходила guard как «непустая», а внутри normalizeCookie
+    /// нормализовалась в пустую и тихо стирала уже сохранённую cookie
+    /// (находка 9 финального ревью).
     private func save() {
-        guard !cookie.trimmingCharacters(in: .whitespaces).isEmpty else { return }
+        guard !OpenCodeUsageParser.normalizeCookie(cookie).isEmpty else { return }
         do {
             try store.save(cookie)
             hasSavedCookie = true
@@ -112,7 +119,10 @@ struct OpenCodeCookieSection: View {
 
         // Сохраняем только если в поле что-то ввели; если оно пустое, а cookie
         // уже сохранена — проверяем то, что уже лежит в Keychain, ничего не трогая.
-        if !cookie.trimmingCharacters(in: .whitespaces).isEmpty {
+        // Тот же normalizeCookie, что и в save() — иначе тут воспроизводится
+        // та же находка 9: строка из одних пробелов/переводов строки прошла
+        // бы этот guard, но store.save() всё равно её сотрёт.
+        if !OpenCodeUsageParser.normalizeCookie(cookie).isEmpty {
             do {
                 try store.save(cookie)
                 hasSavedCookie = true

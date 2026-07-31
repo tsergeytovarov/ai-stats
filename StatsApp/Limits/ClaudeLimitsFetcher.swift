@@ -19,7 +19,7 @@ final class ClaudeLimitsFetcher: LimitsFetching {
 
     init(keychain: KeychainStore = MacOSKeychainStore(),
          account: String = NSUserName(),
-         session: URLSession = .shared,
+         session: URLSession = .limitsFetching(),
          now: @escaping @Sendable () -> Date = { Date() }) {
         self.keychain = keychain
         self.account = account

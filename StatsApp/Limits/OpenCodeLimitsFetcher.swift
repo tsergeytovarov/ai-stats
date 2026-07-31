@@ -24,7 +24,7 @@ final class OpenCodeLimitsFetcher: LimitsFetching {
 
     init(keychain: KeychainStore = MacOSKeychainStore(),
          account: String = NSUserName(),
-         session: URLSession = .shared,
+         session: URLSession = .limitsFetching(),
          now: @escaping @Sendable () -> Date = { Date() }) {
         self.keychain = keychain
         self.account = account
@@ -71,7 +71,14 @@ final class OpenCodeLimitsFetcher: LimitsFetching {
         }
     }
 
-    private struct HTTPStatusError: Error { let code: Int }
+    /// LocalizedError — иначе в limit_fetch_state.error оседает generic-текст
+    /// Foundation вроде «The operation couldn't be completed», по которому
+    /// нельзя отличить протухший захардкоженный workspacesServerID от
+    /// редизайна страницы (находка 11 финального ревью).
+    private struct HTTPStatusError: Error, LocalizedError {
+        let code: Int
+        var errorDescription: String? { "HTTP \(code) от opencode.ai" }
+    }
 
     private func get(url: URL, cookie: String, accept: String,
                      extra: [String: String]) async throws -> String {
