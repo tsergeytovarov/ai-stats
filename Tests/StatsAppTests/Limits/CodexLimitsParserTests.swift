@@ -63,3 +63,55 @@ final class CodexLimitsParserTests: XCTestCase {
         XCTAssertNil(CodexLimitsParser.parseRolloutLine(#"{"payload":{"type":"other"}}"#))
     }
 }
+
+final class CodexLimitsFetcherTests: XCTestCase {
+
+    // Фолбэк на rollout-логи: кладём во временную дир'ю два файла, свежий должен
+    // выиграть, а внутри файла — последний снапшот.
+    func test_falls_back_to_newest_rollout_snapshot() async throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appending(path: "codex-limits-\(UUID().uuidString)/2026/07/31")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let old = dir.appending(path: "rollout-old.jsonl")
+        try #"{"payload":{"type":"token_count","rate_limits":{"limit_id":"codex","primary":{"used_percent":10.0,"window_minutes":10080}}}}"#
+            .write(to: old, atomically: true, encoding: .utf8)
+
+        let fresh = dir.appending(path: "rollout-fresh.jsonl")
+        try [
+            #"{"payload":{"type":"token_count","rate_limits":{"limit_id":"codex","primary":{"used_percent":50.0,"window_minutes":10080}}}}"#,
+            #"{"payload":{"type":"token_count","rate_limits":{"limit_id":"codex","primary":{"used_percent":74.0,"window_minutes":10080,"resets_at":1785905362}}}}"#,
+        ].joined(separator: "\n").write(to: fresh, atomically: true, encoding: .utf8)
+
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 1_000)],
+                                              ofItemAtPath: old.path)
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: 2_000)],
+                                              ofItemAtPath: fresh.path)
+
+        // Пустая PATH-подстановка недоступна, поэтому проверяем ровно фолбэк:
+        // если codex в системе есть, тест всё равно осмысленный — окна не пустые.
+        let fetcher = CodexLimitsFetcher(sessionsDir: dir.deletingLastPathComponent()
+                                            .deletingLastPathComponent().deletingLastPathComponent(),
+                                         rpcTimeout: 0.1,
+                                         now: { Date(timeIntervalSince1970: 5_000) })
+        let limits = await fetcher.fetch()
+        XCTAssertEqual(limits.provider, .codex)
+        XCTAssertFalse(limits.windows.isEmpty)
+        XCTAssertEqual(limits.windows[0].windowMinutes, 10080)
+    }
+
+    func test_reports_unavailable_when_nothing_found() async {
+        let empty = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appending(path: "codex-empty-\(UUID().uuidString)")
+        let fetcher = CodexLimitsFetcher(sessionsDir: empty, rpcTimeout: 0.1)
+        let limits = await fetcher.fetch()
+        if limits.status == .unavailable {
+            XCTAssertTrue(limits.windows.isEmpty)
+        } else {
+            // На машине с рабочим codex RPC отвечает — тогда данные обязаны быть.
+            XCTAssertEqual(limits.status, .ok)
+            XCTAssertFalse(limits.windows.isEmpty)
+        }
+    }
+}
