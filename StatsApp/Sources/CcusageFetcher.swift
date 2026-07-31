@@ -152,9 +152,12 @@ enum CcusageError: Error, LocalizedError {
     case binaryNotFound(commandHead: String)
     case invalidCommandPrefix(String)
     case emptyCommandPrefix
+    case timedOut(seconds: TimeInterval)
 
     var errorDescription: String? {
         switch self {
+        case .timedOut(let seconds):
+            return "ccusage не ответил за \(Int(seconds)) с и был убит."
         case .processFailed(let code, let stderr):
             return "ccusage exited with code \(code): \(stderr)"
         case .binaryNotFound(let head):
@@ -166,6 +169,13 @@ enum CcusageError: Error, LocalizedError {
             return "ccusage_command не может быть пустым. Используй [\"npx\", \"-y\", \"ccusage@20\"]."
         }
     }
+}
+
+/// Результат запуска ccusage-процесса: вывод и код возврата.
+struct CcusageProcessOutput {
+    let stdout: Data
+    let stderr: Data
+    let exitCode: Int32
 }
 
 struct CcusageFetcher: Fetcher {
@@ -193,33 +203,97 @@ struct CcusageFetcher: Fetcher {
         }
         try Self.validateCommandHead(head)
 
-        let process = Process()
-        process.executableURL = try resolveExecutable(head)
-        process.arguments = args
-        // GUI-приложение получает PATH = /usr/bin:/bin без brew/nvm. Child
-        // process (npx → node) запустится через shebang `#!/usr/bin/env node`,
-        // и `env` ищет node ровно в этом PATH → exit 127. Прокидываем child'у
-        // расширенный PATH по тем же дирам что и resolveExecutable.
-        process.environment = Self.enrichedEnvironment(base: ProcessInfo.processInfo.environment)
+        let output = try Self.runProcess(
+            executable: try resolveExecutable(head),
+            arguments: args,
+            // GUI-приложение получает PATH = /usr/bin:/bin без brew/nvm. Child
+            // process (npx → node) запустится через shebang `#!/usr/bin/env node`,
+            // и `env` ищет node ровно в этом PATH → exit 127. Прокидываем child'у
+            // расширенный PATH по тем же дирам что и resolveExecutable.
+            environment: Self.enrichedEnvironment(base: ProcessInfo.processInfo.environment)
+        )
 
-        let stdoutPipe = Pipe()
-        let stderrPipe = Pipe()
-        process.standardOutput = stdoutPipe
-        process.standardError = stderrPipe
-
-        try process.run()
-        process.waitUntilExit()
-
-        let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-        let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-
-        guard process.terminationStatus == 0 else {
-            let stderr = String(data: stderrData, encoding: .utf8) ?? ""
-            throw CcusageError.processFailed(exitCode: process.terminationStatus, stderr: stderr)
+        guard output.exitCode == 0 else {
+            let stderr = String(data: output.stderr, encoding: .utf8) ?? ""
+            throw CcusageError.processFailed(exitCode: output.exitCode, stderr: stderr)
         }
 
-        let payload = try CcusageParser.parse(stdoutData, source: provider, now: now)
+        let payload = try CcusageParser.parse(output.stdout, source: provider, now: now)
         return .aiUsage(payload)
+    }
+
+    /// Сколько ждём ccusage, прежде чем считать его зависшим. Реальный прогон
+    /// укладывается в единицы секунд даже на годовом окне.
+    static let processTimeout: TimeInterval = 120
+
+    /// Запускает процесс и собирает его вывод.
+    ///
+    /// Вывод идёт во временные файлы, а не в пайпы. Пайп держит всего 16 КБ:
+    /// когда ccusage писал больше, он навсегда блокировался в write(), а мы —
+    /// в waitUntilExit(), потому что читали пайпы уже после выхода процесса.
+    /// Синк вставал намертво и молча: source оставался inFlight, ошибки в лог
+    /// не попадало, цифры расходов просто замирали. Файл не блокируется никогда.
+    static func runProcess(
+        executable: URL,
+        arguments: [String],
+        environment: [String: String],
+        timeout: TimeInterval = processTimeout
+    ) throws -> CcusageProcessOutput {
+        let fm = FileManager.default
+        let stem = fm.temporaryDirectory.appendingPathComponent("ccusage-\(UUID().uuidString)")
+        let stdoutURL = stem.appendingPathExtension("out")
+        let stderrURL = stem.appendingPathExtension("err")
+        fm.createFile(atPath: stdoutURL.path, contents: nil)
+        fm.createFile(atPath: stderrURL.path, contents: nil)
+        defer {
+            try? fm.removeItem(at: stdoutURL)
+            try? fm.removeItem(at: stderrURL)
+        }
+
+        let stdoutHandle = try FileHandle(forWritingTo: stdoutURL)
+        let stderrHandle = try FileHandle(forWritingTo: stderrURL)
+        defer {
+            try? stdoutHandle.close()
+            try? stderrHandle.close()
+        }
+
+        let process = Process()
+        process.executableURL = executable
+        process.arguments = arguments
+        process.environment = environment
+        process.standardOutput = stdoutHandle
+        process.standardError = stderrHandle
+        // Пустой stdin: npm/npx умеет спросить подтверждение и ждать ответа,
+        // которого у menu-bar-приложения нет. С /dev/null он сразу получит EOF.
+        process.standardInput = FileHandle.nullDevice
+
+        let exited = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in exited.signal() }
+        try process.run()
+
+        if exited.wait(timeout: .now() + timeout) == .timedOut {
+            Self.kill(process)
+            throw CcusageError.timedOut(seconds: timeout)
+        }
+
+        return CcusageProcessOutput(
+            stdout: (try? Data(contentsOf: stdoutURL)) ?? Data(),
+            stderr: (try? Data(contentsOf: stderrURL)) ?? Data(),
+            exitCode: process.terminationStatus
+        )
+    }
+
+    /// SIGTERM, а если процесс не ушёл за grace-период — SIGKILL. Зависший в
+    /// write() npm на TERM реагирует не всегда.
+    private static func kill(_ process: Process, grace: TimeInterval = 2) {
+        process.terminate()
+        let deadline = Date().addingTimeInterval(grace)
+        while process.isRunning && Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+        if process.isRunning {
+            Darwin.kill(process.processIdentifier, SIGKILL)
+        }
     }
 
     /// Системные дир'ы с node/npx/bun (brew). Раньше включали и `~/.bun/bin`,
