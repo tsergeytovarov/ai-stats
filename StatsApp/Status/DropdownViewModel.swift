@@ -128,9 +128,17 @@ final class DropdownViewModel: ObservableObject {
 
     /// Читает последнее состояние лимитов из базы. Опрос делает LimitsCoordinator —
     /// вью-модель только показывает то, что уже записано.
+    ///
+    /// При ошибке чтения показанное НЕ затирается: одно упавшее чтение не значит,
+    /// что данных нет, а «нет данных» поверх живых цифр — враньё на экране.
+    /// Тот же паттерн, что у loadAnalytics рядом.
     func loadLimits() async {
         guard let limitsRepository else { return }
-        limits = (try? await limitsRepository.latest()) ?? [:]
+        do {
+            limits = try await limitsRepository.latest()
+        } catch {
+            AppLogger.sync.error("loadLimits failed: \(error.localizedDescription, privacy: .private)")
+        }
     }
 
     func todayCost() async -> Double {
