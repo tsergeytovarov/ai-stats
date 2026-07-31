@@ -2,6 +2,13 @@ import SwiftUI
 
 struct MenuBarCapsuleView: View {
     let priceText: String   // "$1,602.78"
+    var limits: [LimitProvider: ProviderLimits] = [:]
+
+    /// Кольца прячем, если ни по одному провайдеру нет данных: три серых
+    /// пунктира в меню-баре — мусор, а не информация.
+    private var showsRings: Bool {
+        Self.showsRings(for: limits)
+    }
 
     var body: some View {
         HStack(spacing: 4) {
@@ -9,6 +16,14 @@ struct MenuBarCapsuleView: View {
             Text(priceText)
                 .font(.system(size: 11, weight: .semibold))
                 .monospacedDigit()
+            if showsRings {
+                HStack(spacing: 3) {
+                    ForEach(LimitProvider.allCases, id: \.self) { provider in
+                        LimitRingView(provider: provider, limits: limits[provider])
+                    }
+                }
+                .padding(.leading, 2)
+            }
         }
         .foregroundStyle(.white)
         .padding(.vertical, 2)
@@ -21,5 +36,14 @@ struct MenuBarCapsuleView: View {
             .clipShape(Capsule())
         )
         .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 0.5))
+    }
+}
+
+extension MenuBarCapsuleView {
+    /// Общее условие показа колец — используется и вью, и StatusItemController
+    /// при расчёте детерминированной ширины capsule. Один источник правды,
+    /// чтобы не завести второе (расходящееся) определение «есть ли данные».
+    static func showsRings(for limits: [LimitProvider: ProviderLimits]) -> Bool {
+        LimitProvider.allCases.contains { limits[$0]?.ringWindow != nil }
     }
 }
