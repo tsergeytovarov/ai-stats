@@ -71,6 +71,13 @@ enum OpenCodeUsageParser {
         return result.isEmpty ? nil : result
     }
 
+    /// Сколько символов между `key:` и открывающей скобкой мы готовы пропустить.
+    /// React Flight вставляет туда обратную ссылку вида `$R[33]=`, живьём это
+    /// выглядит так: `rollingUsage:$R[33]={status:"ok",resetInSec:18000,…}`.
+    /// Ограничение не даёт уехать на скобку следующего, постороннего объекта,
+    /// когда у ключа значение `null`.
+    private static let maxCharsBeforeBrace = 30
+
     /// Первый брейс-сбалансированный блок у `key:`, в котором usagePercent и
     /// resetInSec лежат прямыми полями. Вхождения вида `monthlyUsage:null`
     /// пропускаем.
@@ -83,9 +90,11 @@ enum OpenCodeUsageParser {
                 index += 1
                 continue
             }
-            var cursor = index + pattern.count
-            while cursor < chars.count, chars[cursor] == " " { cursor += 1 }
-            guard cursor < chars.count, chars[cursor] == "{" else {
+            let searchStart = index + pattern.count
+            let searchEnd = min(searchStart + maxCharsBeforeBrace, chars.count)
+            var cursor = searchStart
+            while cursor < searchEnd, chars[cursor] != "{" { cursor += 1 }
+            guard cursor < searchEnd else {
                 index += 1
                 continue
             }
