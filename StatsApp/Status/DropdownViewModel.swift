@@ -141,6 +141,23 @@ final class DropdownViewModel: ObservableObject {
         }
     }
 
+    /// Разовая проверка cookie из настроек («Проверить») идёт мимо
+    /// LimitsCoordinator и раньше нигде не сохраняла результат: попап до
+    /// следующего тика координатора продолжал показывать старое состояние,
+    /// хотя человек только что увидел «работает» (находка 12 финального
+    /// ревью). persist() — тот же метод, что использует координатор, так что
+    /// throttled уходит в saveState, а не в record().
+    func recordManualCheck(_ limits: ProviderLimits) async {
+        guard let limitsRepository else { return }
+        do {
+            try await limitsRepository.persist(limits, now: Date())
+        } catch {
+            AppLogger.sync.error(
+                "recordManualCheck failed: \(error.localizedDescription, privacy: .private)")
+        }
+        await loadLimits()
+    }
+
     func todayCost() async -> Double {
         let today = [DateUtils.isoDayLocal(Date())]
         return (try? await db.read { db in try StatsQueries.aiTotals(in: db, days: today).totalCost }) ?? 0

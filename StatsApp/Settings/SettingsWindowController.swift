@@ -23,6 +23,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
             onExport: { [weak self] in self?.doExport() },
             onImport: { [weak self] in self?.doImport() },
             onRefreshNow: { [weak self] in self?.doRefresh() },
+            onOpenCodeCookieChecked: { [weak self] limits in
+                await self?.container.dropdownViewModel.recordManualCheck(limits)
+            },
             accountViewModel: self.container.makeAccountTabViewModel()
         )
         let hosting = NSHostingController(rootView: view)

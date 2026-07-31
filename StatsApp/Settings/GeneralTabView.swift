@@ -10,6 +10,7 @@ struct GeneralTabView: View {
     let onExport: () -> Void
     let onImport: () -> Void
     let onRefreshNow: () -> Void
+    let onOpenCodeCookieChecked: (ProviderLimits) async -> Void
 
     /// Source-of-truth — SMAppService у системы. Toggle отражает её и обновляет
     /// после каждого toggle. Init читает изначальное состояние из системы.
@@ -47,7 +48,7 @@ struct GeneralTabView: View {
             }
 
             Divider()
-            OpenCodeCookieSection()
+            OpenCodeCookieSection(onChecked: onOpenCodeCookieChecked)
 
             Spacer()
             Text("Burn \(version)").font(.caption).foregroundStyle(.secondary)

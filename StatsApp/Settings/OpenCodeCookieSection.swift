@@ -42,6 +42,13 @@ struct OpenCodeCookieSection: View {
 
     private let store = OpenCodeCookieStore()
 
+    /// Разовая проверка идёт мимо LimitsCoordinator — без этого колбэка попап
+    /// до следующего тика координатора продолжал бы показывать старое
+    /// состояние, хотя человек только что увидел «работает» (находка 12
+    /// финального ревью). По умолчанию no-op — превью и другие вызовы без
+    /// AppContainer под рукой не обязаны его прокидывать.
+    var onChecked: (ProviderLimits) async -> Void = { _ in }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Лимиты OpenCode")
@@ -143,5 +150,9 @@ struct OpenCodeCookieSection: View {
         case .unavailable:   checkResult = "страница не разобралась"
         case .stale, .throttled: checkResult = "не достучался"
         }
+        // Записываем результат в общее состояние — попап должен показать то
+        // же самое, что человек только что увидел здесь, не дожидаясь
+        // следующего тика координатора.
+        await onChecked(limits)
     }
 }
