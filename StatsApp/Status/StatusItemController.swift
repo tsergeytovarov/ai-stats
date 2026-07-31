@@ -56,6 +56,12 @@ final class StatusItemController: NSObject {
     /// nonisolated — pure-функция, не трогает actor state, тестируется без MainActor.
     /// showsRings по умолчанию false — старые вызовы (и тесты капсулы без лимитов)
     /// продолжают считать ширину так же, как до задачи 8.
+    ///
+    /// Внешний HStack(spacing: 4) в MenuBarCapsuleView — это 2 дочерних вью без
+    /// колец (Ember, Text) и 3 с кольцами (Ember, Text, HStack колец): 1 разрыв
+    /// spacing превращается в 2. Без второго interItemSpacing правый край
+    /// последнего кольца съезжал под обрезку NSStatusItem на 4pt — это нашли
+    /// в ревью до слияния.
     nonisolated static func capsuleWidth(for priceText: String, showsRings: Bool = false) -> CGFloat {
         let font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .semibold)
         let textWidth = (priceText as NSString)
@@ -63,7 +69,7 @@ final class StatusItemController: NSObject {
             .width
         var width = emberSize + interItemSpacing + textWidth + horizontalPadding
         if showsRings {
-            width += ringsWidth
+            width += interItemSpacing + ringsWidth
         }
         return ceil(width)
     }

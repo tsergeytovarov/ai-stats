@@ -31,4 +31,20 @@ final class StatusItemControllerTests: XCTestCase {
         XCTAssertGreaterThan(w, 50)
         XCTAssertLessThan(w, 200)
     }
+
+    func test_capsuleWidth_addsExactRingsGeometry_whenShowsRingsTrue() {
+        // Дельта между "с кольцами" и "без колец" обязана точно совпасть с
+        // геометрией блока колец в MenuBarCapsuleView:
+        //   доп. spacing(4) внешнего HStack — с кольцами у него 3 ребёнка
+        //   (Ember, Text, HStack колец) вместо 2, то есть 2 промежутка вместо 1;
+        //   + padding(.leading, 2) перед блоком колец;
+        //   + 3 кольца по 10pt + 2 промежутка по 3pt между ними (HStack(spacing: 3)).
+        // Раньше второй spacing(4) не добавлялся — правый край последнего кольца
+        // уезжал под обрезку NSStatusItem. Тест ловит именно эту регрессию, а не
+        // фиксирует текущее магическое число.
+        let withoutRings = StatusItemController.capsuleWidth(for: "$1.23", showsRings: false)
+        let withRings = StatusItemController.capsuleWidth(for: "$1.23", showsRings: true)
+        let expectedDelta: CGFloat = 4 + 2 + 3 * 10 + 2 * 3
+        XCTAssertEqual(withRings - withoutRings, expectedDelta)
+    }
 }
