@@ -102,6 +102,29 @@ final class LimitsRepositoryTests: XCTestCase {
         XCTAssertEqual(codex.windows[0].usedPercent, 20)
     }
 
+    // Путь 429: saveState фиксирует throttled + retry_after, не трогая ни
+    // историю, ни lastSuccessAt — координатор не имеет права выдавать это
+    // за успешный опрос.
+    func test_save_state_records_throttle_without_touching_history_or_last_success() async throws {
+        let db = try makeDB()
+        let repo = LimitsRepository(db: db)
+
+        try await repo.record(limits(78, reset: 1_785_905_362), now: Date(timeIntervalSince1970: 1_000))
+        try await repo.saveState(provider: .codex, status: .throttled, error: "429",
+                                 retryAfter: Date(timeIntervalSince1970: 1_600),
+                                 now: Date(timeIntervalSince1970: 1_300))
+
+        let rows = try await db.read { try LimitSnapshotRow.fetchAll($0) }
+        XCTAssertEqual(rows.count, 1)
+
+        let state = try await db.read { try LimitFetchStateRow.fetchAll($0) }
+        XCTAssertEqual(state.count, 1)
+        XCTAssertEqual(state[0].status, "throttled")
+        XCTAssertEqual(state[0].retryAfterAt, 1_600)
+        XCTAssertEqual(state[0].lastSuccessAt, 1_000)
+        XCTAssertEqual(state[0].lastAttemptAt, 1_300)
+    }
+
     func test_prune_drops_snapshots_older_than_retention() async throws {
         let db = try makeDB()
         let repo = LimitsRepository(db: db, retentionDays: 60)

@@ -82,15 +82,21 @@ final class LimitsRepository {
                 let state = try LimitFetchStateRow
                     .filter(LimitFetchStateRow.Columns.provider == key)
                     .fetchOne(db)
-                let rows = try LimitSnapshotRow
-                    .filter(LimitSnapshotRow.Columns.provider == key)
-                    .order(LimitSnapshotRow.Columns.observedAt.desc)
-                    .fetchAll(db)
+                // По строке на окно, а не вся история в память: метод дёргает
+                // интерфейс на каждое обновление, а история за 60 дней — это
+                // тысячи строк ради трёх нужных. Запрос повторяет форму той же
+                // выборки в record() и ложится на idx_limit_snapshots_lookup.
+                let windowsPresent = try Int.fetchAll(db, sql: """
+                    SELECT DISTINCT window_minutes FROM limit_snapshots WHERE provider = ?
+                    """, arguments: [key])
 
-                var seen = Set<Int>()
                 var windows: [LimitWindow] = []
-                for row in rows where !seen.contains(row.windowMinutes) {
-                    seen.insert(row.windowMinutes)
+                for minutes in windowsPresent.sorted() {
+                    guard let row = try LimitSnapshotRow
+                        .filter(LimitSnapshotRow.Columns.provider == key)
+                        .filter(LimitSnapshotRow.Columns.windowMinutes == minutes)
+                        .order(LimitSnapshotRow.Columns.observedAt.desc)
+                        .fetchOne(db) else { continue }
                     windows.append(LimitWindow(
                         windowMinutes: row.windowMinutes,
                         usedPercent: row.usedPercent,
