@@ -215,10 +215,12 @@ enum LimitThresholds {
 
 - [ ] **Шаг 5: Написать падающий тест на миграцию**
 
-Добавь в `Tests/StatsAppTests/Limits/LimitModelsTests.swift` новый класс:
+Добавь в `Tests/StatsAppTests/Limits/LimitModelsTests.swift` новый класс. Импорт
+`GRDB` поставь наверх файла, к остальным импортам, а не перед классом:
 
 ```swift
-import GRDB
+// наверху файла, рядом с import XCTest:
+// import GRDB
 
 final class LimitsMigrationTests: XCTestCase {
 
