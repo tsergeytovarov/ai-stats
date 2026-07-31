@@ -399,7 +399,7 @@ struct LimitFetchStateRow: Codable, FetchableRecord, PersistableRecord, Equatabl
 
 ```bash
 git add Shared/Limits/LimitModels.swift Shared/Storage/Database.swift Shared/Storage/Models.swift Tests/StatsAppTests/Limits/LimitModelsTests.swift Tests/StatsAppTests/DatabaseTests.swift
-git commit -m "feat(limits): модель лимитов и таблицы истории"
+git commit -m "feat(limits): добавить модель лимитов и таблицы истории"
 ```
 
 ---
@@ -559,7 +559,7 @@ enum CodexLimitsParser {
 
 ```bash
 git add Shared/Limits/CodexLimitsParser.swift Tests/StatsAppTests/Limits/CodexLimitsParserTests.swift
-git commit -m "feat(limits): парсер лимитов codex из rpc и rollout-логов"
+git commit -m "feat(limits): разобрать лимиты codex из rpc и rollout-логов"
 ```
 
 - [ ] **Шаг 6: Написать протокол и фетчер**
@@ -788,7 +788,7 @@ final class CodexLimitsFetcherTests: XCTestCase {
 
 ```bash
 git add StatsApp/Limits/LimitsFetching.swift StatsApp/Limits/CodexLimitsFetcher.swift Tests/StatsAppTests/Limits/CodexLimitsParserTests.swift
-git commit -m "feat(limits): фетчер лимитов codex через app-server"
+git commit -m "feat(limits): получать лимиты codex через app-server"
 ```
 
 ---
@@ -1122,7 +1122,7 @@ final class ClaudeLimitsFetcherTests: XCTestCase {
 
 ```bash
 git add Shared/Limits/ClaudeUsageParser.swift StatsApp/Limits/ClaudeLimitsFetcher.swift Tests/StatsAppTests/Limits/ClaudeLimitsTests.swift
-git commit -m "feat(limits): фетчер лимитов claude через oauth-эндпоинт"
+git commit -m "feat(limits): получать лимиты claude через oauth-эндпоинт"
 ```
 
 ---
@@ -1373,7 +1373,7 @@ enum OpenCodeUsageParser {
 
 ```bash
 git add Shared/Limits/OpenCodeUsageParser.swift Tests/StatsAppTests/Limits/OpenCodeLimitsTests.swift
-git commit -m "feat(limits): парсер страницы лимитов opencode"
+git commit -m "feat(limits): разобрать страницу лимитов opencode"
 ```
 
 - [ ] **Шаг 6: Написать фетчер**
@@ -1549,7 +1549,7 @@ final class OpenCodeLimitsFetcherTests: XCTestCase {
 
 ```bash
 git add StatsApp/Limits/OpenCodeLimitsFetcher.swift Tests/StatsAppTests/Limits/OpenCodeLimitsTests.swift
-git commit -m "feat(limits): фетчер лимитов opencode по сессионной cookie"
+git commit -m "feat(limits): получать лимиты opencode по сессионной cookie"
 ```
 
 ---
@@ -1831,7 +1831,7 @@ final class LimitsRepository {
 
 ```bash
 git add StatsApp/Limits/LimitsRepository.swift Tests/StatsAppTests/Limits/LimitsRepositoryTests.swift
-git commit -m "feat(limits): ступенчатая история лимитов и статусы опроса"
+git commit -m "feat(limits): хранить ступенчатую историю лимитов и статусы опроса"
 ```
 
 ---
@@ -2092,7 +2092,7 @@ actor LimitsCoordinator {
 
 ```bash
 git add StatsApp/Limits/LimitsCoordinator.swift StatsApp/Sync/SyncCoordinator.swift StatsApp/AppContainer.swift Tests/StatsAppTests/Limits/LimitsCoordinatorTests.swift
-git commit -m "feat(limits): опрос источников по расписанию с уважением к 429"
+git commit -m "feat(limits): опрашивать источники по расписанию с уважением к 429"
 ```
 
 ---
@@ -2470,7 +2470,7 @@ struct DropdownLimitsSection: View {
 
 ```bash
 git add Shared/Limits/LimitFormat.swift Shared/Limits/LimitRingPalette.swift StatsApp/Status/DropdownLimitsSection.swift StatsApp/Status/DropdownViewModel.swift StatsApp/Status/DropdownSections.swift Tests/StatsAppTests/Limits/LimitFormatTests.swift Tests/StatsAppTests/Limits/LimitRingPaletteTests.swift
-git commit -m "feat(limits): секция лимитов на вкладке расходов"
+git commit -m "feat(limits): показать лимиты на вкладке расходов"
 ```
 
 ---
@@ -2613,7 +2613,7 @@ struct MenuBarCapsuleView: View {
 
 ```bash
 git add StatsApp/Status/LimitRingView.swift StatsApp/Status/MenuBarCapsuleView.swift StatsApp/Status/StatusItemController.swift
-git commit -m "feat(limits): три кольца лимитов в капсуле меню-бара"
+git commit -m "feat(limits): нарисовать три кольца лимитов в капсуле меню-бара"
 ```
 
 ---
@@ -2819,7 +2819,7 @@ struct OpenCodeCookieSection: View {
 
 ```bash
 git add StatsApp/Settings/OpenCodeCookieSection.swift StatsApp/Settings/GeneralTabView.swift Tests/StatsAppTests/Settings/OpenCodeCookieStoreTests.swift CHANGELOG.md
-git commit -m "feat(limits): настройка cookie opencode и запись в changelog"
+git commit -m "feat(limits): добавить настройку cookie opencode"
 ```
 
 ---
