@@ -2756,7 +2756,11 @@ struct OpenCodeCookieStore {
 }
 
 struct OpenCodeCookieSection: View {
+    /// Поле всегда стартует пустым: подгружать сюда сохранённый секрет незачем,
+    /// SecureField его всё равно маскирует, а plaintext в @State — лишняя
+    /// поверхность утечки. Факт наличия показываем отдельной подписью.
     @State private var cookie: String = ""
+    @State private var hasSavedCookie = false
     @State private var checkResult: String?
     @State private var checking = false
 
@@ -2789,7 +2793,7 @@ struct OpenCodeCookieSection: View {
                 }
             }
         }
-        .onAppear { cookie = store.load() ?? "" }
+        .onAppear { hasSavedCookie = store.load() != nil }
     }
 
     private func save() {
