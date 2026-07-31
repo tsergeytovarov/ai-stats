@@ -101,6 +101,34 @@ final class CodexLimitsFetcherTests: XCTestCase {
         XCTAssertEqual(limits.windows[0].windowMinutes, 10080)
     }
 
+    // Фолбэк обязан репортить время файла лога, а не момент опроса — иначе
+    // многочасовой давности цифры подписываются текущим временем (находка 4
+    // финального ревью ветки).
+    func test_rollout_fallback_reports_file_mtime_as_fetchedAt() async throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appending(path: "codex-limits-\(UUID().uuidString)/2026/07/31")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let file = dir.appending(path: "rollout-fresh.jsonl")
+        try #"{"payload":{"type":"token_count","rate_limits":{"limit_id":"codex","primary":{"used_percent":74.0,"window_minutes":10080,"resets_at":1785905362}}}}"#
+            .write(to: file, atomically: true, encoding: .utf8)
+        let mtime = Date(timeIntervalSince1970: 1_700_000_000)
+        try FileManager.default.setAttributes([.modificationDate: mtime], ofItemAtPath: file.path)
+
+        let fetcher = CodexLimitsFetcher(sessionsDir: dir.deletingLastPathComponent()
+                                            .deletingLastPathComponent().deletingLastPathComponent(),
+                                         rpcTimeout: 0.1,
+                                         now: { Date(timeIntervalSince1970: 9_999_999_999) })
+        let limits = await fetcher.fetch()
+        guard limits.status == .stale else {
+            // На машине с рабочим codex RPC фолбэк не используется — тест
+            // неприменим (тот же паттерн, что у test_reports_unavailable_when_nothing_found).
+            return
+        }
+        XCTAssertEqual(limits.fetchedAt, mtime)
+    }
+
     func test_reports_unavailable_when_nothing_found() async {
         let empty = URL(fileURLWithPath: NSTemporaryDirectory())
             .appending(path: "codex-empty-\(UUID().uuidString)")

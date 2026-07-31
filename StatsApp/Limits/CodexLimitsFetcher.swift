@@ -23,10 +23,13 @@ final class CodexLimitsFetcher: LimitsFetching {
             return ProviderLimits(provider: .codex, windows: windows, status: .ok,
                                   fetchedAt: now(), error: nil)
         }
-        if let windows = rolloutWindows(), !windows.isEmpty {
-            // Данные из лога могут отставать — честно помечаем как несвежие.
-            return ProviderLimits(provider: .codex, windows: windows, status: .stale,
-                                  fetchedAt: now(), error: nil)
+        if let fallback = rolloutWindows(), !fallback.windows.isEmpty {
+            // Данные из лога могут отставать на часы — честно подписываем
+            // временем файла, а не моментом опроса: иначе многочасовой
+            // давности цифры выглядят как только что полученные (находка 4
+            // финального ревью ветки).
+            return ProviderLimits(provider: .codex, windows: fallback.windows, status: .stale,
+                                  fetchedAt: fallback.fetchedAt, error: nil)
         }
         return .failure(.codex, status: .unavailable, error: "codex недоступен")
     }
@@ -105,7 +108,11 @@ final class CodexLimitsFetcher: LimitsFetching {
 
     // MARK: - Фолбэк на rollout-логи
 
-    private func rolloutWindows() -> [LimitWindow]? {
+    /// fetchedAt в возврате — время модификации файла лога, а не now(): в
+    /// отличие от RPC-пути данные тут могут быть многочасовой давности, и
+    /// подписывать их моментом опроса значит врать о свежести (находка 4
+    /// финального ревью).
+    private func rolloutWindows() -> (windows: [LimitWindow], fetchedAt: Date)? {
         let fm = FileManager.default
         guard let files = try? recentRolloutFiles(fm: fm) else { return nil }
         for file in files {
@@ -115,7 +122,11 @@ final class CodexLimitsFetcher: LimitsFetching {
             for line in text.split(separator: "\n", omittingEmptySubsequences: true) {
                 if let windows = CodexLimitsParser.parseRolloutLine(String(line)) { last = windows }
             }
-            if let last { return last }
+            if let last {
+                let mtime = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?
+                    .contentModificationDate ?? now()
+                return (last, mtime)
+            }
         }
         return nil
     }

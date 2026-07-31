@@ -40,7 +40,12 @@ final class LimitsRepository {
                 try row.insert(db)
             }
 
-            if !limits.windows.isEmpty {
+            // Только настоящий успешный опрос двигает lastSuccessAt. Фолбэк
+            // Codex на rollout-логи возвращает непустые окна со статусом
+            // stale — это не свежие данные, и подписывать их текущим временем
+            // нельзя (находка 4 финального ревью: «данные на 17:40» поверх
+            // вчерашних цифр).
+            if limits.status == .ok {
                 lastSuccessAt = observedAt
             }
             try LimitFetchStateRow(provider: provider,

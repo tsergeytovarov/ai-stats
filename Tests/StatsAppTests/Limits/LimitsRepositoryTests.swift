@@ -158,6 +158,24 @@ final class LimitsRepositoryTests: XCTestCase {
         XCTAssertEqual(states[0].lastAttemptAt, 1_000)
     }
 
+    // Фолбэк Codex может вернуть непустые окна со статусом stale (данные из
+    // rollout-лога, а не свежий опрос) — lastSuccessAt не имеет права
+    // сдвинуться на текущее время, иначе интерфейс подписывает вчерашние
+    // цифры текущим временем (находка 4 финального ревью).
+    func test_stale_result_with_windows_does_not_advance_last_success() async throws {
+        let db = try makeDB()
+        let repo = LimitsRepository(db: db)
+
+        try await repo.record(limits(78, reset: 1_785_905_362), now: Date(timeIntervalSince1970: 1_000))
+        try await repo.record(limits(78, reset: 1_785_905_362, status: .stale),
+                              now: Date(timeIntervalSince1970: 5_000))
+
+        let state = try await db.read { try LimitFetchStateRow.fetchAll($0) }
+        XCTAssertEqual(state.count, 1)
+        XCTAssertEqual(state[0].lastSuccessAt, 1_000)
+        XCTAssertEqual(state[0].lastAttemptAt, 5_000)
+    }
+
     func test_prune_drops_snapshots_older_than_retention() async throws {
         let db = try makeDB()
         let repo = LimitsRepository(db: db, retentionDays: 60)
