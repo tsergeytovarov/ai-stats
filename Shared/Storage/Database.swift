@@ -251,6 +251,38 @@ enum Database {
                 )
             """)
         }
+        migrator.registerMigration("v10_limits") { db in
+            // Ступенчатая история лимитов. Пишем только изменения — ровный опрос
+            // раз в 5 минут иначе даст 100k строк в год ни о чём, а второму этапу
+            // (прогноз по темпу расхода) нужны именно ступени.
+            try db.execute(sql: """
+                CREATE TABLE limit_snapshots (
+                    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                    provider       TEXT NOT NULL,
+                    window_minutes INTEGER NOT NULL,
+                    used_percent   REAL NOT NULL,
+                    resets_at      INTEGER,
+                    observed_at    INTEGER NOT NULL
+                )
+            """)
+            try db.execute(sql: """
+                CREATE INDEX idx_limit_snapshots_lookup
+                    ON limit_snapshots(provider, window_minutes, observed_at DESC)
+            """)
+
+            // Статус последнего опроса на провайдера. retry_after_at нужен, чтобы
+            // после 429 не долбиться в эндпоинт Claude до истечения Retry-After.
+            try db.execute(sql: """
+                CREATE TABLE limit_fetch_state (
+                    provider        TEXT PRIMARY KEY,
+                    last_attempt_at INTEGER,
+                    last_success_at INTEGER,
+                    status          TEXT NOT NULL,
+                    error           TEXT,
+                    retry_after_at  INTEGER
+                )
+            """)
+        }
         try migrator.migrate(writer)
     }
 
