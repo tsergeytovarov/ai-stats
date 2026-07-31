@@ -60,6 +60,20 @@ struct DropdownLimitsSection: View {
         .padding(.vertical, 2)
     }
 
+    /// Ширина полоски фиксирована намеренно. Раньше полоска была единственным
+    /// резиновым элементом строки и забирала остаток после хвоста со временем
+    /// сброса, а хвост у каждой строки своей длины («сброс через 4д 12ч» против
+    /// «сброс через 27д 5ч»). Из-за этого полоски начинались и кончались на
+    /// разных местах и не складывались в колонку. Теперь резиновый — хвост.
+    static let barWidth: CGFloat = 110
+
+    /// Заполненная часть полоски. Процент клампим: сервер теоретически может
+    /// прислать больше сотни (перерасход квоты), и тогда заливка вылезла бы
+    /// за пределы дорожки.
+    static func fillWidth(percent: Double, barWidth: CGFloat = barWidth) -> CGFloat {
+        barWidth * min(max(percent, 0), 100) / 100
+    }
+
     private func windowRow(_ window: LimitWindow, provider: LimitProvider) -> some View {
         HStack(spacing: 8) {
             Text(LimitFormat.window(minutes: window.windowMinutes))
@@ -67,29 +81,27 @@ struct DropdownLimitsSection: View {
                 .foregroundStyle(TextColor.secondary)
                 .frame(width: 62, alignment: .leading)
 
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(LimitRingPalette.trackColor)
-                    // Цвет — фирменный цвет провайдера, тот же что у его кольца
-                    // в капсуле. Полоска и кольцо обязаны читаться как одно и то
-                    // же, иначе связь между меню-баром и попапом теряется.
-                    Capsule()
-                        .fill(LimitRingPalette.color(for: provider))
-                        .frame(width: geo.size.width * window.usedPercent / 100)
-                }
+            ZStack(alignment: .leading) {
+                Capsule().fill(LimitRingPalette.trackColor)
+                // Цвет — фирменный цвет провайдера, тот же что у его кольца
+                // в капсуле. Полоска и кольцо обязаны читаться как одно и то
+                // же, иначе связь между меню-баром и попапом теряется.
+                Capsule()
+                    .fill(LimitRingPalette.color(for: provider))
+                    .frame(width: Self.fillWidth(percent: window.usedPercent))
             }
-            .frame(height: 5)
+            .frame(width: Self.barWidth, height: 5)
 
             Text(LimitFormat.percent(window.usedPercent))
                 .font(BrandFont.caption)
                 .monospacedDigit()
                 .frame(width: 46, alignment: .trailing)
 
-            if let reset = LimitFormat.resetsIn(window.resetsAt, now: now) {
-                Text(reset)
-                    .font(BrandFont.caption)
-                    .foregroundStyle(TextColor.muted)
-            }
+            Text(LimitFormat.resetsIn(window.resetsAt, now: now) ?? "")
+                .font(BrandFont.caption)
+                .foregroundStyle(TextColor.muted)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }
