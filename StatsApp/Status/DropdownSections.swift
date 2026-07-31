@@ -89,6 +89,9 @@ struct DropdownAISection: View {
                 Sparkline(values: viewModel.sparklineSeries, variant: .ai)
                     .frame(height: 38)
             }
+
+            DropdownLimitsSection(limits: viewModel.limits)
+                .padding(.top, 14)
         }
     }
 }

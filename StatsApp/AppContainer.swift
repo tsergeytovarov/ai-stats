@@ -84,15 +84,19 @@ final class AppContainer {
         // Опрос лимитов — свой актор со своими расписаниями на провайдера
         // (Codex раз в 5 минут, OpenCode раз в 15, Claude раз в час с уважением
         // к Retry-After из 429). SyncCoordinator просто дёргает тик.
+        // Репозиторий один на всё приложение: координатор им пишет, вью-модель
+        // им же читает — второй инстанс тут не нужен.
+        let limitsRepository = LimitsRepository(db: dbPool)
         let limitsCoordinator = LimitsCoordinator(
             fetchers: [CodexLimitsFetcher(), ClaudeLimitsFetcher(), OpenCodeLimitsFetcher()],
-            repository: LimitsRepository(db: dbPool))
+            repository: limitsRepository)
         coordinator.limitsTick = { await limitsCoordinator.tick() }
 
         self.syncCoordinator = coordinator
         self.dropdownViewModel = DropdownViewModel(
             db: dbPool,
-            syncCoordinator: coordinator
+            syncCoordinator: coordinator,
+            limitsRepository: limitsRepository
         )
     }
 
@@ -181,6 +185,7 @@ final class AppContainer {
         let interval = TimeInterval(config.syncIntervalMinutes * 60)
         syncCoordinator.startTimer(interval: interval, sources: sources)
         await dropdownViewModel.reload()
+        await dropdownViewModel.loadLimits()
     }
 
     func showFirstLaunchAlertIfNeeded() {

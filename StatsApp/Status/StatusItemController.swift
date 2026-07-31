@@ -126,6 +126,7 @@ final class StatusItemController: NSObject {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
             Task { @MainActor in
                 await viewModel.reload()
+                await viewModel.loadLimits()
                 await refreshTitle()
             }
         }

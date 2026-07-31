@@ -33,6 +33,7 @@ enum DropdownSection: String, CaseIterable, Identifiable {
 final class DropdownViewModel: ObservableObject {
     private let db: any DatabaseReader
     private weak var syncCoordinator: SyncCoordinator?
+    private let limitsRepository: LimitsRepository?
 
     @Published var period: Period = .day {
         didSet {
@@ -57,11 +58,15 @@ final class DropdownViewModel: ObservableObject {
     @Published var analyticsCard: AnalyticsCard?
     /// Шпаргалка моделей (Codex live + Claude static). Композируется в UI отдельно от карточки.
     @Published var modelGuide: ModelGuide?
+    /// Последнее известное состояние лимитов. Пусто — опроса ещё не было.
+    @Published private(set) var limits: [LimitProvider: ProviderLimits] = [:]
 
     init(db: any DatabaseReader,
-         syncCoordinator: SyncCoordinator) {
+         syncCoordinator: SyncCoordinator,
+         limitsRepository: LimitsRepository? = nil) {
         self.db = db
         self.syncCoordinator = syncCoordinator
+        self.limitsRepository = limitsRepository
     }
 
     /// Async-обёртка над reloadSync. Сохранена для существующих call site'ов
@@ -119,6 +124,13 @@ final class DropdownViewModel: ObservableObject {
         } catch {
             AppLogger.sync.error("loadAnalytics failed: \(error.localizedDescription, privacy: .private)")
         }
+    }
+
+    /// Читает последнее состояние лимитов из базы. Опрос делает LimitsCoordinator —
+    /// вью-модель только показывает то, что уже записано.
+    func loadLimits() async {
+        guard let limitsRepository else { return }
+        limits = (try? await limitsRepository.latest()) ?? [:]
     }
 
     func todayCost() async -> Double {
