@@ -9,11 +9,18 @@ struct DropdownView: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             VStack(alignment: .leading, spacing: 0) {
-                content
-                    .padding(.horizontal, 18)
-                    .padding(.top, 16)
-
-                Spacer(minLength: 0)
+                // Секция лимитов добавила контента, и он перерос фиксированную
+                // высоту попапа: футер с кнопками обновления, настроек и выхода
+                // уезжал за границу окна, добраться до них было нельзя.
+                // Прокручивается только контент — футер и остров остаются на месте.
+                ScrollView {
+                    content
+                        .padding(.horizontal, 18)
+                        .padding(.top, 16)
+                        .padding(.bottom, 12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .scrollIndicators(.visible)
 
                 Divider().background(SurfaceColor.dividerSubtle).padding(.horizontal, 18)
 

@@ -36,19 +36,10 @@ final class StatusItemController: NSObject {
     nonisolated private static let interItemSpacing: CGFloat = 4
     nonisolated private static let horizontalPadding: CGFloat = 8 * 2  // лево + право
 
-    // Геометрия колец лимитов — должна точно соответствовать MenuBarCapsuleView:
-    //   .padding(.leading, 2) + HStack(spacing: 3) из 3 LimitRingView(diameter: 10)
-    // Без этого слагаемого frame капсулы уже, чем реальный SwiftUI-контент —
-    // кольца обрезаются по правому краю, а не просто «не помещаются красиво».
-    nonisolated private static let ringDiameter: CGFloat = 10
-    nonisolated private static let ringSpacing: CGFloat = 3
-    nonisolated private static let ringsLeadingPadding: CGFloat = 2
-
-    nonisolated private static var ringsWidth: CGFloat {
-        let count = CGFloat(LimitProvider.allCases.count)
-        guard count > 0 else { return 0 }
-        return ringsLeadingPadding + count * ringDiameter + (count - 1) * ringSpacing
-    }
+    // Геометрия колец берётся из LimitRingLayout — того же места, откуда её берёт
+    // вёрстка. Дублировать эти числа здесь нельзя: когда они жили в двух местах,
+    // они разъехались, и правый край последнего кольца ушёл под обрезку.
+    nonisolated private static var ringsWidth: CGFloat { LimitRingLayout.totalWidth }
 
     /// Считает ширину capsule под priceText (+ кольца лимитов, если показаны).
     /// Использует NSString.size(...) с тем же шрифтом что MenuBarCapsuleView

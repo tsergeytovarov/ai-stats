@@ -72,26 +72,4 @@ extension ProviderLimits {
         if let soonest = dated.min(by: { $0.0 < $1.0 })?.1 { return soonest }
         return windows.min(by: { $0.windowMinutes < $1.windowMinutes })
     }
-
-    /// Худший процент по всем окнам — им определяется цвет кольца. Заливка идёт
-    /// по ближайшему окну, цвет по худшему: короткое окно почти всегда у нуля и
-    /// само по себе спрятало бы упёршийся недельный лимит.
-    var worstPercent: Double? {
-        windows.map(\.usedPercent).max()
-    }
-}
-
-enum LimitSeverity: Sendable {
-    case calm, warning, critical
-}
-
-enum LimitThresholds {
-    static let warning = 70.0
-    static let critical = 90.0
-
-    static func severity(worstPercent: Double) -> LimitSeverity {
-        if worstPercent >= critical { return .critical }
-        if worstPercent >= warning { return .warning }
-        return .calm
-    }
 }

@@ -1,12 +1,12 @@
 import SwiftUI
 
 /// Кольцо лимита одного провайдера. Заливка — по ближайшему к сбросу окну,
-/// цвет — по худшему окну. Нет данных — серый пунктир.
+/// цвет — фирменный и постоянный. Нет данных — серый пунктир.
 struct LimitRingView: View {
     let provider: LimitProvider
     let limits: ProviderLimits?
-    var diameter: CGFloat = 10
-    var lineWidth: CGFloat = 2
+    var diameter: CGFloat = LimitRingLayout.diameter
+    var lineWidth: CGFloat = LimitRingLayout.lineWidth
 
     private var fillFraction: Double {
         guard let percent = limits?.ringWindow?.usedPercent else { return 0 }
@@ -19,12 +19,6 @@ struct LimitRingView: View {
         return limits.ringWindow != nil
     }
 
-    private var strokeColor: Color {
-        guard let worst = limits?.worstPercent else { return .secondary }
-        return LimitRingPalette.color(for: provider,
-                                      severity: LimitThresholds.severity(worstPercent: worst))
-    }
-
     var body: some View {
         ZStack {
             if hasData {
@@ -32,7 +26,8 @@ struct LimitRingView: View {
                     .stroke(LimitRingPalette.trackColor, lineWidth: lineWidth)
                 Circle()
                     .trim(from: 0, to: fillFraction)
-                    .stroke(strokeColor, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .stroke(LimitRingPalette.color(for: provider),
+                            style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                 Circle()
                     .stroke(LimitRingPalette.contourColor, lineWidth: 0.5)

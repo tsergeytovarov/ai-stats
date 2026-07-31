@@ -70,12 +70,11 @@ struct DropdownLimitsSection: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(LimitRingPalette.trackColor)
-                    // Полоска окна красится по СВОЕМУ проценту, в отличие от кольца:
-                    // здесь видно все окна сразу, подменять цвет худшим незачем.
+                    // Цвет — фирменный цвет провайдера, тот же что у его кольца
+                    // в капсуле. Полоска и кольцо обязаны читаться как одно и то
+                    // же, иначе связь между меню-баром и попапом теряется.
                     Capsule()
-                        .fill(LimitRingPalette.color(
-                            for: provider,
-                            severity: LimitThresholds.severity(worstPercent: window.usedPercent)))
+                        .fill(LimitRingPalette.color(for: provider))
                         .frame(width: geo.size.width * window.usedPercent / 100)
                 }
             }
