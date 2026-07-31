@@ -62,3 +62,63 @@ final class OpenCodeUsageParserTests: XCTestCase {
                        "auth=Fe26.2**abc; __Host-auth=zzz")
     }
 }
+
+final class OpenCodeLimitsFetcherTests: XCTestCase {
+
+    override func tearDown() {
+        StubURLProtocol.handler = nil
+        super.tearDown()
+    }
+
+    private func fetcher(cookie: String?) -> OpenCodeLimitsFetcher {
+        let store = MemoryKeychainStore()
+        if let cookie {
+            try? store.set(cookie, account: "tester",
+                           service: OpenCodeLimitsFetcher.keychainService)
+        }
+        return OpenCodeLimitsFetcher(keychain: store, account: "tester",
+                                     session: StubURLProtocol.session(),
+                                     now: { Date(timeIntervalSince1970: 1_785_000_000) })
+    }
+
+    private func ok(_ url: URL, _ body: String) -> (HTTPURLResponse, Data) {
+        (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!,
+         Data(body.utf8))
+    }
+
+    func test_discovers_workspace_then_parses_limits() async {
+        StubURLProtocol.handler = { request in
+            let url = request.url!
+            if url.path == "/_server" {
+                return self.ok(url, #"{id:"wrk_ABC"}"#)
+            }
+            return self.ok(url, "rollingUsage:{usagePercent:0,resetInSec:1200},weeklyUsage:{usagePercent:2,resetInSec:200000}")
+        }
+        let limits = await fetcher(cookie: "Fe26.2**abc").fetch()
+        XCTAssertEqual(limits.status, .ok)
+        XCTAssertEqual(limits.windows.count, 2)
+    }
+
+    func test_no_cookie_is_unconfigured_and_never_hits_network() async {
+        StubURLProtocol.handler = { _ in XCTFail("сети быть не должно"); return (HTTPURLResponse(), Data()) }
+        let limits = await fetcher(cookie: nil).fetch()
+        XCTAssertEqual(limits.status, .unconfigured)
+    }
+
+    func test_no_workspace_is_unauthorized() async {
+        StubURLProtocol.handler = { request in self.ok(request.url!, "пусто") }
+        let limits = await fetcher(cookie: "Fe26.2**abc").fetch()
+        XCTAssertEqual(limits.status, .unauthorized)
+    }
+
+    // Вёрстка поменялась: воркспейс нашёлся, а usage не разобрался.
+    func test_unparsable_page_is_unavailable() async {
+        StubURLProtocol.handler = { request in
+            request.url!.path == "/_server"
+                ? self.ok(request.url!, #"{id:"wrk_ABC"}"#)
+                : self.ok(request.url!, "<html>редизайн</html>")
+        }
+        let limits = await fetcher(cookie: "Fe26.2**abc").fetch()
+        XCTAssertEqual(limits.status, .unavailable)
+    }
+}
