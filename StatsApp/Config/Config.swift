@@ -26,7 +26,7 @@ struct Config: Equatable {
             githubLogin: container.githubLogin,
             syncIntervalMinutes: container.syncIntervalMinutes ?? 15,
             ccusageCommand: container.ccusageCommand ?? ["npx", "-y", "ccusage@20"],
-            enabledProviders: container.enabledProviders ?? ["claude", "codex"],
+            enabledProviders: container.enabledProviders ?? Config.defaultProviders,
             aiuseApiBaseURL: container.aiuseApiBaseURL.flatMap { $0.isEmpty ? nil : $0 } ?? "https://aiuse.popovs.tech/api"
         )
     }
@@ -49,13 +49,24 @@ struct Config: Equatable {
         }
     }
 
+    /// Провайдеры, которые ccusage умеет и мы включаем из коробки. Провайдер без
+    /// данных отдаёт `{"daily": []}` и exit 0 — лишний пункт тут ничего не ломает
+    /// у тех, кто этим агентом не пользуется.
+    static let defaultProviders = ["claude", "codex", "opencode"]
+
+    /// Версия набора провайдеров. Растёт, когда мы добавляем провайдера в дефолт:
+    /// у уже установленных копий config.json лежит на диске со старым списком, и
+    /// сам он не обновится — см. ConfigLoader.migrateEnabledProviders.
+    static let providersMigration = 1
+
     static let defaultTemplate: Data = """
     {
       "github_token": "",
       "github_login": "",
       "sync_interval_minutes": 15,
       "ccusage_command": ["npx", "-y", "ccusage@20"],
-      "enabled_providers": ["claude", "codex"],
+      "enabled_providers": ["claude", "codex", "opencode"],
+      "providers_migration": 1,
       "aiuse_api_base_url": "https://aiuse.popovs.tech/api"
     }
 
@@ -100,6 +111,45 @@ enum ConfigLoader {
         } catch let decodingError {
             throw ConfigError.invalidJSON(underlying: decodingError)
         }
+    }
+
+    /// Дописывает в `enabled_providers` провайдеров, появившихся в дефолте после
+    /// того, как конфиг был создан. Без этого добавление провайдера видят только
+    /// новые установки: у остальных на диске лежит список из их версии.
+    ///
+    /// Гейт — ключ `providers_migration` в самом конфиге. Он же защищает осознанный
+    /// отказ: удалил провайдера из списка руками — второй раз мы его не вернём.
+    /// Возвращает true, если список реально изменился (caller после этого сбрасывает
+    /// окно синка, иначе новый провайдер подтянет только последнюю неделю).
+    @discardableResult
+    static func migrateEnabledProviders(at url: URL = Paths.configURL) throws -> Bool {
+        guard FileManager.default.fileExists(atPath: url.path) else { return false }
+        let data = try Data(contentsOf: url)
+        guard var json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return false
+        }
+
+        let applied = (json["providers_migration"] as? Int) ?? 0
+        guard applied < Config.providersMigration else { return false }
+
+        var changed = false
+        // Ключа нет вообще — конфиг и так поедет на дефолте, трогать список незачем.
+        if var providers = json["enabled_providers"] as? [String] {
+            for provider in Config.defaultProviders where !providers.contains(provider) {
+                providers.append(provider)
+                changed = true
+            }
+            if changed { json["enabled_providers"] = providers }
+        }
+
+        json["providers_migration"] = Config.providersMigration
+        let newData = try JSONSerialization.data(
+            withJSONObject: json,
+            options: [.prettyPrinted, .sortedKeys]
+        )
+        try newData.write(to: url, options: .atomic)
+        setSecurePermissions(at: url)
+        return changed
     }
 
     /// Перезаписывает поле `github_token` пустой строкой, сохраняя остальные ключи

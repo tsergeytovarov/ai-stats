@@ -88,4 +88,47 @@ final class CcusageParserTests: XCTestCase {
         // codex-auto-review: 5000*5 + 1400*15 + 2000*0.63 (all /1e6) = 0.04726
         XCTAssertEqual(codexModel.costUsd, 0.04726, accuracy: 0.00001)
     }
+
+    // MARK: - opencode
+
+    /// Фикстура снята с живого `ccusage opencode daily --json` (7 дней, glm-5.2).
+    /// Схема opencode совпадает с claude'овской — парсер идёт по default-ветке,
+    /// и этот тест сторожит именно совпадение: сменят формат — упадёт здесь.
+    func test_parses_opencode_fixture() throws {
+        let url = Bundle(for: type(of: self)).url(forResource: "ccusage-opencode-daily", withExtension: "json")!
+        let data = try Data(contentsOf: url)
+        let payload = try CcusageParser.parse(data, source: "opencode", now: { ISO8601DateFormatter().date(from: "2026-08-03T10:00:00Z")! })
+
+        XCTAssertEqual(payload.dayRows.count, 7)
+
+        let day0 = payload.dayRows[0]
+        XCTAssertEqual(day0.day, "2026-06-30")
+        XCTAssertEqual(day0.source, "opencode")
+        XCTAssertEqual(day0.inputTokens, 177524)      // 119284 + 0 (create) + 58240 (read)
+        XCTAssertEqual(day0.inputTokensNoCache, 119284)
+        XCTAssertEqual(day0.outputTokens, 387)
+        XCTAssertEqual(day0.costUsd, 0.183944, accuracy: 0.000001)
+        XCTAssertEqual(day0.modelsJson, "[\"glm-5.2\"]")
+
+        // Сумма по дням сходится с totals.totalCost из того же вывода ccusage.
+        let total = payload.dayRows.reduce(0) { $0 + $1.costUsd }
+        XCTAssertEqual(total, 19.02716516, accuracy: 0.000001)
+    }
+
+    func test_opencode_breakdown_produces_per_model_rows() throws {
+        let url = Bundle(for: type(of: self)).url(forResource: "ccusage-opencode-daily", withExtension: "json")!
+        let data = try Data(contentsOf: url)
+        let payload = try CcusageParser.parse(data, source: "opencode", now: { ISO8601DateFormatter().date(from: "2026-08-03T10:00:00Z")! })
+
+        XCTAssertEqual(payload.modelRows.count, 7, "по одной модели в каждом дне фикстуры")
+        XCTAssertTrue(payload.modelRows.allSatisfy { $0.model == "glm-5.2" && $0.source == "opencode" })
+
+        // glm-5.2 нет в нашем PricingTable — цена обязана прийти из ccusage,
+        // иначе fallback молча обнулит расход по opencode.
+        let jul11 = payload.modelRows.first { $0.day == "2026-07-11" }!
+        XCTAssertEqual(jul11.costUsd, 14.27915276, accuracy: 0.000001)
+        XCTAssertEqual(jul11.inputTokensNoCache, 5261673)
+        XCTAssertEqual(jul11.inputTokens, 30619369)   // 5261673 + 25357696
+        XCTAssertEqual(jul11.outputTokens, 72530)
+    }
 }
