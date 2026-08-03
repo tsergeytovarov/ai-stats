@@ -1,0 +1,166 @@
+{
+  "daily": [
+    {
+      "cacheCreationTokens": 0,
+      "cacheReadTokens": 58240,
+      "date": "2026-06-30",
+      "inputTokens": 119284,
+      "modelBreakdowns": [
+        {
+          "cacheCreationTokens": 0,
+          "cacheReadTokens": 58240,
+          "cost": 0.183944,
+          "inputTokens": 119284,
+          "modelName": "glm-5.2",
+          "outputTokens": 387
+        }
+      ],
+      "modelsUsed": [
+        "glm-5.2"
+      ],
+      "outputTokens": 387,
+      "totalCost": 0.183944,
+      "totalTokens": 177934
+    },
+    {
+      "cacheCreationTokens": 0,
+      "cacheReadTokens": 7552,
+      "date": "2026-07-02",
+      "inputTokens": 13140,
+      "modelBreakdowns": [
+        {
+          "cacheCreationTokens": 0,
+          "cacheReadTokens": 7552,
+          "cost": 0.02263432,
+          "inputTokens": 13140,
+          "modelName": "glm-5.2",
+          "outputTokens": 169
+        }
+      ],
+      "modelsUsed": [
+        "glm-5.2"
+      ],
+      "outputTokens": 169,
+      "totalCost": 0.02263432,
+      "totalTokens": 21209
+    },
+    {
+      "cacheCreationTokens": 0,
+      "cacheReadTokens": 25357696,
+      "date": "2026-07-11",
+      "inputTokens": 5261673,
+      "modelBreakdowns": [
+        {
+          "cacheCreationTokens": 0,
+          "cacheReadTokens": 25357696,
+          "cost": 14.279152760000006,
+          "inputTokens": 5261673,
+          "modelName": "glm-5.2",
+          "outputTokens": 72530
+        }
+      ],
+      "modelsUsed": [
+        "glm-5.2"
+      ],
+      "outputTokens": 72530,
+      "totalCost": 14.279152760000006,
+      "totalTokens": 30692053
+    },
+    {
+      "cacheCreationTokens": 0,
+      "cacheReadTokens": 5826432,
+      "date": "2026-07-12",
+      "inputTokens": 802760,
+      "modelBreakdowns": [
+        {
+          "cacheCreationTokens": 0,
+          "cacheReadTokens": 5826432,
+          "cost": 2.6674023200000003,
+          "inputTokens": 802760,
+          "modelName": "glm-5.2",
+          "outputTokens": 6515
+        }
+      ],
+      "modelsUsed": [
+        "glm-5.2"
+      ],
+      "outputTokens": 6515,
+      "totalCost": 2.6674023200000003,
+      "totalTokens": 6635707
+    },
+    {
+      "cacheCreationTokens": 0,
+      "cacheReadTokens": 654656,
+      "date": "2026-07-13",
+      "inputTokens": 655153,
+      "modelBreakdowns": [
+        {
+          "cacheCreationTokens": 0,
+          "cacheReadTokens": 654656,
+          "cost": 1.09795836,
+          "inputTokens": 655153,
+          "modelName": "glm-5.2",
+          "outputTokens": 2394
+        }
+      ],
+      "modelsUsed": [
+        "glm-5.2"
+      ],
+      "outputTokens": 2394,
+      "totalCost": 1.09795836,
+      "totalTokens": 1312203
+    },
+    {
+      "cacheCreationTokens": 0,
+      "cacheReadTokens": 181248,
+      "date": "2026-07-23",
+      "inputTokens": 182388,
+      "modelBreakdowns": [
+        {
+          "cacheCreationTokens": 0,
+          "cacheReadTokens": 181248,
+          "cost": 0.44081687999999997,
+          "inputTokens": 182388,
+          "modelName": "glm-5.2",
+          "outputTokens": 31443
+        }
+      ],
+      "modelsUsed": [
+        "glm-5.2"
+      ],
+      "outputTokens": 31443,
+      "totalCost": 0.44081687999999997,
+      "totalTokens": 395079
+    },
+    {
+      "cacheCreationTokens": 0,
+      "cacheReadTokens": 97152,
+      "date": "2026-07-24",
+      "inputTokens": 170531,
+      "modelBreakdowns": [
+        {
+          "cacheCreationTokens": 0,
+          "cacheReadTokens": 97152,
+          "cost": 0.33525652,
+          "inputTokens": 170531,
+          "modelName": "glm-5.2",
+          "outputTokens": 16194
+        }
+      ],
+      "modelsUsed": [
+        "glm-5.2"
+      ],
+      "outputTokens": 16194,
+      "totalCost": 0.33525652,
+      "totalTokens": 283877
+    }
+  ],
+  "totals": {
+    "cacheCreationTokens": 0,
+    "cacheReadTokens": 32182976,
+    "inputTokens": 7204929,
+    "outputTokens": 129632,
+    "totalCost": 19.027165160000006,
+    "totalTokens": 39518062
+  }
+}

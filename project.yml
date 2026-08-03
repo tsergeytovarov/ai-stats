@@ -38,8 +38,8 @@ targets:
         LSMinimumSystemVersion: "$(MACOSX_DEPLOYMENT_TARGET)"
         CFBundleDisplayName: Burn
         CFBundleName: Burn
-        CFBundleShortVersionString: "1.1.4"
-        CFBundleVersion: "25"
+        CFBundleShortVersionString: "1.2.0"
+        CFBundleVersion: "26"
         NSHumanReadableCopyright: "Sergey Tovarov, MIT"
         CFBundleDevelopmentRegion: en
         CFBundleLocalizations: [en, ru]
@@ -72,8 +72,8 @@ targets:
       path: StatsWidget/Info.plist
       properties:
         CFBundleDisplayName: Burn Widget
-        CFBundleShortVersionString: "1.1.4"
-        CFBundleVersion: "25"
+        CFBundleShortVersionString: "1.2.0"
+        CFBundleVersion: "26"
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     entitlements:
@@ -97,6 +97,8 @@ targets:
       - path: Tests/StatsAppTests/Fixtures/ccusage-claude-daily.json
         buildPhase: resources
       - path: Tests/StatsAppTests/Fixtures/ccusage-codex-daily.json
+        buildPhase: resources
+      - path: Tests/StatsAppTests/Fixtures/ccusage-opencode-daily.json
         buildPhase: resources
       - path: Tests/StatsAppTests/Fixtures/models_cache.json
         buildPhase: resources

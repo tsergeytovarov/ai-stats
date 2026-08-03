@@ -23,7 +23,7 @@ Popover — две вкладки: **Расходы** и **Аналитика**.
 
 **Расходы:**
 
-- Сегодняшние / недельные / месячные траты по AI-агентам через `ccusage` + собственный pricing table (USD за 1M токенов, актуально на 2026 год, вкл. claude-opus/sonnet/haiku 4.x и gpt-5.x).
+- Сегодняшние / недельные / месячные траты по AI-агентам (Claude Code, Codex, opencode) через `ccusage` + собственный pricing table (USD за 1M токенов, актуально на 2026 год, вкл. claude-opus/sonnet/haiku 4.x и gpt-5.x).
 - Топ моделей за выбранный период с разбивкой по стоимости.
 - 30-дневный sparkline-тренд AI-трат.
 - Виджеты на десктопе (Small / Medium / Large): сумма за период с дельтой vs прошлый период; в Medium и Large — ещё и топ моделей.
@@ -137,7 +137,7 @@ Settings → «Общие» → «Запускать Burn при входе в �
 ## Если что-то не так
 
 - **macOS просит пароль при каждом запуске.** Это ad-hoc подпись, не баг — см. [Разрешения и пароли](#разрешения-и-пароли). Лечится только настоящим Developer ID.
-- **AI-траты по нулям.** Нужен Node.js (или bun) в PATH — Burn зовёт `npx ccusage`. Проверь `npx ccusage` в терминале. Считаются только CLI-агенты (Claude Code, Codex CLI); web ChatGPT/Claude.ai — нет.
+- **AI-траты по нулям.** Нужен Node.js (или bun) в PATH — Burn зовёт `npx ccusage`. Проверь `npx ccusage` в терминале. Считаются только CLI-агенты (Claude Code, Codex CLI, opencode); web ChatGPT/Claude.ai — нет.
 
 ---
 
@@ -149,10 +149,13 @@ Settings → «Общие» → «Запускать Burn при входе в �
 {
   "sync_interval_minutes": 15,
   "ccusage_command": ["npx", "-y", "ccusage@20"],
-  "enabled_providers": ["claude", "codex"],
+  "enabled_providers": ["claude", "codex", "opencode"],
+  "providers_migration": 1,
   "aiuse_api_base_url": "https://aiuse.popovs.tech/api"
 }
 ```
+
+**`enabled_providers`** — агенты, которых считает ccusage (`claude`, `codex`, `opencode`; сам ccusage знает и другие). Провайдер без данных ничего не стоит: он вернёт пустой отчёт. `providers_migration` — служебное поле: по нему app понимает, что новых провайдеров в дефолте с прошлого запуска не появилось. Удалишь провайдера из списка — миграция не вернёт его обратно.
 
 Поля `github_token` / `github_login` остаются как legacy: если они есть в конфиге, при старте app перенесёт токен в Keychain (`tech.popovs.aistats.secrets`, account `combined-v1`) и затрёт поле в JSON — plaintext-токен не остаётся на диске. Вход через GitHub делается из Settings → «Аккаунт» и конфиг для этого не нужен.
 
@@ -170,7 +173,7 @@ Settings → «Общие» → «Запускать Burn при входе в �
 
 ## Известные ограничения
 
-- **ChatGPT/Claude.ai web** не поддерживаются — у них нет публичного API использования. Только CLI-агенты (Claude Code, Codex CLI) через [ccusage](https://ccusage.com).
+- **ChatGPT/Claude.ai web** не поддерживаются — у них нет публичного API использования. Только CLI-агенты (Claude Code, Codex CLI, opencode) через [ccusage](https://ccusage.com).
 - **$ это «API-equivalent».** Реально на подписках $20-200/мес ты платишь меньше; цифра показывает сколько стоила бы та же нагрузка по API.
 
 ## Для разработчиков

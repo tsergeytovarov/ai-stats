@@ -18,10 +18,16 @@ final class AppContainer {
     let aiuseAPI: AiuseAPIClient
 
     init() throws {
+        // Провайдер, добавленный в дефолт, сам в лежащий на диске config.json не
+        // попадёт — дописываем до чтения, чтобы этот же запуск его уже увидел.
+        let providersChanged = (try? ConfigLoader.migrateEnabledProviders()) ?? false
         let (cfg, wasCreated) = try ConfigLoader.loadOrCreate()
         self.config = cfg
         self.configWasCreated = wasCreated
         self.dbPool = try Database.openPool()
+        if providersChanged {
+            Self.resetCcusageSyncWindow(in: dbPool)
+        }
 
         // aiuse wiring
         let kc = MacOSKeychainStore()
@@ -98,6 +104,16 @@ final class AppContainer {
             syncCoordinator: coordinator,
             limitsRepository: limitsRepository
         )
+    }
+
+    /// Убирает отметку о последнем синке ccusage, чтобы следующий прогон взял окно
+    /// в год вместо недели (см. SyncCoordinator.syncWindowStart). Нужно ровно один
+    /// раз — после добавления провайдера, иначе его история старше недели никогда
+    /// не попадёт в базу: старые дни никто не добирает.
+    nonisolated static func resetCcusageSyncWindow(in db: any DatabaseWriter) {
+        try? db.write { db in
+            _ = try SyncStateRow.filter(SyncStateRow.Columns.source == "ccusage").deleteAll(db)
+        }
     }
 
     /// Миграция github_token из config.json в combined Keychain item.

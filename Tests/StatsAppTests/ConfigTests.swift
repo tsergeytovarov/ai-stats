@@ -1,4 +1,5 @@
 import XCTest
+import GRDB
 @testable import StatsApp
 
 final class ConfigTests: XCTestCase {
@@ -28,7 +29,7 @@ final class ConfigTests: XCTestCase {
         XCTAssertEqual(cfg.syncIntervalMinutes, 15)
         XCTAssertEqual(cfg.ccusageCommand, ["npx", "-y", "ccusage@20"],
                        "default запиннен на major 20 — не @latest, supply chain")
-        XCTAssertEqual(cfg.enabledProviders, ["claude", "codex"])
+        XCTAssertEqual(cfg.enabledProviders, ["claude", "codex", "opencode"])
     }
 
     func test_github_disabled_when_token_empty() throws {
@@ -43,7 +44,7 @@ final class ConfigTests: XCTestCase {
         let data = Config.defaultTemplate
         let cfg = try Config.decode(from: data)
         XCTAssertFalse(cfg.githubEnabled)
-        XCTAssertEqual(cfg.enabledProviders, ["claude", "codex"])
+        XCTAssertEqual(cfg.enabledProviders, ["claude", "codex", "opencode"])
     }
 
     func test_default_template_pins_ccusage_to_major_20() throws {
@@ -51,6 +52,96 @@ final class ConfigTests: XCTestCase {
         // Если перейдём на major 21+ — обнови и этот тест, и ccusage_command в defaultTemplate.
         let cfg = try Config.decode(from: Config.defaultTemplate)
         XCTAssertEqual(cfg.ccusageCommand, ["npx", "-y", "ccusage@20"])
+    }
+
+    /// Шаблон для новых установок уже несёт актуальную версию — иначе первый же
+    /// запуск переписал бы только что созданный файл ради проставления ключа.
+    func test_default_template_carries_current_providers_migration() throws {
+        let raw = try JSONSerialization.jsonObject(with: Config.defaultTemplate) as? [String: Any]
+        XCTAssertEqual(raw?["providers_migration"] as? Int, Config.providersMigration)
+    }
+
+    // MARK: - ConfigLoader.migrateEnabledProviders
+
+    private func writeTempConfig(_ payload: [String: Any]) throws -> URL {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ai-stats-cfg-\(UUID().uuidString).json")
+        try JSONSerialization.data(withJSONObject: payload).write(to: tmp)
+        return tmp
+    }
+
+    func test_migration_appends_new_provider_to_existing_config() throws {
+        let tmp = try writeTempConfig([
+            "github_token": "",
+            "github_login": "",
+            "enabled_providers": ["claude", "codex"],
+            "custom_extra_field": "user-added-value"
+        ])
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let changed = try ConfigLoader.migrateEnabledProviders(at: tmp)
+        XCTAssertTrue(changed)
+
+        let cfg = try Config.decode(from: Data(contentsOf: tmp))
+        XCTAssertEqual(cfg.enabledProviders, ["claude", "codex", "opencode"])
+
+        let raw = try JSONSerialization.jsonObject(with: try Data(contentsOf: tmp)) as? [String: Any]
+        XCTAssertEqual(raw?["providers_migration"] as? Int, Config.providersMigration)
+        XCTAssertEqual(raw?["custom_extra_field"] as? String, "user-added-value",
+                       "неизвестные поля не должны теряться при перезаписи")
+    }
+
+    func test_migration_does_not_resurrect_provider_removed_by_user() throws {
+        let tmp = try writeTempConfig([
+            "github_token": "",
+            "github_login": "",
+            "enabled_providers": ["claude"],
+            "providers_migration": Config.providersMigration
+        ])
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let changed = try ConfigLoader.migrateEnabledProviders(at: tmp)
+        XCTAssertFalse(changed)
+
+        let cfg = try Config.decode(from: Data(contentsOf: tmp))
+        XCTAssertEqual(cfg.enabledProviders, ["claude"],
+                       "версия уже применена — осознанно выключенный провайдер не возвращаем")
+    }
+
+    func test_migration_leaves_config_without_provider_list_alone() throws {
+        let tmp = try writeTempConfig(["github_token": "", "github_login": ""])
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let changed = try ConfigLoader.migrateEnabledProviders(at: tmp)
+        XCTAssertFalse(changed, "ключа нет — конфиг и так поедет на дефолте")
+
+        let cfg = try Config.decode(from: Data(contentsOf: tmp))
+        XCTAssertEqual(cfg.enabledProviders, Config.defaultProviders)
+    }
+
+    func test_migration_is_noop_when_file_missing() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ai-stats-missing-\(UUID().uuidString).json")
+        XCTAssertFalse(try ConfigLoader.migrateEnabledProviders(at: tmp))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: tmp.path),
+                       "миграция не должна создавать конфиг — это работа loadOrCreate")
+    }
+
+    // MARK: - AppContainer.resetCcusageSyncWindow
+
+    func test_resetCcusageSyncWindow_drops_only_ccusage_state() throws {
+        let dbq = try DatabaseQueue()
+        try Database.migrate(dbq)
+        try dbq.write { db in
+            try SyncStateRow(source: "ccusage", lastSyncAt: "2026-08-01T10:00:00Z", lastError: nil).insert(db)
+            try SyncStateRow(source: "claude-cowork", lastSyncAt: "2026-08-01T10:00:00Z", lastError: nil).insert(db)
+        }
+
+        AppContainer.resetCcusageSyncWindow(in: dbq)
+
+        let sources = try dbq.read { db in try String.fetchAll(db, sql: "SELECT source FROM sync_state") }
+        XCTAssertEqual(sources, ["claude-cowork"],
+                       "без отметки ccusage следующий синк возьмёт годовое окно и добёрет историю нового провайдера")
     }
 
     // MARK: - ConfigLoader.clearGithubTokenField
